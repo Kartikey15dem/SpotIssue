@@ -1,7 +1,5 @@
 package org.example.project.auth.presentation
 
-import org.example.project.auth.domain.LocationProvider
-
 import android.Manifest
 import android.app.Activity
 import android.content.Context
