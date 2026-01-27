@@ -1,5 +1,7 @@
 package org.example.project.auth.presentation.viewmodel
 
+import android.Manifest
+import androidx.annotation.RequiresPermission
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.delay
@@ -47,6 +49,7 @@ class LocationFetchViewModel(
         )
     }
 
+    @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     private suspend fun fetchLocation() {
         try {
             // Try to get location, with retries to allow for permission dialog
