@@ -6,6 +6,8 @@ import kotlin.apply
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.androidx.room)
 }
 
 val localPropsFile = rootProject.file("local.properties")
@@ -76,3 +78,16 @@ android {
     }
 
 }
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+
+// Add KSP configuration for Room
+dependencies {
+    add("kspCommonMainMetadata", libs.androidx.room.compiler)
+    add("kspAndroid", libs.androidx.room.compiler)
+//    add("kspIosX64", libs.androidx.room.compiler)
+    add("kspIosArm64", libs.androidx.room.compiler)
+    add("kspIosSimulatorArm64", libs.androidx.room.compiler)
+}
+

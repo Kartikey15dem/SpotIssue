@@ -2,6 +2,7 @@ package org.example.project.home.di
 
 import org.example.project.home.data.local.FeedLocalDataSource
 import org.example.project.home.data.remote.FeedRemoteDataSource
+import org.example.project.home.data.repository.FakeFeedRepositoryImpl
 import org.example.project.home.data.repository.FeedRepositoryImpl
 import org.example.project.home.data.repository.FakePostRepositoryImpl
 import org.example.project.home.domain.repository.FeedRepository
@@ -29,12 +30,15 @@ val homeModule = module {
     // Local data source for caching
     single { FeedLocalDataSource(get()) }
 
-    // Remote data source for Supabase API
-    single { FeedRemoteDataSource(get()) }
+    // Remote data source for Supabase API (commented out - we fake the API calls)
+    // single { FeedRemoteDataSource(get()) }
 
-    // Data layer - repositories
-    single { FeedRepositoryImpl(get(), get()) } bind FeedRepository::class
+    // Data layer - repositories - USING FAKE IMPLEMENTATION WITH REAL LOCAL DATA
+    single { FakeFeedRepositoryImpl(get()) } bind FeedRepository::class
     singleOf(::FakePostRepositoryImpl) bind PostRepository::class
+
+    // Real implementations (commented out)
+    // single { FeedRepositoryImpl(get(), get()) } bind FeedRepository::class
 
     // Domain layer - use cases
     factoryOf(::GetPostsUseCase)

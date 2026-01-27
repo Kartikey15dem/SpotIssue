@@ -2,6 +2,7 @@ package org.example.project
 
 import android.app.Application
 import org.example.project.auth.di.authUiModule
+import org.example.project.core.data.local.initializeDatabase
 import org.example.project.core.di.platformModule
 import org.example.project.home.di.homeUiModule
 import org.example.project.profile.di.profileUiModule
@@ -20,11 +21,13 @@ class IssueSpotApplication : Application() {
             profileUiModule,
             platformModule
         )
+        initializeDatabase(this)
 
         initializeKoin(
             additionalModules = androidModules
         ) {
             androidContext(this@IssueSpotApplication)
+
         }
     }
 }

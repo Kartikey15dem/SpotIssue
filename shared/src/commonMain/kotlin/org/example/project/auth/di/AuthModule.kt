@@ -1,6 +1,7 @@
 package org.example.project.auth.di
 
 import org.example.project.auth.data.repository.AuthRepositoryImpl
+import org.example.project.auth.data.repository.FakeAuthRepository
 import org.example.project.auth.domain.repository.AuthRepository
 import org.example.project.auth.domain.usecase.SendOtpUseCase
 import org.example.project.auth.domain.usecase.VerifyOtpUseCase
@@ -15,7 +16,8 @@ import org.koin.dsl.module
  */
 val authModule = module {
     // Repository
-    singleOf(::AuthRepositoryImpl) bind AuthRepository::class
+//    singleOf(::AuthRepositoryImpl) bind AuthRepository::class
+    singleOf(::FakeAuthRepository) bind AuthRepository::class
 
     // Use Cases
     factoryOf(::SendOtpUseCase)

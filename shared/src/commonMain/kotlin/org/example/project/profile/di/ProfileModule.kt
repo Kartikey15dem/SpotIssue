@@ -3,6 +3,7 @@ package org.example.project.profile.di
 import org.example.project.core.data.local.AppDatabase
 import org.example.project.core.data.local.getDatabase
 import org.example.project.profile.data.local.ProfileLocalDataSource
+import org.example.project.profile.data.repository.FakeProfileRepositoryImpl
 import org.example.project.profile.data.repository.ProfileRepositoryImpl
 import org.example.project.profile.domain.repository.ProfileRepository
 import org.example.project.profile.domain.usecases.GetLikedPostsUseCase
@@ -37,11 +38,18 @@ val profileModule = module {
     }
 
     // Data layer - repositories (requires AuthSettings and SupabaseClient for cache tracking and API calls)
+//    single {
+//        ProfileRepositoryImpl(
+//            localDataSource = get(),
+//            authSettings = get(),
+//            supabase = get()
+//        )
+//    } bind ProfileRepository::class
+
     single {
-        ProfileRepositoryImpl(
+        FakeProfileRepositoryImpl(
             localDataSource = get(),
             authSettings = get(),
-            supabase = get()
         )
     } bind ProfileRepository::class
 
