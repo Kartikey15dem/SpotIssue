@@ -1,5 +1,7 @@
 package org.example.project.home.data.repository
 
+import org.example.project.home.domain.models.CreatePost
+import org.example.project.home.domain.models.Post
 import org.example.project.home.domain.repository.PostRepository
 
 /**
@@ -20,6 +22,10 @@ class FakePostRepositoryImpl : PostRepository {
     }
 
     override suspend fun addComment(postId: String, comment: String): Result<Unit> {
+        return Result.success(Unit)
+    }
+
+    override suspend fun createPost(post: CreatePost): Result<Unit> {
         return Result.success(Unit)
     }
 

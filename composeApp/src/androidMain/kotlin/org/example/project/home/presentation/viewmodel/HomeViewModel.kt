@@ -40,7 +40,6 @@ class HomeViewModel(
 
 
     init {
-        // Observe current level changes and reload data
         viewModelScope.launch {
             currentLevelManager.currentLevel.collect { level ->
                 _uiState.update { it.copy(postLevel = level) }

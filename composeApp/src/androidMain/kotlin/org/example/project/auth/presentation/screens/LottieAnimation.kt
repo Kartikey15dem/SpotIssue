@@ -26,7 +26,6 @@ fun LottieAnimation(
     loop: Boolean = true,
     speed: Float = 1f
 ) {
-    // Load the composition from raw resource
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(rawRes))
 
     Box(

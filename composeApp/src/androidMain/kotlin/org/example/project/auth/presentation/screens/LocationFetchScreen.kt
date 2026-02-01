@@ -177,7 +177,7 @@ private fun LocationFetchingAnimation() {
 private fun LocationCompletedAnimation(address: String?) {
     // Lottie animation for completion - almost full width
     LottieAnimation(
-        rawRes = R.raw.location_fetch,
+        rawRes = R.raw.success,
         modifier = Modifier
             .fillMaxWidth(0.9f)
             .aspectRatio(1f),

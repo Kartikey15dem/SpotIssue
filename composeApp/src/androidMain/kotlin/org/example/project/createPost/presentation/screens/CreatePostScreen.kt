@@ -1,96 +1,83 @@
 package org.example.project.createPost.presentation.screens
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import org.example.project.home.domain.models.PostLevel
+import kotlinx.coroutines.flow.collectLatest
+import org.example.project.R
+import org.example.project.createPost.presentation.viewmodel.CreatePostIntent
+import org.example.project.createPost.presentation.viewmodel.CreatePostSideEffect
+import org.example.project.createPost.presentation.viewmodel.CreatePostState
+import org.example.project.createPost.presentation.viewmodel.CreatePostViewModel
 import org.example.project.home.presentation.components.PostHeader
+import org.example.project.profile.presentation.viewmodel.EditProfileSideEffect
 import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTheme
 import org.example.project.theme.IssueSpotTypography
-import androidx.compose.ui.res.painterResource
-import org.example.project.R
-
-// MVI - Intent
-sealed interface CreatePostIntent {
-    data object CloseClicked : CreatePostIntent
-    data class IssueScopeChanged(val postLevel: PostLevel) : CreatePostIntent
-    data class DescriptionChanged(val description: String) : CreatePostIntent
-    data object AddPhotoClicked : CreatePostIntent
-    data object AddVideoClicked : CreatePostIntent
-    data object CancelClicked : CreatePostIntent
-    data object PostIssueClicked : CreatePostIntent
-}
-
-// MVI - State
-data class CreatePostState(
-    val userName: String = "John Doe",
-    val location: String = "Downtown, Mumbai Central",
-    val selectedPostLevel: PostLevel = PostLevel.LOCALITY,
-    val description: String = "",
-    val isLoading: Boolean = false,
-    val error: String? = null,
-    val showIssueScopeDropdown: Boolean = false
-)
-
-// MVI - Side Effects
-sealed interface CreatePostSideEffect {
-    data object NavigateBack : CreatePostSideEffect
-    data object ShowPhotoPicker : CreatePostSideEffect
-    data object ShowVideoPicker : CreatePostSideEffect
-    data class ShowError(val message: String) : CreatePostSideEffect
-    data class PostCreated(val postId: String) : CreatePostSideEffect
-}
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun CreatePostScreen(
     modifier: Modifier = Modifier,
     initialState: CreatePostState = CreatePostState(),
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    viewModel: CreatePostViewModel = koinViewModel()
 ) {
     var state by remember { mutableStateOf(initialState) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    fun handleIntent(intent: CreatePostIntent) {
-        when (intent) {
-            CreatePostIntent.CloseClicked -> onNavigateBack()
-            CreatePostIntent.CancelClicked -> onNavigateBack()
-            is CreatePostIntent.IssueScopeChanged -> {
-                state = state.copy(selectedPostLevel = intent.postLevel, showIssueScopeDropdown = false)
-            }
-            is CreatePostIntent.DescriptionChanged -> {
-                state = state.copy(description = intent.description)
-            }
-            CreatePostIntent.AddPhotoClicked -> {
-                // TODO: Handle photo selection
-            }
-            CreatePostIntent.AddVideoClicked -> {
-                // TODO: Handle video selection
-            }
-            CreatePostIntent.PostIssueClicked -> {
-                if (state.description.isBlank()) {
-                    // Show error
-                    state = state.copy(error = "Please describe the issue")
-                    return
+    LaunchedEffect(viewModel) {
+        viewModel.sideEffects.collectLatest { effect ->
+            when (effect) {
+                CreatePostSideEffect.NavigateBack -> onNavigateBack
+                CreatePostSideEffect.ShowPhotoPicker -> {}
+                CreatePostSideEffect.ShowVideoPicker -> {}
+                is CreatePostSideEffect.ShowError ->{
+                    snackbarHostState.showSnackbar(effect.message)
                 }
-                // TODO: Handle post submission
-                state = state.copy(isLoading = true)
-                // Simulate posting
-                state = state.copy(isLoading = false)
-                onNavigateBack()
+                is CreatePostSideEffect.PostCreated -> {
+                    // Show success message or navigate
+                }
             }
         }
     }
 
+
     CreatePostScreenContent(
         modifier = modifier,
         state = state,
-        onIntent = ::handleIntent
+        onIntent = viewModel::onIntent
     )
 }
 

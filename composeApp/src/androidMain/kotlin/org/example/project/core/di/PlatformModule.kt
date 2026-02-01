@@ -10,7 +10,6 @@ val platformModule: Module = module {
     single<ImagePicker> { ImagePicker(get()) }
     single{ AuthSettings() }
 
-    // Android Context is provided by Koin Android initialization
 }
 
 class ImagePicker(context : Context){
