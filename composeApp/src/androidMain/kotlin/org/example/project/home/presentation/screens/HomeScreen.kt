@@ -78,8 +78,6 @@ fun HomeScreen(
                     snackbarHostState.showSnackbar(effect.message)
                 }
                 is HomeSideEffect.SharePost -> {
-                    // Platform-specific share will be handled here
-                    // For now, just show a snackbar
                     snackbarHostState.showSnackbar("Share: ${effect.text}")
                 }
             }

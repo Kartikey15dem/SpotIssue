@@ -10,10 +10,10 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.example.project.core.di.ImagePicker
 import org.example.project.profile.domain.usecases.GetProfileUseCase
 import org.example.project.profile.domain.usecases.UpdateProfileUseCase
 import org.example.project.profile.domain.models.Profile
+import org.example.project.utils.AndroidVideoPicker
 import kotlin.onSuccess
 
 /**
@@ -22,7 +22,7 @@ import kotlin.onSuccess
 class EditProfileViewModel(
     private val getProfileUseCase: GetProfileUseCase,
     private val updateProfileUseCase: UpdateProfileUseCase,
-    private val imagePicker: ImagePicker
+    private val imagePicker: AndroidVideoPicker
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(EditProfileState())

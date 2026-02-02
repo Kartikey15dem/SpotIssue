@@ -230,7 +230,6 @@ class ProfileRepositoryImpl(
                     mediaType = when (dto.media_type) {
                         "image" -> MediaType.IMAGE
                         "video" -> MediaType.VIDEO
-                        "gif" -> MediaType.GIF
                         else -> MediaType.IMAGE
                     },
                     mediaUrl = dto.media_url ?: "",
@@ -349,7 +348,6 @@ class ProfileRepositoryImpl(
                     mediaType = when (dto.media_type) {
                         "image" -> MediaType.IMAGE
                         "video" -> MediaType.VIDEO
-                        "gif" -> MediaType.GIF
                         else -> MediaType.IMAGE
                     },
                     mediaUrl = dto.media_url ?: "",

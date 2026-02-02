@@ -4,6 +4,7 @@ import android.app.Application
 import org.example.project.auth.di.authUiModule
 import org.example.project.core.data.local.initializeDatabase
 import org.example.project.core.di.platformModule
+import org.example.project.createPost.di.createPostUiModule
 import org.example.project.home.di.homeUiModule
 import org.example.project.profile.di.profileUiModule
 import org.example.project.utils.initializeKoin
@@ -19,6 +20,7 @@ class IssueSpotApplication : Application() {
             authUiModule,
             homeUiModule,
             profileUiModule,
+            createPostUiModule,
             platformModule
         )
         initializeDatabase(this)

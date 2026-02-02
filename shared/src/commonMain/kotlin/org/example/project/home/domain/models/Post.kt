@@ -17,7 +17,7 @@ data class Post(
 enum class MediaType {
     IMAGE,
     VIDEO,
-    GIF
+    PDF
 }
 enum class PostLevel(val displayName: String){
     LOCALITY("Locality"),

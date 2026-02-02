@@ -30,11 +30,14 @@ class CreatePostViewModel(
             is CreatePostIntent.DescriptionChanged -> {
                 changeDescription(description = intent.description)
             }
-            CreatePostIntent.AddPhotoClicked -> {
-                handleAddPhoto()
+            CreatePostIntent.AddMediaClicked -> {
+                handleAddMedia()
             }
-            CreatePostIntent.AddVideoClicked -> {
-                handleAddVideo()
+            CreatePostIntent.AddPdfClicked -> {
+                handleAddPdf()
+            }
+            CreatePostIntent.RemoveMedia -> {
+                removeMedia()
             }
             CreatePostIntent.PostIssueClicked -> {
                 createPost()
@@ -70,15 +73,15 @@ class CreatePostViewModel(
         }
     }
 
-    private fun handleAddPhoto() {
+    private fun handleAddMedia() {
         viewModelScope.launch {
-            _sideEffects.emit(CreatePostSideEffect.ShowPhotoPicker)
+            _sideEffects.emit(CreatePostSideEffect.ShowMediaPicker)
         }
     }
 
-    private fun handleAddVideo() {
+    private fun handleAddPdf() {
         viewModelScope.launch {
-            _sideEffects.emit(CreatePostSideEffect.ShowVideoPicker)
+            _sideEffects.emit(CreatePostSideEffect.ShowPdfPicker)
         }
     }
 
@@ -87,34 +90,100 @@ class CreatePostViewModel(
             _sideEffects.emit(CreatePostSideEffect.NavigateBack)
         }
     }
+
+    // --- Set visual media with mime type detection ---
+    fun setVisualMedia(uri: String, mimeType: String?) {
+        // Validate media first
+        if (!validateMedia(mimeType)) {
+            viewModelScope.launch {
+                _sideEffects.emit(CreatePostSideEffect.ShowError("Unsupported media format"))
+            }
+            return
+        }
+
+        val type = when {
+            mimeType?.startsWith("image/") == true -> MediaType.IMAGE
+            mimeType?.startsWith("video/") == true -> MediaType.VIDEO
+            else -> null
+        }
+        _uiState.value = _uiState.value.copy(selectedMediaUri = uri, selectedMediaType = type)
+    }
+
+    // --- Set PDF document ---
+    fun setDocumentUrl(uri: String) {
+        // Validate PDF format
+        if (!validateMedia("application/pdf")) {
+            viewModelScope.launch {
+                _sideEffects.emit(CreatePostSideEffect.ShowError("PDF format is not supported"))
+            }
+            return
+        }
+        _uiState.value = _uiState.value.copy(selectedMediaUri = uri, selectedMediaType = MediaType.PDF)
+    }
+
+    // --- Helper for Validation ---
+    fun validateMedia(mimeType: String?): Boolean {
+        // Production supported types
+        val supportedTypes = listOf(
+            "image/jpeg", "image/png", "image/webp",
+            "video/mp4", "video/mpeg", "video/quicktime",
+            "application/pdf"
+        )
+        return mimeType != null && supportedTypes.any { mimeType.startsWith(it) }
+    }
+
+    // --- Legacy methods for backward compatibility ---
+    @Deprecated("Use setVisualMedia instead")
+    fun setImageUrl(imageUrl: String) {
+        _uiState.value = _uiState.value.copy(
+            selectedMediaUri = imageUrl,
+            selectedMediaType = MediaType.IMAGE
+        )
+    }
+
+    @Deprecated("Use setVisualMedia instead")
+    fun setVideoUrl(videoUrl: String) {
+        _uiState.value = _uiState.value.copy(
+            selectedMediaUri = videoUrl,
+            selectedMediaType = MediaType.VIDEO
+        )
+    }
+
+    private fun removeMedia(){
+        _uiState.value = _uiState.value.copy(
+            selectedMediaUri = null,
+            selectedMediaType = null
+        )
+    }
 }
 
 sealed interface CreatePostIntent {
     data object CloseClicked : CreatePostIntent
     data class DescriptionChanged(val description: String) : CreatePostIntent
-    data object AddPhotoClicked : CreatePostIntent
-    data object AddVideoClicked : CreatePostIntent
+    data object AddMediaClicked : CreatePostIntent
+    data object AddPdfClicked : CreatePostIntent
+    data object RemoveMedia : CreatePostIntent
     data object CancelClicked : CreatePostIntent
     data object PostIssueClicked : CreatePostIntent
 }
 
 // MVI - State
 data class CreatePostState(
-    val userName: String = "",
-    val location: String = "",
+    val userName: String = "Current User", // TODO: Get from auth
+    val location: String = "Current Location", // TODO: Get from location service
     val selectedPostLevel: PostLevel = PostLevel.LOCALITY,
     val description: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
     val showIssueScopeDropdown: Boolean = false,
-    val imageUrl : String? = null,
-    val videoUrl : String? = null
+    val selectedMediaUri: String? = "https://m.media-amazon.com/images/I/61KLfjW9-HL._AC_UF894,1000_QL80_.jpg",
+    val selectedMediaType: MediaType? = MediaType.IMAGE
 )
 
 sealed interface CreatePostSideEffect {
     data object NavigateBack : CreatePostSideEffect
-    data object ShowPhotoPicker : CreatePostSideEffect
-    data object ShowVideoPicker : CreatePostSideEffect
+    data object ShowMediaPicker : CreatePostSideEffect
+    data object ShowPdfPicker : CreatePostSideEffect
     data class ShowError(val message: String) : CreatePostSideEffect
     data class PostCreated(val postId: String) : CreatePostSideEffect
 }

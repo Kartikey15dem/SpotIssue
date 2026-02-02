@@ -4,18 +4,19 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import java.io.File
 
 /**
- * Android implementation of ImagePicker
- * This class handles image selection from gallery and camera
+ * Android implementation of VideoPicker
+ * This class handles video selection from gallery and camera
  *
- * Note: The actual image picking is handled by Compose launchers in the UI layer
+ * Note: The actual video picking is handled by Compose launchers in the UI layer
  * This class provides utility methods for permissions and URI creation
  */
-class AndroidImagePicker(private val context: Context) {
+class AndroidVideoPicker(private val context: Context) {
 
     fun hasCameraPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
@@ -25,12 +26,12 @@ class AndroidImagePicker(private val context: Context) {
     }
 
     fun hasGalleryPermission(): Boolean {
-        // On Android 13+, need READ_MEDIA_IMAGES permission
+        // On Android 13+, need READ_MEDIA_VIDEO permission
         // On older versions, need READ_EXTERNAL_STORAGE
-        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
                 context,
-                Manifest.permission.READ_MEDIA_IMAGES
+                Manifest.permission.READ_MEDIA_VIDEO
             ) == PackageManager.PERMISSION_GRANTED
         } else {
             ContextCompat.checkSelfPermission(
@@ -40,18 +41,18 @@ class AndroidImagePicker(private val context: Context) {
         }
     }
 
-    fun createImageUri(): Uri {
-        val image = File(context.filesDir, "camera_photo_${System.currentTimeMillis()}.jpg")
+    fun createVideoUri(): Uri {
+        val video = File(context.filesDir, "camera_video_${System.currentTimeMillis()}.mp4")
         return FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
-            image
+            video
         )
     }
 
-    fun getImagePermission(): String {
+    fun getVideoPermission(): String {
         return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
+            Manifest.permission.READ_MEDIA_VIDEO
         } else {
             Manifest.permission.READ_EXTERNAL_STORAGE
         }

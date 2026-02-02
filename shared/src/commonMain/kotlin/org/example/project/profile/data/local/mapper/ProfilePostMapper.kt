@@ -18,7 +18,6 @@ fun UserPostEntity.toPost(): Post = Post(
     mediaType = when (mediaType) {
         "IMAGE" -> MediaType.IMAGE
         "VIDEO" -> MediaType.VIDEO
-        "GIF" -> MediaType.GIF
         else -> MediaType.IMAGE
     },
     mediaUrl = mediaUrl ?: "",
@@ -73,7 +72,6 @@ fun LikedPostEntity.toPost(): Post = Post(
     mediaType = when (mediaType) {
         "IMAGE" -> MediaType.IMAGE
         "VIDEO" -> MediaType.VIDEO
-        "GIF" -> MediaType.GIF
         else -> MediaType.IMAGE
     },
     mediaUrl = mediaUrl ?: "",
