@@ -27,7 +27,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,7 +63,6 @@ import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.core.net.toUri
 import org.example.project.home.domain.models.MediaType
-import org.example.project.home.presentation.viewmodel.HomeIntent
 
 @Composable
 fun CreatePostScreen(
@@ -127,123 +125,134 @@ fun CreatePostScreenContent(
     onIntent: (CreatePostIntent) -> Unit = {}
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxSize(),
         color = IssueSpotColors.Surface
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
-        ) {
-            // Header with close button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = { onIntent(CreatePostIntent.CloseClicked) }
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_close),
-                        contentDescription = "Close",
-                        tint = IssueSpotColors.OnBackground
-                    )
-                }
-                PostHeader(
-                    userName = state.userName,
-                    timeAgo = null,
-                    postLevel = state.selectedPostLevel,
-                    location = state.location
-                )
-                Button(
-                    onClick = { onIntent(CreatePostIntent.PostIssueClicked) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = IssueSpotColors.PostButtonBackground,
-                        contentColor = IssueSpotColors.PostButtonText
-                    ),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.defaultMinSize(minWidth = 0.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                ) {
-                    Text("Post", style = IssueSpotTypography.bodyLarge)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Combined Description + Media Preview Box
-            Box(
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Main scrollable content
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = Color.Transparent,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = IssueSpotColors.OnSecondaryContainer,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                )
-            {
-                val scrollState = rememberScrollState()
-                Column(modifier = Modifier
                     .fillMaxSize()
-                    .imePadding()
-                    .verticalScroll(scrollState)
-
+                    .padding(20.dp)
+                    .padding(bottom = 80.dp) // Space for sticky buttons
+            ) {
+                // Header with close button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Description TextField
-                    OutlinedTextField(
-                        value = state.description,
-                        onValueChange = { onIntent(CreatePostIntent.DescriptionChanged(it)) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .defaultMinSize(minHeight = 150.dp)
-                            .padding(2.dp),
-                        placeholder = {
-                            Text(
-                                text = "Describe the issue you want to report...",
-                                color = IssueSpotColors.OnSurfaceVariant
-                            )
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent
-                        ),
-                        shape = RoundedCornerShape(0.dp),
-                        textStyle = IssueSpotTypography.bodyMedium,
-                        isError = state.error != null
-                    )
-
-                    // Media Preview (seamlessly below text)
-                    if (state.selectedMediaUri != null) {
-                        MediaPreviewContent(
-                            mediaUri = state.selectedMediaUri,
-                            mediaType = state.selectedMediaType,
-                            onRemove = { onIntent(CreatePostIntent.RemoveMedia) }
+                    IconButton(
+                        onClick = { onIntent(CreatePostIntent.CloseClicked) }
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_close),
+                            contentDescription = "Close",
+                            tint = IssueSpotColors.OnBackground
                         )
                     }
+                    PostHeader(
+                        userName = state.userName,
+                        timeAgo = null,
+                        postLevel = state.selectedPostLevel,
+                        location = state.location
+                    )
+                    Button(
+                        onClick = { onIntent(CreatePostIntent.PostIssueClicked) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = IssueSpotColors.PostButtonBackground,
+                            contentColor = IssueSpotColors.PostButtonText
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.defaultMinSize(minWidth = 0.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    ) {
+                        Text("Post", style = IssueSpotTypography.bodyLarge)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Combined Description + Media Preview Box
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false) // Takes remaining space
+                        .background(
+                            color = Color.Transparent,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = IssueSpotColors.OnSecondaryContainer,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                ) {
+                    val scrollState = rememberScrollState()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(scrollState)
+                    ) {
+                        // Description TextField
+                        OutlinedTextField(
+                            value = state.description,
+                            onValueChange = { onIntent(CreatePostIntent.DescriptionChanged(it)) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = 150.dp)
+                                .padding(2.dp),
+                            placeholder = {
+                                Text(
+                                    text = "Describe the issue you want to report...",
+                                    color = IssueSpotColors.OnSurfaceVariant
+                                )
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(0.dp),
+                            textStyle = IssueSpotTypography.bodyMedium,
+                            isError = state.error != null
+                        )
+
+                        // Media Preview (seamlessly below text)
+                        if (state.selectedMediaUri != null) {
+                            MediaPreviewContent(
+                                mediaUri = state.selectedMediaUri,
+                                mediaType = state.selectedMediaType,
+                                onRemove = { onIntent(CreatePostIntent.RemoveMedia) }
+                            )
+                        }
+                    }
+                }
+
+                if (state.error != null) {
+                    Text(
+                        text = state.error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = IssueSpotTypography.bodySmall,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    )
                 }
             }
 
-            if (state.error != null) {
-                Text(
-                    text = state.error,
-                    color = MaterialTheme.colorScheme.error,
-                    style = IssueSpotTypography.bodySmall,
-                    modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Add Media and PDF buttons
+            // STICKY BOTTOM BUTTONS - Attached to keyboard
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .imePadding() // Moves up with keyboard!
+                    .background(IssueSpotColors.Surface)
+                    .border(
+                        width = 1.dp,
+                        color = IssueSpotColors.OnSurfaceVariant.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+                    )
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedButton(
@@ -251,12 +260,21 @@ fun CreatePostScreenContent(
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = IssueSpotColors.Surface
                     ),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_photo),
                         contentDescription = "Add Photo or Video",
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(20.dp),
+                        tint = IssueSpotColors.Primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Media",
+                        style = IssueSpotTypography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
 
@@ -265,17 +283,24 @@ fun CreatePostScreenContent(
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = IssueSpotColors.Surface
                     ),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_add),
                         contentDescription = "Add PDF",
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(20.dp),
+                        tint = IssueSpotColors.Primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "PDF",
+                        style = IssueSpotTypography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(2.dp))
 
         }
     }
