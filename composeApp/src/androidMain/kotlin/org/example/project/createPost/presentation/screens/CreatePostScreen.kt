@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,7 +29,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SnackbarHostState
@@ -42,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -56,13 +55,13 @@ import org.example.project.createPost.presentation.viewmodel.CreatePostIntent
 import org.example.project.createPost.presentation.viewmodel.CreatePostSideEffect
 import org.example.project.createPost.presentation.viewmodel.CreatePostState
 import org.example.project.createPost.presentation.viewmodel.CreatePostViewModel
-import org.example.project.home.presentation.components.PostHeader
 import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTheme
 import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.core.net.toUri
 import org.example.project.home.domain.models.MediaType
+import org.example.project.home.presentation.components.PostLevelChip
 
 @Composable
 fun CreatePostScreen(
@@ -133,8 +132,7 @@ fun CreatePostScreenContent(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(20.dp)
-                    .padding(bottom = 80.dp) // Space for sticky buttons
+                    .padding(12.dp)
             ) {
                 // Header with close button
                 Row(
@@ -142,21 +140,69 @@ fun CreatePostScreenContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
-                        onClick = { onIntent(CreatePostIntent.CloseClicked) }
+                    Row(
+                        horizontalArrangement = Arrangement.Start,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_close),
-                            contentDescription = "Close",
-                            tint = IssueSpotColors.OnBackground
-                        )
+                        IconButton(
+                            onClick = { onIntent(CreatePostIntent.CloseClicked) }
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_close),
+                                contentDescription = "Close",
+                                tint = IssueSpotColors.OnBackground
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(IssueSpotColors.SurfaceVariant),
+                            contentAlignment = Alignment.TopCenter
+                        ) {
+                            Image(
+                                painter = painterResource(R.drawable.ic_user_avatar),
+                                contentDescription = "s avatar",
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                        Column {
+                            Row(
+                                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp, start = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Current User",
+                                    style = IssueSpotTypography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+
+                            }
+                            Row(
+                                modifier = Modifier.padding(start = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_location_on),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = IssueSpotColors.OnSurfaceVariant
+                                )
+                                Text(
+                                    modifier = Modifier.padding(start = 4.dp),
+                                    text = "Tere Bhai ki Road",
+                                    style = IssueSpotTypography.bodySmall,
+                                    color = IssueSpotColors.OnSurfaceVariant
+                                )
+                            }
+                        }
                     }
-                    PostHeader(
-                        userName = state.userName,
-                        timeAgo = null,
-                        postLevel = state.selectedPostLevel,
-                        location = state.location
-                    )
+
+                    // Right-aligned: Post button
                     Button(
                         onClick = { onIntent(CreatePostIntent.PostIssueClicked) },
                         colors = ButtonDefaults.buttonColors(
@@ -240,67 +286,68 @@ fun CreatePostScreenContent(
                 }
             }
 
-            // STICKY BOTTOM BUTTONS - Attached to keyboard
+            // STICKY BOTTOM BUTTONS - Attached to keyboard (Icon-only, transparent)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .imePadding() // Moves up with keyboard!
-                    .background(IssueSpotColors.Surface)
-                    .border(
-                        width = 1.dp,
-                        color = IssueSpotColors.OnSurfaceVariant.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
-                    )
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { onIntent(CreatePostIntent.AddMediaClicked) },
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = IssueSpotColors.Surface
+                    .imePadding()
+                    .background(Color.Transparent)
+                    .padding(
+                        bottom = 24.dp,
+                        start = 2.dp,
+                        top = 2.dp,
+                        end = 24.dp
                     ),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+            ) {
+                // Media Icon Button
+                Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
+                        .size(44.dp)
+                        .background(
+                            color = IssueSpotColors.OnSurfaceVariant.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_photo),
-                        contentDescription = "Add Photo or Video",
-                        modifier = Modifier.size(20.dp),
-                        tint = IssueSpotColors.Primary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Media",
-                        style = IssueSpotTypography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    IconButton(
+                        onClick = { onIntent(CreatePostIntent.AddMediaClicked) },
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_photo),
+                            contentDescription = "Add Photo or Video",
+                            modifier = Modifier.size(24.dp),
+                            tint = IssueSpotColors.OnSurfaceVariant
+                        )
+                    }
                 }
 
-                OutlinedButton(
-                    onClick = { onIntent(CreatePostIntent.AddPdfClicked) },
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = IssueSpotColors.Surface
-                    ),
+                // PDF Icon Button
+                Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
+                        .size(44.dp)
+                        .background(
+                            color = IssueSpotColors.OnSurfaceVariant.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_add),
-                        contentDescription = "Add PDF",
-                        modifier = Modifier.size(20.dp),
-                        tint = IssueSpotColors.Primary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "PDF",
-                        style = IssueSpotTypography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    IconButton(
+                        onClick = { onIntent(CreatePostIntent.AddPdfClicked) },
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_add),
+                            contentDescription = "Add PDF",
+                            modifier = Modifier.size(24.dp),
+                            tint = IssueSpotColors.OnSurfaceVariant
+                        )
+                    }
                 }
             }
+
 
         }
     }
