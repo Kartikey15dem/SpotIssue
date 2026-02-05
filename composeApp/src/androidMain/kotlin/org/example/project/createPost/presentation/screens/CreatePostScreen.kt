@@ -10,6 +10,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,9 +18,11 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imeNestedScroll
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -117,6 +120,7 @@ fun CreatePostScreen(
         onIntent = viewModel::onIntent
     )
 }
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CreatePostScreenContent(
     modifier: Modifier = Modifier,
@@ -234,55 +238,57 @@ fun CreatePostScreenContent(
                             shape = RoundedCornerShape(12.dp)
                         )
                 ) {
-                    val scrollState = rememberScrollState()
-                    Column(
+                    LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
-                            .verticalScroll(scrollState)
+                            .imePadding(), // This still helps with keyboard detection
+                        reverseLayout = true // <--- THIS is the "Anchor to Bottom" constraint
                     ) {
-                        // Description TextField
-                        OutlinedTextField(
-                            value = state.description,
-                            onValueChange = { onIntent(CreatePostIntent.DescriptionChanged(it)) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .defaultMinSize(minHeight = 150.dp)
-                                .padding(2.dp),
-                            placeholder = {
-                                Text(
-                                    text = "Describe the issue you want to report...",
-                                    color = IssueSpotColors.OnSurfaceVariant
-                                )
-                            },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent
-                            ),
-                            shape = RoundedCornerShape(0.dp),
-                            textStyle = IssueSpotTypography.bodyMedium,
-                            isError = state.error != null
-                        )
-
-                        // Media Preview (seamlessly below text)
-                        if (state.selectedMediaUri != null) {
+                        item {
+                            if (state.selectedMediaUri != null) {
                             MediaPreviewContent(
                                 mediaUri = state.selectedMediaUri,
                                 mediaType = state.selectedMediaType,
                                 onRemove = { onIntent(CreatePostIntent.RemoveMedia) }
                             )
                         }
-                    }
-                }
+                            // Description TextField
+                            OutlinedTextField(
+                                value = state.description,
+                                onValueChange = { onIntent(CreatePostIntent.DescriptionChanged(it)) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .defaultMinSize(minHeight = 150.dp),
+                                placeholder = {
+                                    Text(
+                                        text = "Describe the issue you want to report...",
+                                        color = IssueSpotColors.OnSurfaceVariant
+                                    )
+                                },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    focusedBorderColor = Color.Transparent,
+                                    unfocusedBorderColor = Color.Transparent
+                                ),
+                                shape = RoundedCornerShape(0.dp),
+                                textStyle = IssueSpotTypography.bodyMedium,
+                                isError = state.error != null
+                            )
 
-                if (state.error != null) {
-                    Text(
-                        text = state.error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = IssueSpotTypography.bodySmall,
-                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                    )
+                            // Media Preview (seamlessly below text)
+
+                        }
+                    }
+
+                    if (state.error != null) {
+                        Text(
+                            text = state.error,
+                            color = MaterialTheme.colorScheme.error,
+                            style = IssueSpotTypography.bodySmall,
+                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                        )
+                    }
                 }
             }
 
