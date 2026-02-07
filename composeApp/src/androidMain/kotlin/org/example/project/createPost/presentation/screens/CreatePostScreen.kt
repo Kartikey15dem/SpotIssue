@@ -1,31 +1,37 @@
 package org.example.project.createPost.presentation.screens
 
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imeNestedScroll
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -39,20 +45,31 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import org.example.project.R
 import org.example.project.createPost.presentation.viewmodel.CreatePostIntent
 import org.example.project.createPost.presentation.viewmodel.CreatePostSideEffect
@@ -64,8 +81,8 @@ import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.core.net.toUri
 import org.example.project.home.domain.models.MediaType
-import org.example.project.home.presentation.components.PostLevelChip
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CreatePostScreen(
     modifier: Modifier = Modifier,
@@ -120,13 +137,16 @@ fun CreatePostScreen(
         onIntent = viewModel::onIntent
     )
 }
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CreatePostScreenContent(
     modifier: Modifier = Modifier,
     state: CreatePostState,
     onIntent: (CreatePostIntent) -> Unit = {}
 ) {
+    val requester = remember { BringIntoViewRequester() }
+    val coroutineScope = rememberCoroutineScope()
+
     Surface(
         modifier = modifier.fillMaxSize(),
         color = IssueSpotColors.Surface
@@ -223,73 +243,146 @@ fun CreatePostScreenContent(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Combined Description + Media Preview Box
+
+
+// 2. THE BOX
+                // 1. STATE VARIABLES
+                var boxHeightPx by remember { mutableIntStateOf(0) }
+                var cursorYInText by remember { mutableFloatStateOf(0f) }
+                var textLayoutResultState by remember { mutableStateOf<TextLayoutResult?>(null) }
+
+// [NEW] Get Keyboard Height dynamically
+                val density = LocalDensity.current
+                val imeHeightPx = WindowInsets.ime.getBottom(density)
+
+// 2. THE BOX (Container)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f, fill = false) // Takes remaining space
-                        .background(
-                            color = Color.Transparent,
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = IssueSpotColors.OnSecondaryContainer,
-                            shape = RoundedCornerShape(12.dp)
-                        )
+                        .weight(1f, fill = false)
+                        .background(Color.Transparent, RoundedCornerShape(12.dp))
+                        .border(1.dp, IssueSpotColors.OnSecondaryContainer, RoundedCornerShape(12.dp))
+                        .onGloballyPositioned { coordinates ->
+                            boxHeightPx = coordinates.size.height
+                        }
                 ) {
-                    LazyColumn(
+                    val scrollState = rememberScrollState()
+
+                    // 3. CALCULATE SCROLL NEEDED (Live Logic)
+                    // We use a derived state to constantly check if the keyboard is covering the cursor
+                    val amountToScroll by remember(imeHeightPx, cursorYInText, boxHeightPx, scrollState.value) {
+                        derivedStateOf {
+                            // A. Where is the cursor visually on screen?
+                            val cursorScreenY = cursorYInText - scrollState.value
+
+                            // B. How much space is below the cursor?
+                            val distanceToBottom = boxHeightPx - cursorScreenY
+
+                            // C. Compare: Is the keyboard taller than that space?
+                            val overlap = imeHeightPx - distanceToBottom
+
+                            // If overlap is positive, we need to scroll that much to reveal the cursor
+                            if (overlap > 0) overlap else 0f
+                        }
+                    }
+
+                    // 4. PERFORM THE SCROLL
+                    LaunchedEffect(amountToScroll) {
+                        if (amountToScroll > 0) {
+                            // "scrollBy" jumps instantly. "animateScrollBy" slides slowly.
+                            // Using scrollBy makes it feel like the keyboard pushed it up natively.
+                            scrollState.scrollBy(amountToScroll)
+                        }
+                    }
+
+                    Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .imePadding(), // This still helps with keyboard detection
-                        reverseLayout = true // <--- THIS is the "Anchor to Bottom" constraint
+                            .verticalScroll(scrollState)
+                            // [IMPORTANT] Add padding at the bottom equal to keyboard height.
+                            // This acts as a "buffer" so you can always scroll up high enough.
+                            .padding(bottom = with(density) { imeHeightPx.toDp() })
                     ) {
-                        item {
-                            if (state.selectedMediaUri != null) {
+                        // Local wrapper for text + cursor
+                        var textFieldValue by remember { mutableStateOf(TextFieldValue(state.description)) }
+
+                        // Sync with ViewModel
+                        LaunchedEffect(state.description) {
+                            if (textFieldValue.text != state.description) {
+                                textFieldValue = textFieldValue.copy(text = state.description)
+                            }
+                        }
+
+                        BasicTextField(
+                            value = textFieldValue,
+                            onValueChange = { newValue ->
+                                textFieldValue = newValue
+                                onIntent(CreatePostIntent.DescriptionChanged(newValue.text))
+
+                                // [FIX] Update cursor position on clicks/typing
+                                val layoutResult = textLayoutResultState
+                                if (layoutResult != null) {
+                                    val cursorIndex = newValue.selection.start
+                                    if (cursorIndex <= layoutResult.layoutInput.text.length) {
+                                        val cursorRect = layoutResult.getCursorRect(cursorIndex)
+                                        cursorYInText = cursorRect.bottom
+                                    }
+                                }
+                            },
+
+                            // [FIX] Update cursor position on layout changes (paste/initial load)
+                            onTextLayout = { result ->
+                                textLayoutResultState = result
+                                val cursorIndex = textFieldValue.selection.start
+                                if (cursorIndex <= result.layoutInput.text.length) {
+                                    val cursorRect = result.getCursorRect(cursorIndex)
+                                    cursorYInText = cursorRect.bottom
+                                }
+                            },
+
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = 150.dp)
+                                .padding(12.dp),
+
+                            textStyle = IssueSpotTypography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+
+                            decorationBox = { innerTextField ->
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    if (textFieldValue.text.isEmpty()) {
+                                        Text(
+                                            text = "Describe the issue you want to report...",
+                                            style = IssueSpotTypography.bodyMedium,
+                                            color = IssueSpotColors.OnSurfaceVariant
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
+                        )
+
+                        // Media Preview
+                        if (state.selectedMediaUri != null) {
                             MediaPreviewContent(
                                 mediaUri = state.selectedMediaUri,
                                 mediaType = state.selectedMediaType,
                                 onRemove = { onIntent(CreatePostIntent.RemoveMedia) }
                             )
                         }
-                            // Description TextField
-                            OutlinedTextField(
-                                value = state.description,
-                                onValueChange = { onIntent(CreatePostIntent.DescriptionChanged(it)) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .defaultMinSize(minHeight = 150.dp),
-                                placeholder = {
-                                    Text(
-                                        text = "Describe the issue you want to report...",
-                                        color = IssueSpotColors.OnSurfaceVariant
-                                    )
-                                },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent,
-                                    focusedBorderColor = Color.Transparent,
-                                    unfocusedBorderColor = Color.Transparent
-                                ),
-                                shape = RoundedCornerShape(0.dp),
-                                textStyle = IssueSpotTypography.bodyMedium,
-                                isError = state.error != null
-                            )
-
-                            // Media Preview (seamlessly below text)
-
-                        }
-                    }
-
-                    if (state.error != null) {
-                        Text(
-                            text = state.error,
-                            color = MaterialTheme.colorScheme.error,
-                            style = IssueSpotTypography.bodySmall,
-                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                        )
                     }
                 }
+                if (state.error != null) {
+                    Text(
+                        text = state.error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = IssueSpotTypography.bodySmall,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    )
+                }
+
+
             }
 
             // STICKY BOTTOM BUTTONS - Attached to keyboard (Icon-only, transparent)
@@ -625,5 +718,10 @@ fun CreatePostScreenPreview() {
         )
     }
 }
+
+
+
+
+
 
 
