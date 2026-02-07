@@ -1,15 +1,14 @@
 package org.example.project.createPost.presentation.screens
 
 import android.net.Uri
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +17,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,8 +26,6 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,8 +36,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -51,7 +47,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,7 +64,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 import org.example.project.R
 import org.example.project.createPost.presentation.viewmodel.CreatePostIntent
 import org.example.project.createPost.presentation.viewmodel.CreatePostSideEffect
@@ -91,12 +85,15 @@ fun CreatePostScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     val mediaPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         uri?.let {
-            viewModel.setVisualMedia(it.toString(), null)
+            // Get actual MIME type from ContentResolver
+            val mimeType = context.contentResolver.getType(it)
+            viewModel.setVisualMedia(it.toString(), mimeType)
         }
     }
 
@@ -144,9 +141,6 @@ fun CreatePostScreenContent(
     state: CreatePostState,
     onIntent: (CreatePostIntent) -> Unit = {}
 ) {
-    val requester = remember { BringIntoViewRequester() }
-    val coroutineScope = rememberCoroutineScope()
-
     Surface(
         modifier = modifier.fillMaxSize(),
         color = IssueSpotColors.Surface
@@ -459,255 +453,65 @@ fun MediaPreviewContent(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
+    // 1. Change main container to Column to stack items vertically
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .height(180.dp)
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        when (mediaType) {
-            MediaType.IMAGE -> {
-                Image(
-                    painter = rememberAsyncImagePainter(model = mediaUri.toUri()),
-                    contentDescription = "Selected Image",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            IssueSpotColors.OnSecondaryContainer,
-                            RoundedCornerShape(8.dp)
-                        ),
-                    contentScale = ContentScale.Fit
-                )
-            }
-            MediaType.VIDEO -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            IssueSpotColors.OnSecondaryContainer,
-                            RoundedCornerShape(8.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_video),
-                        contentDescription = "Video Selected",
-                        modifier = Modifier.size(64.dp),
-                        tint = IssueSpotColors.Primary
-                    )
-                }
-            }
-            else -> {}
-        }
-
+        // 2. Close Button (Appears above the content)
         IconButton(
             onClick = onRemove,
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 12.dp, end = 12.dp)
-                .size(40.dp)
-                .background(
-                    IssueSpotColors.Surface.copy(alpha = 0.8f),
-                    CircleShape
-                )
+                .align(Alignment.End) // Align to the right
+                .clip(CircleShape)
+                .background(Color.Black)
+                .size(32.dp) // Standard touch target size
+
         ) {
             Icon(
                 painter = painterResource(R.drawable.ic_close),
                 contentDescription = "Remove media",
-                modifier = Modifier.size(24.dp),
-                tint = IssueSpotColors.OnBackground
+                modifier = Modifier.size(20.dp),
+                tint = Color.White // Black Icon
             )
+        }
+
+        // 3. Media Content (Image or Video)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f) // Keep the square aspect ratio for the content itself
+                .clip(RoundedCornerShape(8.dp))
+        ) {
+            when (mediaType) {
+                MediaType.IMAGE -> {
+                    Image(
+                        painter = rememberAsyncImagePainter(model = mediaUri.toUri()),
+                        contentDescription = "Selected Image",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+                MediaType.VIDEO -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_video),
+                            contentDescription = "Video Selected",
+                            modifier = Modifier.size(64.dp),
+                            tint = IssueSpotColors.Primary
+                        )
+                    }
+                }
+                else -> {}
+            }
         }
     }
 }
 
-
-//@Composable
-//fun CreatePostScreenContent(
-//    modifier: Modifier = Modifier,
-//    state: CreatePostState,
-//    onIntent: (CreatePostIntent) -> Unit = {}
-//) {
-//    Surface(
-//        modifier = modifier.fillMaxWidth(),
-//        color = IssueSpotColors.Surface
-//    ) {
-//        Column(
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .padding(20.dp)
-//        ) {
-//            // Header with close button
-//            Row(
-//                modifier = Modifier.fillMaxWidth(),
-//                horizontalArrangement = Arrangement.SpaceBetween,
-//                verticalAlignment = Alignment.CenterVertically
-//            ) {
-//                Text(
-//                    text = "Create New Issue Post",
-//                    style = IssueSpotTypography.headlineLarge,
-//                    fontWeight = FontWeight.Bold
-//                )
-//                IconButton(
-//                    onClick = { onIntent(CreatePostIntent.CloseClicked) }
-//                ) {
-//                    Icon(
-//                        painter = painterResource(R.drawable.ic_close),
-//                        contentDescription = "Close",
-//                        tint = IssueSpotColors.OnBackground
-//                    )
-//                }
-//            }
-//
-//            Spacer(modifier = Modifier.height(16.dp))
-//
-//            // User info header
-//            PostHeader(
-//                userName = state.userName,
-//                timeAgo = null, // No time for new post
-//                postLevel = state.selectedPostLevel,
-//                location = state.location
-//            )
-//
-//            Spacer(modifier = Modifier.height(20.dp))
-//
-//            // Description TextField
-//            OutlinedTextField(
-//                value = state.description,
-//                onValueChange = { onIntent(CreatePostIntent.DescriptionChanged(it)) },
-//                modifier = Modifier
-//                    .fillMaxWidth()
-//                    .height(200.dp),
-//                placeholder = {
-//                    Text(
-//                        text = "Describe the issue you want to report...",
-//                        color = IssueSpotColors.OnSurfaceVariant
-//                    )
-//                },
-//                colors = OutlinedTextFieldDefaults.colors(
-//                    focusedContainerColor = IssueSpotColors.Background,
-//                    unfocusedContainerColor = IssueSpotColors.Background,
-//                    focusedBorderColor = IssueSpotColors.Primary,
-//                    unfocusedBorderColor = IssueSpotColors.OnSecondaryContainer
-//                ),
-//                shape = RoundedCornerShape(12.dp),
-//                textStyle = IssueSpotTypography.bodyMedium,
-//                isError = state.error != null
-//            )
-//
-//            if (state.error != null) {
-//                Text(
-//                    text = state.error,
-//                    color = MaterialTheme.colorScheme.error,
-//                    style = IssueSpotTypography.bodySmall,
-//                    modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-//                )
-//            }
-//
-//            Spacer(modifier = Modifier.height(8.dp))
-//
-//            // Media Preview
-//            if (state.selectedMediaUri != null) {
-//                MediaPreview(
-//                    mediaUri = state.selectedMediaUri,
-//                    mediaType = state.selectedMediaType,
-//                    onRemove = { onIntent(CreatePostIntent.RemoveMedia) }
-//                )
-//                Spacer(modifier = Modifier.height(12.dp))
-//            }
-//
-//            // Add Photo and Video buttons
-//            Row(
-//                modifier = Modifier.fillMaxWidth(),
-//                horizontalArrangement = Arrangement.spacedBy(12.dp)
-//            ) {
-//                OutlinedButton(
-//                    onClick = { onIntent(CreatePostIntent.AddPhotoClicked) },
-//                    colors = ButtonDefaults.outlinedButtonColors(
-//                        containerColor = IssueSpotColors.Surface
-//                    )
-//                ) {
-//                    Icon(
-//                        painter = painterResource(R.drawable.ic_photo),
-//                        contentDescription = "Add Photo",
-//                        modifier = Modifier.size(16.dp)
-//                    )
-//                    Spacer(modifier = Modifier.width(8.dp))
-//                    Text(
-//                        text = "Add Photo",
-//                        style = IssueSpotTypography.bodyMedium,
-//                        fontWeight = FontWeight.Bold
-//                    )
-//                }
-//
-//                OutlinedButton(
-//                    onClick = { onIntent(CreatePostIntent.AddVideoClicked) },
-//                    colors = ButtonDefaults.outlinedButtonColors(
-//                        containerColor = IssueSpotColors.Surface
-//                    )
-//                ) {
-//                    Icon(
-//                        painter = painterResource(R.drawable.ic_video),
-//                        contentDescription = "Add Video",
-//                        modifier = Modifier.size(16.dp)
-//                    )
-//                    Spacer(modifier = Modifier.width(8.dp))
-//                    Text(
-//                        text = "Add Video",
-//                        style = IssueSpotTypography.bodyMedium,
-//                        fontWeight = FontWeight.Bold
-//                    )
-//                }
-//            }
-//
-//            Spacer(modifier = Modifier.height(16.dp))
-//
-//            // Cancel and Post buttons
-//            Row(
-//                modifier = Modifier.fillMaxWidth(),
-//                horizontalArrangement = Arrangement.spacedBy(12.dp)
-//            ) {
-//                OutlinedButton(
-//                    onClick = { onIntent(CreatePostIntent.CancelClicked) },
-//                    modifier = Modifier.weight(1f),
-//                    colors = ButtonDefaults.outlinedButtonColors(
-//                        containerColor = IssueSpotColors.Surface
-//                    )
-//                ) {
-//                    Text(
-//                        text = "Cancel",
-//                        style = IssueSpotTypography.bodyLarge,
-//                        fontWeight = FontWeight.SemiBold
-//                    )
-//                }
-//
-//                Button(
-//                    onClick = { onIntent(CreatePostIntent.PostIssueClicked) },
-//                    modifier = Modifier.weight(1f),
-//                    enabled = !state.isLoading,
-//                    colors = ButtonDefaults.buttonColors(
-//                        containerColor = IssueSpotColors.PostButtonBackground,
-//                        contentColor = IssueSpotColors.PostButtonText
-//                    )
-//                ) {
-//                    if (state.isLoading) {
-//                        CircularProgressIndicator(
-//                            modifier = Modifier.size(20.dp),
-//                            color = IssueSpotColors.OnPrimary,
-//                            strokeWidth = 2.dp
-//                        )
-//                    } else {
-//                        Text(
-//                            text = "Post Issue",
-//                            style = IssueSpotTypography.bodyLarge,
-//                            fontWeight = FontWeight.Bold
-//                        )
-//                    }
-//                }
-//            }
-//        }
-//    }
-//}
 
 @Preview
 @Composable
