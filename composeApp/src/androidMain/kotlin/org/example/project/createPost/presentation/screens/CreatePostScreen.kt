@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -74,6 +75,7 @@ import org.example.project.theme.IssueSpotTheme
 import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.core.net.toUri
+import coil3.compose.AsyncImage
 import org.example.project.home.domain.models.MediaType
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -466,28 +468,28 @@ fun MediaPreviewContent(
                 .align(Alignment.End) // Align to the right
                 .clip(CircleShape)
                 .background(Color.Black)
-                .size(32.dp) // Standard touch target size
+                .size(28.dp) // Standard touch target size
 
         ) {
             Icon(
                 painter = painterResource(R.drawable.ic_close),
                 contentDescription = "Remove media",
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(18.dp),
                 tint = Color.White // Black Icon
             )
         }
-
+        Spacer(modifier = modifier.height(6.dp))
         // 3. Media Content (Image or Video)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f) // Keep the square aspect ratio for the content itself
+                .wrapContentHeight()
                 .clip(RoundedCornerShape(8.dp))
         ) {
             when (mediaType) {
                 MediaType.IMAGE -> {
-                    Image(
-                        painter = rememberAsyncImagePainter(model = mediaUri.toUri()),
+                    AsyncImage(
+                        model = mediaUri.toUri(),
                         contentDescription = "Selected Image",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
