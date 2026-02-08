@@ -2,6 +2,7 @@ package org.example.project
 
 import androidx.compose.runtime.*
 import coil3.compose.setSingletonImageLoaderFactory
+import org.example.project.core.components.OverlayProvider
 import org.example.project.core.navigation.NavigationRoot
 import org.example.project.core.navigation.Route
 import org.example.project.core.settings.AuthSettings
@@ -18,9 +19,11 @@ fun App() {
     IssueSpotTheme {
         val authSettings: AuthSettings = koinInject()
         val start = if (authSettings.isLoggedIn()) Route.Home else Route.Auth
-        NavigationRoot(
-            start = start
-        )
+        OverlayProvider {
+            NavigationRoot(
+                start = start
+            )
+        }
     }
 
 }

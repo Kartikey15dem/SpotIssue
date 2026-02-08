@@ -9,6 +9,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -76,6 +77,8 @@ import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.core.net.toUri
 import coil3.compose.AsyncImage
+import org.example.project.core.components.LocalOverlayController
+import org.example.project.core.components.VideoPreviewPlayer
 import org.example.project.home.domain.models.MediaType
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -380,65 +383,67 @@ fun CreatePostScreenContent(
 
 
             }
+            if(state.selectedMediaUri == null) {
 
-            // STICKY BOTTOM BUTTONS - Attached to keyboard (Icon-only, transparent)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .imePadding()
-                    .background(Color.Transparent)
-                    .padding(
-                        bottom = 24.dp,
-                        start = 2.dp,
-                        top = 2.dp,
-                        end = 24.dp
-                    ),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
-            ) {
-                // Media Icon Button
-                Box(
+                // STICKY BOTTOM BUTTONS - Attached to keyboard (Icon-only, transparent)
+                Row(
                     modifier = Modifier
-                        .size(44.dp)
-                        .background(
-                            color = IssueSpotColors.OnSurfaceVariant.copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(8.dp)
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .imePadding()
+                        .background(Color.Transparent)
+                        .padding(
+                            bottom = 24.dp,
+                            start = 2.dp,
+                            top = 2.dp,
+                            end = 24.dp
                         ),
-                    contentAlignment = Alignment.Center
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
                 ) {
-                    IconButton(
-                        onClick = { onIntent(CreatePostIntent.AddMediaClicked) },
-                        modifier = Modifier.size(44.dp)
+                    // Media Icon Button
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(
+                                color = IssueSpotColors.OnSurfaceVariant.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_photo),
-                            contentDescription = "Add Photo or Video",
-                            modifier = Modifier.size(24.dp),
-                            tint = IssueSpotColors.OnSurfaceVariant
-                        )
+                        IconButton(
+                            onClick = { onIntent(CreatePostIntent.AddMediaClicked) },
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_photo),
+                                contentDescription = "Add Photo or Video",
+                                modifier = Modifier.size(24.dp),
+                                tint = IssueSpotColors.OnSurfaceVariant
+                            )
+                        }
                     }
-                }
 
-                // PDF Icon Button
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(
-                            color = IssueSpotColors.OnSurfaceVariant.copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(8.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    IconButton(
-                        onClick = { onIntent(CreatePostIntent.AddPdfClicked) },
-                        modifier = Modifier.size(44.dp)
+                    // PDF Icon Button
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(
+                                color = IssueSpotColors.OnSurfaceVariant.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_add),
-                            contentDescription = "Add PDF",
-                            modifier = Modifier.size(24.dp),
-                            tint = IssueSpotColors.OnSurfaceVariant
-                        )
+                        IconButton(
+                            onClick = { onIntent(CreatePostIntent.AddPdfClicked) },
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_add),
+                                contentDescription = "Add PDF",
+                                modifier = Modifier.size(24.dp),
+                                tint = IssueSpotColors.OnSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -455,6 +460,7 @@ fun MediaPreviewContent(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val overlayController = LocalOverlayController.current
     // 1. Change main container to Column to stack items vertically
     Column(
         modifier = modifier
@@ -483,7 +489,6 @@ fun MediaPreviewContent(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .wrapContentHeight()
                 .clip(RoundedCornerShape(8.dp))
         ) {
             when (mediaType) {
@@ -491,8 +496,14 @@ fun MediaPreviewContent(
                     AsyncImage(
                         model = mediaUri.toUri(),
                         contentDescription = "Selected Image",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
+                        modifier = Modifier.fillMaxSize()
+                            .clickable(onClick = {
+                                overlayController.show(
+                                    type = MediaType.IMAGE,
+                                    url = mediaUri
+                                )
+                            }),
+                        contentScale = ContentScale.Crop
                     )
                 }
                 MediaType.VIDEO -> {
@@ -500,11 +511,16 @@ fun MediaPreviewContent(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_video),
-                            contentDescription = "Video Selected",
-                            modifier = Modifier.size(64.dp),
-                            tint = IssueSpotColors.Primary
+                        VideoPreviewPlayer(
+                            videoUri = mediaUri,
+                            modifier = Modifier.fillMaxSize(),
+                            onFullscreenClick = {
+                                // Trigger the global overlay when fullscreen icon is clicked
+                                overlayController.show(
+                                    type = MediaType.VIDEO,
+                                    url = mediaUri
+                                )
+                            }
                         )
                     }
                 }
