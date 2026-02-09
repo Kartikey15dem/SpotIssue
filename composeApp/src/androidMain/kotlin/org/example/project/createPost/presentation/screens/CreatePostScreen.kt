@@ -76,6 +76,7 @@ import org.koin.compose.viewmodel.koinViewModel
 import androidx.core.net.toUri
 import coil3.compose.AsyncImage
 import org.example.project.core.components.LocalOverlayController
+import org.example.project.core.components.PdfPreviewContent
 import org.example.project.core.components.VideoPreviewPlayer
 import org.example.project.home.domain.models.MediaType
 
@@ -540,6 +541,16 @@ fun MediaPreviewContent(
                         )
                     }
                 }
+
+                MediaType.PDF -> {
+                    PdfPreviewContent(
+                        pdfUri = mediaUri.toUri(),
+                        onFullscreenClick = {
+                            overlayController.show(MediaType.PDF, mediaUri)
+                        }
+                    )
+                }
+
                 else -> {}
             }
         }

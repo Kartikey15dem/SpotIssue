@@ -26,6 +26,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.core.net.toUri
 import coil3.compose.SubcomposeAsyncImage
 import org.example.project.R
 import org.example.project.home.domain.models.MediaType
@@ -57,7 +58,7 @@ fun OverlayProvider(
                     when (data.type) {
                         MediaType.IMAGE -> FullScreenImageViewer(url = data.url)
                         MediaType.VIDEO -> FullScreenVideoPlayer(url = data.url)
-                        MediaType.PDF -> {}
+                        MediaType.PDF -> FullScreenPdfViewer(uri = data.url.toUri())
                     }
                     IconButton(
                         onClick = { overlayController.hide() },
