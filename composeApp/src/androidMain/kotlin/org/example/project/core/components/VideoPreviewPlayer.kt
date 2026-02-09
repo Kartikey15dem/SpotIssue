@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -35,7 +36,8 @@ import org.example.project.R
 fun VideoPreviewPlayer(
     videoUri: String,
     onFullscreenClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onAspectRatioAvailable: (Float) -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -53,6 +55,18 @@ fun VideoPreviewPlayer(
             playWhenReady = false
             // repeatMode = Player.REPEAT_MODE_ONE // Optional: Uncomment if you want auto-looping
             volume = 1f
+
+            addListener(object : Player.Listener {
+                override fun onVideoSizeChanged(videoSize: VideoSize) {
+                    if (videoSize.height > 0) {
+                        // Calculate ratio
+                        var videoRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
+                        if(videoRatio < 1f) videoRatio = 1f
+                        onAspectRatioAvailable(videoRatio)
+
+                    }
+                }
+            })
         }
     }
 
@@ -101,7 +115,7 @@ fun VideoPreviewPlayer(
                 PlayerView(ctx).apply {
                     player = exoPlayer
                     useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM // Fills the card
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT // Fills the card
                     layoutParams = FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT

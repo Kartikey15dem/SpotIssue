@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -64,7 +63,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.flow.collectLatest
 import org.example.project.R
 import org.example.project.createPost.presentation.viewmodel.CreatePostIntent
@@ -461,6 +459,7 @@ fun MediaPreviewContent(
     modifier: Modifier = Modifier
 ) {
     val overlayController = LocalOverlayController.current
+    var aspectRatio by remember { mutableFloatStateOf(1f) }
     // 1. Change main container to Column to stack items vertically
     Column(
         modifier = modifier
@@ -471,7 +470,7 @@ fun MediaPreviewContent(
         IconButton(
             onClick = onRemove,
             modifier = Modifier
-                .align(Alignment.End) // Align to the right
+                .align(Alignment.End)
                 .clip(CircleShape)
                 .background(Color.Black)
                 .size(28.dp) // Standard touch target size
@@ -489,21 +488,35 @@ fun MediaPreviewContent(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .aspectRatio(aspectRatio)
                 .clip(RoundedCornerShape(8.dp))
         ) {
             when (mediaType) {
                 MediaType.IMAGE -> {
+
                     AsyncImage(
                         model = mediaUri.toUri(),
                         contentDescription = "Selected Image",
-                        modifier = Modifier.fillMaxSize()
+                        onSuccess = { state ->
+                            // 1. Get the intrinsic size of the loaded drawable
+                            val width = state.painter.intrinsicSize.width
+                            val height = state.painter.intrinsicSize.height
+
+                            // 2. Calculate Ratio (prevent divide by zero)
+                            if (height != 0f) {
+                                aspectRatio = width / height
+                                if(aspectRatio < 1f) aspectRatio = 1f
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
                             .clickable(onClick = {
                                 overlayController.show(
                                     type = MediaType.IMAGE,
                                     url = mediaUri
                                 )
+
                             }),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Fit
                     )
                 }
                 MediaType.VIDEO -> {
@@ -520,6 +533,9 @@ fun MediaPreviewContent(
                                     type = MediaType.VIDEO,
                                     url = mediaUri
                                 )
+                            },
+                            onAspectRatioAvailable = { newRatio ->
+                                aspectRatio = newRatio
                             }
                         )
                     }
