@@ -12,15 +12,23 @@ import org.example.project.home.domain.models.CreatePost
 import org.example.project.home.domain.models.MediaType
 import org.example.project.home.domain.models.PostLevel
 import org.example.project.home.domain.repository.PostRepository
+import org.example.project.profile.domain.repository.ProfileRepository
 
 class CreatePostViewModel(
-    private val postRepository: PostRepository
+    private val postRepository: PostRepository,
+    private val profileRepository : ProfileRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CreatePostState())
     val uiState: StateFlow<CreatePostState> = _uiState.asStateFlow()
 
     private val _sideEffects = MutableSharedFlow<CreatePostSideEffect>()
     val sideEffects: SharedFlow<CreatePostSideEffect> = _sideEffects
+
+    init{
+        viewModelScope.launch {
+            profileRepository.getProfile()
+        }
+    }
 
     fun onIntent(intent: CreatePostIntent) {
         when (intent) {
@@ -171,12 +179,11 @@ sealed interface CreatePostIntent {
 data class CreatePostState(
     val userName: String = "Current User", // TODO: Get from auth
     val location: String = "Current Location", // TODO: Get from location service
-    val selectedPostLevel: PostLevel = PostLevel.LOCALITY,
     val description: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
     val showIssueScopeDropdown: Boolean = false,
-    val selectedMediaUri: String? = "https://m.media-amazon.com/images/I/61KLfjW9-HL._AC_UF894,1000_QL80_.jpg",
+    val selectedMediaUri: String? = "",
     val selectedMediaType: MediaType? = MediaType.IMAGE
 )
 

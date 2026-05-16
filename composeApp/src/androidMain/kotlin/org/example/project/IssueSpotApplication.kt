@@ -15,7 +15,6 @@ class IssueSpotApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Initialize Koin DI using shared initializer with Android-specific modules
         val androidModules = listOf(
             authUiModule,
             homeUiModule,
