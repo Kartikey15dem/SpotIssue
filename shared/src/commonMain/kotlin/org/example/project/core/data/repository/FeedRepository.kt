@@ -1,7 +1,11 @@
 package org.example.project.core.data.repository
 
+import androidx.paging.PagingData
+import kotlinx.coroutines.flow.Flow
 import org.example.project.home.domain.models.Post
 import org.example.project.home.domain.models.PostLevel
+
+import org.example.project.core.utils.DataState
 
 /**
  * Home feature repository interface
@@ -9,43 +13,22 @@ import org.example.project.home.domain.models.PostLevel
  */
 interface FeedRepository {
     /**
-     * Fetch posts for a given post level
-     * Uses cache-first strategy: loads from cache first, then from API if needed
+     * Get paged posts for a given post level (Room-backed with RemoteMediator)
      */
-    suspend fun getPosts(postLevel: PostLevel): Result<List<Post>>
+    fun getPagedPosts(postLevel: PostLevel): Flow<PagingData<Post>>
 
     /**
-     * Get cached posts (instant, no network call)
+     * Observe active issues count for a given post level (Room-backed)
      */
-    suspend fun getCachedPosts(postLevel: PostLevel): Result<List<Post>>
+    fun observeActiveIssuesCount(postLevel: PostLevel): Flow<DataState<Int>>
 
     /**
-     * Force refresh posts from API (ignores cache)
+     * Force refresh posts from API
      */
-    suspend fun refreshPosts(postLevel: PostLevel): Result<List<Post>>
-
-    /**
-     * Check if posts cache is stale for given level
-     */
-    suspend fun isPostsCacheStale(postLevel: PostLevel): Boolean
-
-    /**
-     * Get active issues count for a given post level
-     */
-    suspend fun getActiveIssuesCount(postLevel: PostLevel): Result<Int>
-
-    /**
-     * Get cached active issues count (instant, no network call)
-     */
-    suspend fun getCachedActiveIssuesCount(postLevel: PostLevel): Result<Int?>
+    suspend fun refreshPosts(postLevel: PostLevel): DataState<Unit>
 
     /**
      * Force refresh active issues count from API
      */
-    suspend fun refreshActiveIssuesCount(postLevel: PostLevel): Result<Int>
-
-    /**
-     * Check if active issues cache is stale for given level
-     */
-    suspend fun isActiveIssuesCacheStale(postLevel: PostLevel): Boolean
+    suspend fun refreshActiveIssuesCount(postLevel: PostLevel): DataState<Unit>
 }

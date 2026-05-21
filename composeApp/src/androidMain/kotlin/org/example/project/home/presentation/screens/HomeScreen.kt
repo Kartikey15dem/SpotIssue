@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -32,24 +31,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import kotlinx.coroutines.flow.collectLatest
-import org.example.project.home.domain.models.MediaType
+import org.example.project.R
+import org.example.project.core.utils.DataState
 import org.example.project.home.domain.models.Post
 import org.example.project.home.domain.models.PostLevel
 import org.example.project.home.domain.models.getText
 import org.example.project.home.presentation.components.PostCard
 import org.example.project.home.presentation.components.PostLevelChip
-import org.example.project.theme.IssueSpotColors
-import org.example.project.theme.IssueSpotTypography
 import org.example.project.home.presentation.viewmodel.HomeIntent
 import org.example.project.home.presentation.viewmodel.HomeSideEffect
 import org.example.project.home.presentation.viewmodel.HomeState
 import org.example.project.home.presentation.viewmodel.HomeViewModel
-import androidx.compose.ui.res.painterResource
-import org.example.project.R
+import org.example.project.theme.IssueSpotColors
+import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -100,6 +100,8 @@ fun HomeContent(
     state: HomeState,
     onIntent: (HomeIntent) -> Unit,
 ) {
+    val pagingItems = state.postsFlow?.collectAsLazyPagingItems()
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -126,20 +128,25 @@ fun HomeContent(
         ) {
             item { Spacer(Modifier.height(8.dp)) }
 
-            items(
-                items = state.feeds,
-                key = { it.id }
-            ) { post ->
-                PostCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
-                    post = post,
-                    onLikeClick = { onIntent(HomeIntent.LikeClicked(post.id)) },
-                    onCommentClick = { onIntent(HomeIntent.CommentClicked(post.id, "")) },
-                    onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
-                    onReportClick = { onIntent(HomeIntent.ReportClicked(post.id)) },
-                )
+            if (pagingItems != null) {
+                items(
+                    count = pagingItems.itemCount,
+                    key = pagingItems.itemKey { it.id }
+                ) { index ->
+                    val post = pagingItems[index]
+                    if (post != null) {
+                        PostCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp),
+                            post = post,
+                            onLikeClick = { onIntent(HomeIntent.LikeClicked(post.id)) },
+                            onCommentClick = { onIntent(HomeIntent.CommentClicked(post.id, "")) },
+                            onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
+                            onReportClick = { onIntent(HomeIntent.ReportClicked(post.id)) },
+                        )
+                    }
+                }
             }
 
             item { Spacer(Modifier.height(16.dp)) }
@@ -234,8 +241,14 @@ private fun HomeHeader(
 
             Spacer(Modifier.width(10.dp))
 
+            val activeIssuesText = when (val res = state.activeIssues) {
+                is DataState.Success -> "${res.data} active issues"
+                is DataState.Error -> "Error loading issues"
+                DataState.Loading -> "Loading issues..."
+            }
+
             Text(
-                text = "  ${state.activeIssues} active issues".replace("\u0005", "↗"),
+                text = "  $activeIssuesText".replace("\u0005", "↗"),
                 style = IssueSpotTypography.bodyLarge,
                 color = IssueSpotColors.OnSurfaceVariant
             )
@@ -258,47 +271,4 @@ private fun HomeHeader(
             color = IssueSpotColors.OnSurfaceVariant
         )
     }
-}
-
-@Preview
-@Composable
-private fun HomeScreenPreview() {
-    val sampleFeeds = listOf(
-        Post(
-            id = "1",
-            userUrl = "",
-            userName = "John Doe",
-            timeAgo = "2h ago",
-            postLevel = PostLevel.LOCALITY,
-            location = "New York, USA",
-            postText = "There's a huge pothole on the main street. It's been there for a week now and it's causing a lot of traffic. Something needs to be done about it.",
-            mediaType = MediaType.IMAGE,
-            mediaUrl = "",
-            likes = 12,
-            comments = 3,
-        ),
-        Post(
-            id = "2",
-            userUrl = "",
-            userName = "Jane Doe",
-            timeAgo = "5h ago",
-            postLevel = PostLevel.DISTRICT,
-            location = "New York, USA",
-            postText = "The street lights on my street are not working. It's been like this for 2 days now. It's very dangerous to walk around at night.",
-            mediaType = MediaType.IMAGE,
-            mediaUrl = "",
-            likes = 5,
-            comments = 1,
-        ),
-    )
-
-    HomeContent(
-        state = HomeState(
-            postLevel = PostLevel.LOCALITY,
-            activeIssues = 2,
-            feeds = sampleFeeds,
-            query = "",
-        ),
-        onIntent = {}
-    )
 }

@@ -2,6 +2,10 @@ package org.example.project.home.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -9,26 +13,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.example.project.home.domain.usecases.GetActiveIssuesUseCase
-import org.example.project.home.domain.usecases.GetCachedActiveIssuesUseCase
-import org.example.project.home.domain.usecases.GetCachedPostsUseCase
-import org.example.project.home.domain.usecases.GetPostsUseCase
-import org.example.project.home.domain.usecases.IsCacheStaleUseCase
-import org.example.project.home.domain.usecases.PostActionsUseCase
-import org.example.project.home.domain.usecases.RefreshPostsUseCase
+import org.example.project.core.data.repository.FeedRepository
+import org.example.project.core.data.repository.PostRepository
+import org.example.project.core.utils.DataState
 import org.example.project.home.presentation.CurrentLevelManager
 import org.example.project.home.domain.models.Post
 import org.example.project.home.domain.models.PostLevel
 
 class HomeViewModel(
-    private val postActions: PostActionsUseCase,
-    private val getPostsUseCase: GetPostsUseCase,
-    private val getCachedPostsUseCase: GetCachedPostsUseCase,
-    private val getActiveIssuesUseCase: GetActiveIssuesUseCase,
-    private val getCachedActiveIssuesUseCase: GetCachedActiveIssuesUseCase,
-    private val refreshPostsUseCase: RefreshPostsUseCase,
-    private val isCacheStaleUseCase: IsCacheStaleUseCase,
+    private val feedRepository: FeedRepository,
+    private val postRepository: PostRepository,
     private val currentLevelManager: CurrentLevelManager
 ) : ViewModel() {
 
@@ -38,12 +34,30 @@ class HomeViewModel(
     private val _sideEffects = MutableSharedFlow<HomeSideEffect>()
     val sideEffects: SharedFlow<HomeSideEffect> = _sideEffects.asSharedFlow()
 
-
     init {
         viewModelScope.launch {
             currentLevelManager.currentLevel.collect { level ->
-                _uiState.update { it.copy(postLevel = level) }
-                loadDataForLevel(level)
+                updateState { it.copy(
+                    postLevel = level,
+                    postsFlow = feedRepository.getPagedPosts(level).cachedIn(viewModelScope)
+                ) }
+                observeActiveIssues(level)
+            }
+        }
+
+        // Periodic refresh loop every 10 minutes
+        viewModelScope.launch {
+            while (isActive) {
+                delay(10 * 60 * 1000L)
+                refresh()
+            }
+        }
+    }
+
+    private fun observeActiveIssues(level: PostLevel) {
+        viewModelScope.launch {
+            feedRepository.observeActiveIssuesCount(level).collect { dataState ->
+                updateState { it.copy(activeIssues = dataState) }
             }
         }
     }
@@ -62,103 +76,25 @@ class HomeViewModel(
         }
     }
 
-    /**
-     * Dual-loading strategy:
-     * 1. Load cached data immediately (instant UI update)
-     * 2. Check if cache is stale
-     * 3. If stale, fetch from API (show loading but keep cached data visible)
-     * 4. Update both in-memory cache and Room DB when fresh data arrives
-     */
-    private fun loadDataForLevel(postLevel: PostLevel) {
-        viewModelScope.launch {
-            // Step 1: Load cached data from Room DB immediately
-            loadCachedData(postLevel)
-
-            // Step 2: Check if we need to fetch from API
-            val isPostsStale = isCacheStaleUseCase.forPosts(postLevel)
-            val isActiveIssuesStale = isCacheStaleUseCase.forActiveIssues(postLevel)
-
-            if (isPostsStale || isActiveIssuesStale) {
-                // Step 3: Fetch fresh data from API (show loading indicator)
-                _uiState.update { it.copy(isRefreshing = true) }
-
-                if (isPostsStale) {
-                    loadFreshPosts(postLevel)
-                }
-
-                if (isActiveIssuesStale) {
-                    loadFreshActiveIssues(postLevel)
-                }
-
-                _uiState.update { it.copy(isRefreshing = false) }
-            }
-        }
-    }
-
-    /**
-     * Load cached data from Room DB instantly
-     */
-    private suspend fun loadCachedData(postLevel: PostLevel) {
-        // Load cached posts
-        getCachedPostsUseCase(postLevel)
-            .onSuccess { posts ->
-                if (posts.isNotEmpty()) {
-                    _uiState.update { it.copy(feeds = posts) }
-                }
-            }
-
-        // Load cached active issues count
-        getCachedActiveIssuesUseCase(postLevel)
-            .onSuccess { count ->
-                count?.let {
-                    _uiState.update { state -> state.copy(activeIssues = it) }
-                }
-            }
-    }
-
-    /**
-     * Fetch fresh posts from API
-     */
-    private suspend fun loadFreshPosts(postLevel: PostLevel) {
-        refreshPostsUseCase(postLevel)
-            .onSuccess { posts ->
-                _uiState.update { it.copy(feeds = posts, error = null) }
-            }
-            .onFailure { error ->
-                handleError(error)
-            }
-    }
-
-    /**
-     * Fetch fresh active issues count from API
-     */
-    private suspend fun loadFreshActiveIssues(postLevel: PostLevel) {
-        getActiveIssuesUseCase(postLevel)
-            .onSuccess { count ->
-                _uiState.update { it.copy(activeIssues = count) }
-            }
-            .onFailure { error ->
-                // Silent failure for active issues count
-                _uiState.update { it.copy(activeIssues = 0) }
-            }
+    private fun updateState(update: (HomeState) -> HomeState) {
+        _uiState.update(update)
     }
 
     private fun refresh() {
         val currentLevel = _uiState.value.postLevel
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshing = true) }
+            updateState { it.copy(isRefreshing = true) }
+            
+            // Trigger background refresh
+            feedRepository.refreshPosts(currentLevel)
+            feedRepository.refreshActiveIssuesCount(currentLevel)
 
-            // Force refresh both posts and active issues
-            loadFreshPosts(currentLevel)
-            loadFreshActiveIssues(currentLevel)
-
-            _uiState.update { it.copy(isRefreshing = false) }
+            updateState { it.copy(isRefreshing = false) }
         }
     }
 
     private fun updateSearchQuery(query: String) {
-        _uiState.update { it.copy(query = query) }
-        // TODO: Implement search filtering logic
+        updateState { it.copy(query = query) }
     }
 
     private fun navigateToCreatePost() {
@@ -175,14 +111,14 @@ class HomeViewModel(
 
     private fun like(postId: String) {
         viewModelScope.launch {
-            postActions.like(postId)
+            postRepository.likePost(postId)
                 .onFailure { handleError(it) }
         }
     }
 
     private fun report(postId: String, reason: String?) {
         viewModelScope.launch {
-            postActions.report(postId, reason)
+            postRepository.reportPost(postId, reason)
                 .onSuccess {
                     _sideEffects.emit(HomeSideEffect.ShowSnackbar("Post reported successfully"))
                 }
@@ -192,7 +128,7 @@ class HomeViewModel(
 
     private fun comment(postId: String, comment: String) {
         viewModelScope.launch {
-            postActions.comment(postId, comment)
+            postRepository.addComment(postId, comment)
                 .onFailure { handleError(it) }
         }
     }
@@ -207,12 +143,12 @@ class HomeViewModel(
     }
 
     private fun clearError() {
-        _uiState.update { it.copy(error = null) }
+        updateState { it.copy(error = null) }
     }
 
     private suspend fun handleError(error: Throwable) {
         val message = error.message ?: "Something went wrong"
-        _uiState.update { it.copy(error = message) }
+        updateState { it.copy(error = message) }
         _sideEffects.emit(HomeSideEffect.ShowError(message))
     }
 }
@@ -231,9 +167,9 @@ sealed interface HomeIntent {
 
 data class HomeState(
     val postLevel: PostLevel = PostLevel.LOCALITY,
-    val activeIssues: Int = 0,
-    val isRefreshing: Boolean = false, // Shows loading indicator while keeping cached data visible
-    val feeds: List<Post> = emptyList(),
+    val activeIssues: DataState<Int> = DataState.Loading,
+    val isRefreshing: Boolean = false,
+    val postsFlow: Flow<PagingData<Post>>? = null,
     val query: String = "",
     val error: String? = null
 )
@@ -245,4 +181,3 @@ sealed interface HomeSideEffect {
     data class ShowSnackbar(val message: String) : HomeSideEffect
     data class SharePost(val text: String) : HomeSideEffect
 }
-

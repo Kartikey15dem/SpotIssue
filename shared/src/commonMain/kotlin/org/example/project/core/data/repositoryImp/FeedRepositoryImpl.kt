@@ -1,147 +1,73 @@
 package org.example.project.core.data.repositoryImp
 
 import co.touchlab.kermit.Logger
+import androidx.paging.ExperimentalPagingApi
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.map
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
+import org.example.project.core.data.paging.PostRemoteMediator
+import org.example.project.core.database.IssueSpotDatabase
+import org.example.project.core.database.entities.toPost
+import org.example.project.core.network.services.HomeService
 import org.example.project.home.data.local.FeedLocalDataSource
-import org.example.project.home.data.remote.FeedRemoteDataSource
-import org.example.project.home.data.remote.mapper.toPost
 import org.example.project.home.domain.models.Post
 import org.example.project.home.domain.models.PostLevel
 import org.example.project.core.data.repository.FeedRepository
+import org.example.project.core.utils.DataState
+import org.example.project.core.utils.safeApiCall
+import org.example.project.core.utils.asDataStateFlow
 
-/**
- * Real implementation of FeedRepository using Supabase
- * Implements caching strategy with Room DB and Supabase API
- */
 class FeedRepositoryImpl(
-    private val remoteDataSource: FeedRemoteDataSource,
+    private val homeService: HomeService,
+    private val database: IssueSpotDatabase,
     private val localDataSource: FeedLocalDataSource
 ) : FeedRepository {
     private val logger = Logger.Companion.withTag("FeedRepository")
 
-    /**
-     * Smart fetch: Uses cache if fresh, otherwise fetches from API
-     */
-    override suspend fun getPosts(postLevel: PostLevel): Result<List<Post>> {
-        logger.d { "getPosts called for level=$postLevel" }
-        return try {
-            // Check if cache is stale
-            val isStale = localDataSource.isPostsCacheStale(postLevel)
-            logger.d { "isPostsCacheStale=$isStale for level=$postLevel" }
-
-            if (isStale) {
-                // Cache is stale or doesn't exist, fetch from API
-                refreshPosts(postLevel)
-            } else {
-                // Use cache
-                getCachedPosts(postLevel)
-            }
-        } catch (e: Exception) {
-            logger.e(e) { "Error while getting posts for level=$postLevel" }
-            // If API fails, try to return cached data as fallback
-            try {
-                val cachedPosts = localDataSource.getCachedPosts(postLevel)
-                if (cachedPosts.isNotEmpty()) {
-                    logger.d { "Returning ${cachedPosts.size} cached posts for level=$postLevel as fallback" }
-                    Result.success(cachedPosts)
-                } else {
-                    Result.failure(e)
-                }
-            } catch (_: Exception) {
-                logger.e(e) { "Error while fetching cached posts fallback for level=$postLevel" }
-                Result.failure(e)
-            }
+    @OptIn(ExperimentalPagingApi::class)
+    override fun getPagedPosts(postLevel: PostLevel): Flow<PagingData<Post>> {
+        return Pager(
+            config = PagingConfig(pageSize = 20),
+            remoteMediator = PostRemoteMediator(homeService, database, postLevel),
+            pagingSourceFactory = { database.postDao().pagingSourceByLevel(postLevel.name) }
+        ).flow.map { pagingData ->
+            pagingData.map { it.toPost() }
         }
     }
 
-    override suspend fun getCachedPosts(postLevel: PostLevel): Result<List<Post>> {
-        return try {
-            val cachedPosts = localDataSource.getCachedPosts(postLevel)
-            logger.d { "Loaded ${cachedPosts.size} cached posts for level=$postLevel" }
-            Result.success(cachedPosts)
-        } catch (e: Exception) {
-            logger.e(e) { "Failed to load cached posts for level=$postLevel" }
-            Result.failure(e)
+    override fun observeActiveIssuesCount(postLevel: PostLevel): Flow<DataState<Int>> = flow {
+        // First emit from DB
+        val dbFlow = localDataSource.observeCachedActiveIssues(postLevel)
+            .map { DataState.Success(it ?: 0) as DataState<Int> }
+        
+        // Trigger refresh in background if stale
+        if (localDataSource.isActiveIssuesCacheStale(postLevel)) {
+            refreshActiveIssuesCount(postLevel)
         }
+        
+        emitAll(dbFlow)
+    }.onStart { emit(DataState.Loading) }
+
+    override suspend fun refreshPosts(postLevel: PostLevel): DataState<Unit> = safeApiCall {
+        val response = homeService.getPosts(
+            level = postLevel.name,
+            page = 1,
+            limit = 50
+        )
+        val posts = response.items.map { it.toPost() }
+        localDataSource.cachePosts(postLevel, posts)
+        Unit
     }
 
-    override suspend fun refreshPosts(postLevel: PostLevel): Result<List<Post>> {
-        logger.d { "Refreshing posts from remote for level=$postLevel" }
-        return try {
-            // Fetch from Supabase
-            val postDtos = remoteDataSource.fetchPosts(postLevel)
-
-            // Map to domain models
-            val posts = postDtos.map { it.toPost() }
-
-            // Cache the fetched posts
-            localDataSource.cachePosts(postLevel, posts)
-            logger.d { "Fetched and cached ${posts.size} posts for level=$postLevel" }
-
-            Result.success(posts)
-        } catch (e: Exception) {
-            logger.e(e) { "Failed to refresh posts for level=$postLevel" }
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun isPostsCacheStale(postLevel: PostLevel): Boolean {
-        return localDataSource.isPostsCacheStale(postLevel)
-    }
-
-    override suspend fun getActiveIssuesCount(postLevel: PostLevel): Result<Int> {
-        logger.d { "getActiveIssuesCount called for level=$postLevel" }
-        return try {
-            val isStale = localDataSource.isActiveIssuesCacheStale(postLevel)
-
-            if (isStale) {
-                refreshActiveIssuesCount(postLevel)
-            } else {
-                val cached = localDataSource.getCachedActiveIssues(postLevel)
-                logger.d { "Returning cached active issues=${cached ?: 0} for level=$postLevel" }
-                Result.success(cached ?: 0)
-            }
-        } catch (e: Exception) {
-            logger.e(e) { "Error while getting active issues count for level=$postLevel" }
-            // Fallback to cache if API fails
-            try {
-                val cached = localDataSource.getCachedActiveIssues(postLevel)
-                Result.success(cached ?: 0)
-            } catch (_: Exception) {
-                logger.e(e) { "Error while fetching cached active issues fallback for level=$postLevel" }
-                Result.failure(e)
-            }
-        }
-    }
-
-    override suspend fun getCachedActiveIssuesCount(postLevel: PostLevel): Result<Int?> {
-        return try {
-            val count = localDataSource.getCachedActiveIssues(postLevel)
-            logger.d { "Loaded cached active issues=$count for level=$postLevel" }
-            Result.success(count)
-        } catch (e: Exception) {
-            logger.e(e) { "Failed to load cached active issues for level=$postLevel" }
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun refreshActiveIssuesCount(postLevel: PostLevel): Result<Int> {
-        logger.d { "Refreshing active issues count from remote for level=$postLevel" }
-        return try {
-            // Fetch from Supabase
-            val count = remoteDataSource.fetchActiveIssuesCount(postLevel)
-
-            // Cache the count
-            localDataSource.cacheActiveIssues(postLevel, count)
-
-            logger.d { "Fetched and cached active issues count=$count for level=$postLevel" }
-            Result.success(count)
-        } catch (e: Exception) {
-            logger.e(e) { "Failed to refresh active issues count for level=$postLevel" }
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun isActiveIssuesCacheStale(postLevel: PostLevel): Boolean {
-        return localDataSource.isActiveIssuesCacheStale(postLevel)
+    override suspend fun refreshActiveIssuesCount(postLevel: PostLevel): DataState<Unit> = safeApiCall {
+        val result = homeService.getActiveIssuesCount(postLevel.name)
+        localDataSource.cacheActiveIssues(postLevel, result.totalActiveIssues)
+        Unit
     }
 }

@@ -11,19 +11,26 @@ package org.example.project.core.network
 
 import de.jensklingenberg.ktorfit.Ktorfit
 import io.ktor.client.HttpClient
-//import org.example.project.core.network.services.createAuthenticationService
-//import org.example.project.core.network.services.createHomeService
-//import org.example.project.core.network.services.createProfileService
+import org.example.project.core.network.services.AuthenticationService
+import org.example.project.core.network.services.HomeService
+import org.example.project.core.network.services.ProfileService
+import org.example.project.core.network.services.PostService
+import org.example.project.core.network.services.createAuthenticationService
+import org.example.project.core.network.services.createHomeService
+import org.example.project.core.network.services.createProfileService
+import org.example.project.core.network.services.createPostService
 import kotlin.getValue
 
 
 class KtorfitClient(ktorfit: Ktorfit) {
 
-//    internal val authenticationApi by lazy { ktorfit.createAuthenticationService() }
-//
-//    internal val profileApi by lazy { ktorfit.createProfileService() }
-//
-//    internal val homeApi by lazy { ktorfit.createHomeService() }
+    internal val authenticationApi by lazy { ktorfit.createAuthenticationService() }
+
+    internal val profileApi by lazy { ktorfit.createProfileService() }
+
+    internal val homeApi by lazy { ktorfit.createHomeService() }
+
+    internal val postApi by lazy { ktorfit.createPostService() }
 
     class Builder internal constructor() {
         private lateinit var baseURL: String

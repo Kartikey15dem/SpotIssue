@@ -40,9 +40,15 @@ class UserPreferencesRepositoryImpl(
         localDataSource.clearUserData()
     }
 
-    override  fun getUserData(): Flow<UserData> {
+    override fun getUserData(): Flow<UserData> {
         return localDataSource.userData
     }
 
+    override suspend fun updateLastSync(key: String, timestamp: Long) {
+        localDataSource.updateLastSync(key, timestamp)
+    }
 
-}
+    override suspend fun getLastSync(key: String): Long {
+        return localDataSource.getLastSync(key)
+    }
+    }

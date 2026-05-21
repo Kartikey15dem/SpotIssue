@@ -10,12 +10,14 @@ import org.example.project.core.database.dao.CacheMetadataDao
 import org.example.project.core.database.dao.ActiveIssuesDao
 import org.example.project.core.database.dao.UserPostDao
 import org.example.project.core.database.dao.LikedPostDao
+import org.example.project.core.database.dao.RemoteKeysDao
 import org.example.project.core.database.entities.ProfileEntity
 import org.example.project.core.database.entities.PostEntity
 import org.example.project.core.database.entities.CacheMetadataEntity
 import org.example.project.core.database.entities.ActiveIssuesEntity
 import org.example.project.core.database.entities.UserPostEntity
 import org.example.project.core.database.entities.LikedPostEntity
+import org.example.project.core.database.entities.RemoteKeysEntity
 
 @Database(
     entities = [
@@ -24,9 +26,10 @@ import org.example.project.core.database.entities.LikedPostEntity
         CacheMetadataEntity::class,
         ActiveIssuesEntity::class,
         UserPostEntity::class,
-        LikedPostEntity::class
+        LikedPostEntity::class,
+        RemoteKeysEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 actual abstract class IssueSpotDatabase : RoomDatabase() {
@@ -36,6 +39,7 @@ actual abstract class IssueSpotDatabase : RoomDatabase() {
     actual abstract fun activeIssuesDao(): ActiveIssuesDao
     actual abstract fun userPostDao(): UserPostDao
     actual abstract fun likedPostDao(): LikedPostDao
+    actual abstract fun remoteKeysDao(): RemoteKeysDao
 
 }
 

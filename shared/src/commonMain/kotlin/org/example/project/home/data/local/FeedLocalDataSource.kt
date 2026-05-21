@@ -7,6 +7,8 @@ import org.example.project.core.database.entities.toEntity
 import org.example.project.core.database.entities.toPost
 import org.example.project.home.domain.models.Post
 import org.example.project.home.domain.models.PostLevel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 import kotlin.time.Clock
 
@@ -25,6 +27,15 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
      */
     suspend fun getCachedPosts(postLevel: PostLevel): List<Post> {
         return postDao.getPostsByLevel(postLevel.name).map { it.toPost() }
+    }
+
+    /**
+     * Observe cached posts for a specific level
+     */
+    fun observeCachedPosts(postLevel: PostLevel): Flow<List<Post>> {
+        return postDao.observePostsByLevel(postLevel.name).map { list ->
+            list.map { it.toPost() }
+        }
     }
 
     /**
@@ -62,6 +73,13 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
      */
     suspend fun getCachedActiveIssues(postLevel: PostLevel): Int? {
         return activeIssuesDao.getActiveIssues(postLevel.name)?.count
+    }
+
+    /**
+     * Observe cached active issues count
+     */
+    fun observeCachedActiveIssues(postLevel: PostLevel): Flow<Int?> {
+        return activeIssuesDao.observeActiveIssues(postLevel.name).map { it?.count }
     }
 
     /**

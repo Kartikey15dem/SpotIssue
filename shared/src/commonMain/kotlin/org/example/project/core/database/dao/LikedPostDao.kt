@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
+import androidx.paging.PagingSource
 import org.example.project.core.database.entities.LikedPostEntity
 
 /**
@@ -18,6 +19,9 @@ interface LikedPostDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<LikedPostEntity>)
+
+    @Query("SELECT * FROM liked_posts WHERE userId = :userId ORDER BY likedAt DESC")
+    fun pagingSource(userId: String = "current_user"): PagingSource<Int, LikedPostEntity>
 
     @Query("SELECT * FROM liked_posts WHERE userId = :userId ORDER BY likedAt DESC")
     suspend fun getLikedPosts(userId: String = "current_user"): List<LikedPostEntity>

@@ -2,6 +2,7 @@ package org.example.project.core.database.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import org.example.project.core.model.profile.Profile
 
 /**
  * Room entity for storing user profile data locally.
@@ -37,3 +38,36 @@ data class ProfileEntity(
     val lastSyncedAt: Long = 0L
 )
 
+fun ProfileEntity.toProfile(): Profile {
+    return Profile(
+        imageUrl = imageUrl ?: "",
+        name = name,
+        location = location ?: "",
+        locality = locality ?: "",
+        district = district ?: "",
+        state = state ?: "",
+        country = country ?: "",
+        totalPosts = totalPosts,
+        acks = acks,
+        postByArea = listOf(0, 0, 0, 0), // Default or calculated
+        myPosts = emptyList(),
+        ackPosts = emptyList()
+    )
+}
+
+fun Profile.toEntity(userId: String = "current_user"): ProfileEntity {
+    return ProfileEntity(
+        userId = userId,
+        name = name,
+        imageUrl = imageUrl,
+        location = location,
+        locality = locality,
+        district = district,
+        state = state,
+        country = country,
+        totalPosts = totalPosts,
+        acks = acks,
+        updatedAt = 0L,
+        lastSyncedAt = 0L
+    )
+}

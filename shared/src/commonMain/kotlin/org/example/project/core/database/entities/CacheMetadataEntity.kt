@@ -26,6 +26,8 @@ data class CacheMetadataEntity(
     companion object {
         fun postsKey(postLevel: String): String = "posts_$postLevel"
         fun activeIssuesKey(postLevel: String): String = "active_issues_$postLevel"
+        fun userPostsKey(userId: String): String = "user_posts_$userId"
+        fun likedPostsKey(userId: String): String = "liked_posts_$userId"
     }
 }
 

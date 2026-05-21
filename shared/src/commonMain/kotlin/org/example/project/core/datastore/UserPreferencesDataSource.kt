@@ -81,4 +81,16 @@ class UserPreferencesDataSource(
         }
     }
 
-}
+    suspend fun updateLastSync(key: String, timestamp: Long) {
+        withContext(Dispatchers.IO) {
+            settings.putLong("last_sync_$key", timestamp)
+        }
+    }
+
+    suspend fun getLastSync(key: String): Long {
+        return withContext(Dispatchers.IO) {
+            settings.getLong("last_sync_$key", 0L)
+        }
+    }
+
+    }

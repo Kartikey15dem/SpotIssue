@@ -12,6 +12,7 @@ package org.example.project.core.utils
 object ApiEndPoints {
     const val AUTHENTICATION = "auth"
     const val PROFILE = "profile"
+    const val HOME = "home"
     const val SERVICES = "services"
 
 }

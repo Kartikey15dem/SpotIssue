@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
+import androidx.paging.PagingSource
 import org.example.project.core.database.entities.UserPostEntity
 
 /**
@@ -18,6 +19,9 @@ interface UserPostDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<UserPostEntity>)
+
+    @Query("SELECT * FROM user_posts WHERE userId = :userId ORDER BY createdAt DESC")
+    fun pagingSource(userId: String = "current_user"): PagingSource<Int, UserPostEntity>
 
     @Query("SELECT * FROM user_posts WHERE userId = :userId ORDER BY createdAt DESC")
     suspend fun getUserPosts(userId: String = "current_user"): List<UserPostEntity>

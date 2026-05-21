@@ -6,6 +6,7 @@ import org.example.project.core.database.dao.CacheMetadataDao
 import org.example.project.core.database.dao.ActiveIssuesDao
 import org.example.project.core.database.dao.UserPostDao
 import org.example.project.core.database.dao.LikedPostDao
+import org.example.project.core.database.dao.RemoteKeysDao
 
 
 
@@ -16,6 +17,7 @@ expect abstract class IssueSpotDatabase {
     abstract fun activeIssuesDao(): ActiveIssuesDao
     abstract fun userPostDao(): UserPostDao
     abstract fun likedPostDao(): LikedPostDao
+    abstract fun remoteKeysDao(): RemoteKeysDao
 
 }
 

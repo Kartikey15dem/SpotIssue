@@ -18,5 +18,6 @@ interface UserPreferencesRepository {
 
      fun getUserData(): Flow<UserData>
 
-
-}
+     suspend fun updateLastSync(key: String, timestamp: Long)
+     suspend fun getLastSync(key: String): Long
+     }
