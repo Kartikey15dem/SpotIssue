@@ -57,6 +57,7 @@ fun OverlayProvider(
                     // Render content based on Enum
                     when (data.type) {
                         MediaType.IMAGE -> FullScreenImageViewer(url = data.url)
+                        MediaType.GIF -> FullScreenImageViewer(url = data.url)
                         MediaType.VIDEO -> FullScreenVideoPlayer(url = data.url)
                         MediaType.PDF -> FullScreenPdfViewer(uri = data.url.toUri())
                     }

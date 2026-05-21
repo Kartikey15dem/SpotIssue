@@ -1,7 +1,7 @@
 package org.example.project.profile.data.local.mapper
 
-import org.example.project.core.data.local.entities.UserPostEntity
-import org.example.project.core.data.local.entities.LikedPostEntity
+import org.example.project.core.database.entities.UserPostEntity
+import org.example.project.core.database.entities.LikedPostEntity
 import org.example.project.home.domain.models.MediaType
 import org.example.project.home.domain.models.Post
 import org.example.project.home.domain.models.PostLevel

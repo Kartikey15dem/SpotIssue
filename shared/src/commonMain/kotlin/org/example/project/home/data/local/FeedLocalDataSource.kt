@@ -1,10 +1,10 @@
 package org.example.project.home.data.local
 
-import org.example.project.core.data.local.AppDatabase
-import org.example.project.core.data.local.entities.ActiveIssuesEntity
-import org.example.project.core.data.local.entities.CacheMetadataEntity
-import org.example.project.core.data.local.entities.toEntity
-import org.example.project.core.data.local.entities.toPost
+import org.example.project.core.database.IssueSpotDatabase
+import org.example.project.core.database.entities.ActiveIssuesEntity
+import org.example.project.core.database.entities.CacheMetadataEntity
+import org.example.project.core.database.entities.toEntity
+import org.example.project.core.database.entities.toPost
 import org.example.project.home.domain.models.Post
 import org.example.project.home.domain.models.PostLevel
 
@@ -14,7 +14,7 @@ import kotlin.time.Clock
  * Local data source for home/feed feature
  * Handles caching of posts and active issues count
  */
-class FeedLocalDataSource(private val database: AppDatabase) {
+class FeedLocalDataSource(private val database: IssueSpotDatabase) {
 
     private val postDao = database.postDao()
     private val cacheMetadataDao = database.cacheMetadataDao()

@@ -40,29 +40,24 @@ kotlin {
             implementation(libs.androidx.ui.viewbinding)
 
 
+            implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
             implementation(libs.androidx.core.splashscreen)
 
             implementation(libs.koin.android)
 
             implementation(libs.okhttp)
 
-            // Ktor OkHttp engine for Android (needed by supabase-kt / Ktor client)
-            implementation(libs.ktor.client.okhttp)
+
             implementation(libs.coil.compose)
-            implementation(libs.coil.network.ktor2)
-            implementation(libs.coil.network.ktor3)
-            implementation(libs.androidx.navigation3.ui)
+
             implementation(libs.androidx.navigation3.runtime)
             implementation(libs.androidx.lifecycle.viewmodel.navigation3)
             implementation(libs.androidx.material3.adaptive.navigation3)
-            implementation(libs.kotlinx.serialization.core)
 
-            implementation(libs.koin.androidx.compose)
             implementation(libs.lottie.compose)
         }
-//        commonMain.dependencies {
-//
-//        }
+
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }

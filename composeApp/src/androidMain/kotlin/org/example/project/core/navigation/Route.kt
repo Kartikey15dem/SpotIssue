@@ -11,7 +11,7 @@ sealed interface Route:NavKey{
         data object Login : Route
 
         @Serializable
-        data class Otp(val email: String) : Route
+        data object Otp : Route
 
         @Serializable
         data class LocationFetch(
@@ -20,7 +20,7 @@ sealed interface Route:NavKey{
         ) : Route
 
         @Serializable
-        data class NameCapture(val email: String) : Route
+        data object NameCapture : Route
     }
 
     @Serializable

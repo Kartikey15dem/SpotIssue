@@ -1,12 +1,10 @@
 package org.example.project.home.di
 
 import org.example.project.home.data.local.FeedLocalDataSource
-import org.example.project.home.data.remote.FeedRemoteDataSource
 import org.example.project.home.data.repository.FakeFeedRepositoryImpl
-import org.example.project.home.data.repository.FeedRepositoryImpl
-import org.example.project.home.data.repository.FakePostRepositoryImpl
-import org.example.project.home.domain.repository.FeedRepository
-import org.example.project.home.domain.repository.PostRepository
+import org.example.project.core.data.repositoryImp.FakePostRepositoryImpl
+import org.example.project.core.data.repository.FeedRepository
+import org.example.project.core.data.repository.PostRepository
 import org.example.project.home.domain.usecases.GetActiveIssuesUseCase
 import org.example.project.home.domain.usecases.GetCachedActiveIssuesUseCase
 import org.example.project.home.domain.usecases.GetCachedPostsUseCase

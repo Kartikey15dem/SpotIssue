@@ -12,52 +12,80 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
+import org.example.project.R
+import org.example.project.auth.presentation.viewmodel.AuthEffect
+import org.example.project.auth.presentation.viewmodel.AuthIntent
+import org.example.project.auth.presentation.viewmodel.AuthUiState
 import org.example.project.auth.presentation.viewmodel.AuthViewModel
 import org.koin.compose.viewmodel.koinViewModel
-import org.example.project.R
-import androidx.compose.ui.res.painterResource
 
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
-    onLoginClick: (String) -> Unit,
-    viewModel: AuthViewModel = koinViewModel()
+    onNavigateToOtp: () -> Unit,
+    viewModel: AuthViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(uiState.error) {
-        if (uiState.error != null) {
-            // Show error for a few seconds then clear
-           delay(3000)
-            viewModel.clearError()
+    LaunchedEffect(Unit) {
+        viewModel.effect.collect { effect ->
+            if (effect is AuthEffect.NavigateToOtpScreen) {
+                onNavigateToOtp()
+            }
         }
     }
 
-    LoginContent(
-        email = uiState.email,
-        isLoading = uiState.isLoading,
-        error = uiState.error,
-        onEmailChange = { viewModel.onEmailChange(it) },
-        onSendOtp = { viewModel.sendOtp(onLoginClick) }
-    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        LoginContent(
+            uiState = uiState,
+            onAction = { intent -> viewModel.handleIntent(intent) }
+        )
+
+        // Unified Dialog rendering
+        AuthDialogs(
+            dialogState = uiState.dialogState,
+            onDismiss = { viewModel.handleIntent(AuthIntent.DismissDialog) }
+        )
+    }
 }
 
 @Composable
-fun LoginContent(
-    email: String,
-    isLoading: Boolean,
-    error: String?,
-    onEmailChange: (String) -> Unit,
-    onSendOtp: () -> Unit
+fun AuthDialogs(
+    dialogState: AuthUiState.DialogState?,
+    onDismiss: () -> Unit
 ) {
+    when (dialogState) {
+        is AuthUiState.DialogState.Error -> {
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text(text = "Authentication Error") },
+                text = { Text(text = dialogState.message) },
+                confirmButton = {
+                    TextButton(onClick = onDismiss) {
+                        Text("OK", color = Color(0xFF4A6CF7))
+                    }
+                },
+                containerColor = Color.White
+            )
+        }
+        else -> Unit // Loading is handled directly on the button for better UX
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LoginContent(
+    uiState: AuthUiState,
+    onAction: (AuthIntent) -> Unit
+) {
+    val isLoading = uiState.dialogState == AuthUiState.DialogState.Loading
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -67,7 +95,6 @@ fun LoginContent(
     ) {
         Spacer(modifier = Modifier.height(40.dp))
 
-        // Logo - Squarish with rounded corners and crop
         Image(
             painter = painterResource(id = R.drawable.logo_issue),
             contentDescription = "Company Logo",
@@ -88,10 +115,9 @@ fun LoginContent(
 
         Spacer(modifier = Modifier.height(36.dp))
 
-        // Email input
         OutlinedTextField(
-            value = email,
-            onValueChange = onEmailChange,
+            value = uiState.email,
+            onValueChange = { onAction(AuthIntent.EmailChanged(it)) },
             label = { Text("Email Address") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             modifier = Modifier.fillMaxWidth(),
@@ -103,22 +129,8 @@ fun LoginContent(
             singleLine = true
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // Error message
-        if (error != null) {
-            Text(
-                text = error,
-                fontSize = 12.sp,
-                color = Color.Red,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Terms and conditions text
         Text(
             text = "We will use your email address for verification\npurpose. An OTP will be sent to your email.",
             fontSize = 12.sp,
@@ -129,15 +141,12 @@ fun LoginContent(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Login button
         Button(
-            onClick = onSendOtp,
+            onClick = { onAction(AuthIntent.SendOtpClicked) },
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF4A6CF7)
-            ),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A6CF7)),
             shape = RoundedCornerShape(8.dp),
-            enabled = email.contains("@") && email.contains(".") && !isLoading
+            enabled = uiState.email.contains("@") && uiState.email.contains(".") && !isLoading
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
@@ -163,5 +172,10 @@ fun LoginContent(
 @Preview
 @Composable
 fun LoginScreenPreview() {
-    LoginScreen(onLoginClick = {})
+    MaterialTheme {
+        LoginContent(
+            uiState = AuthUiState(),
+            onAction = {}
+        )
+    }
 }

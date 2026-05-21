@@ -1,10 +1,10 @@
 package org.example.project.profile.data.local
 
 import kotlinx.coroutines.flow.Flow
-import org.example.project.core.data.local.dao.ProfileDao
-import org.example.project.core.data.local.dao.UserPostDao
-import org.example.project.core.data.local.dao.LikedPostDao
-import org.example.project.core.data.local.entities.ProfileEntity
+import org.example.project.core.database.dao.ProfileDao
+import org.example.project.core.database.dao.UserPostDao
+import org.example.project.core.database.dao.LikedPostDao
+import org.example.project.core.database.entities.ProfileEntity
 import org.example.project.home.domain.models.Post
 import org.example.project.profile.data.local.mapper.Sort
 import org.example.project.profile.data.local.mapper.toPost

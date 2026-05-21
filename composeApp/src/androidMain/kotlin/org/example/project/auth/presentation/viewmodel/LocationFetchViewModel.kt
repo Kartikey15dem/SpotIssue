@@ -1,110 +1,156 @@
 package org.example.project.auth.presentation.viewmodel
 
-import android.Manifest
-import androidx.annotation.RequiresPermission
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.example.project.auth.domain.models.UserLocation
-import org.example.project.auth.presentation.screens.LocationFetchStep
-import org.example.project.auth.presentation.screens.LocationFetchUiState
-import org.example.project.profile.domain.repository.ProfileRepository
-import org.example.project.utils.LocationProvider
+import org.example.project.core.datastore.UserPreferencesRepository
+import org.example.project.core.model.auth.UserLocation
+import org.example.project.utils.location.LocationProvider
 
 class LocationFetchViewModel(
     private val locationProvider: LocationProvider,
-    private val profileRepository: ProfileRepository
+    private val prefRepository: UserPreferencesRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LocationFetchUiState())
     val uiState: StateFlow<LocationFetchUiState> = _uiState.asStateFlow()
 
-    private var userName: String = ""
-    private var userEmail: String = ""
+    private val _effect = MutableSharedFlow<LocationFetchEffect>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val effect: SharedFlow<LocationFetchEffect> = _effect.asSharedFlow()
 
-    fun setUserData(name: String, email: String) {
-        userName = name
-        userEmail = email
+    fun handleIntent(intent: LocationFetchIntent) {
+        when (intent) {
+            is LocationFetchIntent.StartLocationFlow -> startFetching()
+            is LocationFetchIntent.ShowRationale -> showError(LocationErrorState.RATIONALE)
+            is LocationFetchIntent.PermissionDenied -> showError(LocationErrorState.PERMISSION_DENIED)
+            is LocationFetchIntent.GpsDisabled -> showError(LocationErrorState.GPS_DISABLED)
+            is LocationFetchIntent.ActionClicked -> handleActionClicked()
+            is LocationFetchIntent.RetryClicked -> startFetching()
+            is LocationFetchIntent.ContinueWithoutLocation -> handleContinueWithoutLocation()
+        }
     }
 
-    fun startLocationFlow() {
+    private fun startFetching() {
+        _uiState.update {
+            it.copy(
+                currentStep = LocationFetchStep.FETCHING,
+                errorState = null
+            )
+        }
+
         viewModelScope.launch {
             try {
-                fetchLocation()
+                var userLocation: UserLocation? = null
+                var attempts = 0
+
+                while (userLocation == null && attempts < 3) {
+                    userLocation = locationProvider.getCurrentLocation()
+                    if (userLocation == null) {
+                        delay(1000)
+                        attempts++
+                    }
+                }
+
+                if (userLocation == null) {
+                    showError(LocationErrorState.FETCH_FAILED)
+                    return@launch
+                }
+
+
+                val formattedAddress = userLocation.address
+
+                prefRepository.updateAddress(formattedAddress)
+
+                _uiState.update { state ->
+                    state.copy(
+                        currentStep = LocationFetchStep.COMPLETED,
+                        address = formattedAddress,
+                        isCompleted = true
+                    )
+                }
+                _effect.emit(LocationFetchEffect.NavigateToNextScreen)
+
+
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    error = "Failed to start location flow: ${e.message}"
-                )
+                showError(LocationErrorState.FETCH_FAILED)
             }
         }
     }
 
-    fun onPermissionDenied() {
-        _uiState.value = _uiState.value.copy(
-            error = "Location permission is required to continue"
-        )
+    private fun handleActionClicked() {
+        viewModelScope.launch {
+            when (_uiState.value.errorState) {
+                LocationErrorState.RATIONALE, LocationErrorState.PERMISSION_DENIED ->
+                    _effect.emit(LocationFetchEffect.OpenAppSettings)
+                LocationErrorState.GPS_DISABLED ->
+                    _effect.emit(LocationFetchEffect.PromptGpsSettings)
+                LocationErrorState.FETCH_FAILED, LocationErrorState.SAVE_FAILED ->
+                    startFetching()
+                null -> {}
+            }
+        }
     }
 
-    @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
-    private suspend fun fetchLocation() {
-        try {
-            // Try to get location, with retries to allow for permission dialog
-            var userLocation: UserLocation? = null
-            var attempts = 0
-            val maxAttempts = 10 // Retry up to 10 times (10 seconds)
+    private fun handleContinueWithoutLocation() {
+        viewModelScope.launch {
+            _effect.emit(LocationFetchEffect.NavigateToNextScreen)
+        }
+    }
 
-            while (userLocation == null && attempts < maxAttempts) {
-                userLocation = locationProvider.getCurrentLocation()
-                if (userLocation == null) {
-                    delay(1000) // Wait 1 second before retrying
-                    attempts++
-                }
-            }
-
-            if (userLocation == null) {
-                _uiState.value = _uiState.value.copy(
-                    error = "Unable to get location. Please check location permissions."
-                )
-                return
-            }
-
-            // Simple one-line formatting similar to other apps: "Home - flat, street, area..."
-            val formattedAddress = userLocation.address
-
-            // Update UI to show completion
-            _uiState.value = _uiState.value.copy(
-                currentStep = LocationFetchStep.COMPLETED,
-                address = formattedAddress,
-                isCompleted = false
-            )
-
-            // Save profile to Room database
-            val result = profileRepository.upsertProfile(
-                name = userName,
-                imageUrl = null, // No image yet
-                locality = userLocation.city, // Using city as locality
-                district = userLocation.city, // Using city as district
-                state = userLocation.state,
-                country = userLocation.country
-            )
-
-            if (result.isSuccess) {
-                // Mark as completed after successful save
-                _uiState.value = _uiState.value.copy(isCompleted = true)
-            } else {
-                _uiState.value = _uiState.value.copy(
-                    error = "Failed to save profile: ${result.exceptionOrNull()?.message}"
-                )
-            }
-
-        } catch (e: Exception) {
-            _uiState.value = _uiState.value.copy(
-                error = "Failed to fetch location: ${e.message}"
+    private fun showError(errorState: LocationErrorState) {
+        _uiState.update {
+            it.copy(
+                currentStep = LocationFetchStep.ERROR,
+                errorState = errorState
             )
         }
     }
 }
+
+sealed class LocationFetchIntent {
+    data object StartLocationFlow : LocationFetchIntent()
+    data object ShowRationale : LocationFetchIntent()
+    data object PermissionDenied : LocationFetchIntent()
+    data object GpsDisabled : LocationFetchIntent()
+    data object ActionClicked : LocationFetchIntent()
+    data object RetryClicked : LocationFetchIntent()
+    data object ContinueWithoutLocation : LocationFetchIntent()
+}
+
+sealed class LocationFetchEffect {
+    data object NavigateToNextScreen : LocationFetchEffect()
+    data object OpenAppSettings : LocationFetchEffect()
+    data object PromptGpsSettings : LocationFetchEffect()
+}
+
+enum class LocationFetchStep {
+    FETCHING, COMPLETED, ERROR
+}
+
+// Configured specifically to your edge cases!
+enum class LocationErrorState(val message: String, val primaryButtonText: String, val showSecondaryRetry: Boolean) {
+    RATIONALE("Location access helps us find your address automatically.", "Open Settings", false),
+    PERMISSION_DENIED("Location permission is disabled. Please enable it in settings.", "Open Settings", false),
+    GPS_DISABLED("Your device's location services are turned off.", "Turn On Location", true),
+    FETCH_FAILED("We couldn't pinpoint your location. Please check your signal.", "Retry", false),
+    SAVE_FAILED("Failed to save your address to the server.", "Retry", false)
+}
+
+data class LocationFetchUiState(
+    val currentStep: LocationFetchStep = LocationFetchStep.FETCHING,
+    val address: String? = null,
+    val isCompleted: Boolean = false,
+    val errorState: LocationErrorState? = null
+)

@@ -1,6 +1,6 @@
 package org.example.project.core.di
 
-import org.example.project.core.data.local.getDatabase
+import org.example.project.core.database.getDatabase
 import org.koin.dsl.module
 
 /**

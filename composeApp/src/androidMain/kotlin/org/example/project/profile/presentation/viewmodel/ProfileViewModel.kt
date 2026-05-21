@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.example.project.home.domain.usecases.PostActionsUseCase
-import org.example.project.profile.domain.repository.ProfileRepository
+import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.home.domain.models.Post
 import org.example.project.profile.data.local.mapper.Sort
 import org.example.project.profile.domain.models.Profile

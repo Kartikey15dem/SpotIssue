@@ -3,51 +3,79 @@ package org.example.project.auth.presentation.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.example.project.auth.presentation.viewmodel.NameCaptureIntent
+import org.example.project.auth.presentation.viewmodel.NameCaptureUiState
 import org.example.project.auth.presentation.viewmodel.NameCaptureViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NameCaptureScreen(
-    email: String,
-    onNameConfirmed: (String) -> Unit,
-    viewModel: NameCaptureViewModel = koinViewModel<NameCaptureViewModel>()
+    onNameConfirmed: () -> Unit,
+    viewModel: NameCaptureViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(email) {
-        viewModel.setEmail(email)
-    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        NameCaptureContent(
+            uiState = uiState,
+            onAction = { intent -> viewModel.handleIntent(intent) }
+        )
 
-    NameCaptureContent(
-        name = uiState.name,
-        isLoading = uiState.isLoading,
-        error = uiState.error,
-        onNameChange = { viewModel.onNameChange(it) },
-        onConfirm = { viewModel.confirmName(onSuccess = { name -> onNameConfirmed(name) }) }
-    )
+        NameCaptureDialogs(
+            dialogState = uiState.dialogState,
+            onDismiss = { viewModel.handleIntent(NameCaptureIntent.DismissDialog) }
+        )
+    }
 }
 
 @Composable
-fun NameCaptureContent(
-    name: String,
-    isLoading: Boolean,
-    error: String?,
-    onNameChange: (String) -> Unit,
-    onConfirm: () -> Unit
+fun NameCaptureDialogs(
+    dialogState: NameCaptureUiState.DialogState?,
+    onDismiss: () -> Unit
 ) {
+    when (dialogState) {
+        is NameCaptureUiState.DialogState.Error -> {
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text(text = "Profile Error") },
+                text = { Text(text = dialogState.message) },
+                confirmButton = {
+                    TextButton(onClick = onDismiss) {
+                        Text("OK", color = Color(0xFF4A6CF7))
+                    }
+                },
+                containerColor = Color.White
+            )
+        }
+        else -> Unit
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NameCaptureContent(
+    uiState: NameCaptureUiState,
+    onAction: (NameCaptureIntent) -> Unit
+) {
+    val focusManager = LocalFocusManager.current
+    val isLoading = uiState.dialogState == NameCaptureUiState.DialogState.Loading
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -58,7 +86,7 @@ fun NameCaptureContent(
         Spacer(modifier = Modifier.height(80.dp))
 
         Text(
-            text = "Tell us your name",
+            text = "Tell us about yourself",
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             color = Color.Black
@@ -67,7 +95,7 @@ fun NameCaptureContent(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "We'll use this name on your bookings and messages.",
+            text = "We'll use this on your bookings and messages.",
             fontSize = 14.sp,
             color = Color.Gray,
             textAlign = TextAlign.Center
@@ -76,14 +104,19 @@ fun NameCaptureContent(
         Spacer(modifier = Modifier.height(32.dp))
 
         OutlinedTextField(
-            value = name,
-            onValueChange = onNameChange,
+            value = uiState.name,
+            onValueChange = { onAction(NameCaptureIntent.NameChanged(it)) },
             label = { Text("Full name") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            enabled = !isLoading,
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Words,
-                keyboardType = KeyboardType.Text
+                keyboardType = KeyboardType.Text,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { focusManager.moveFocus(FocusDirection.Down) }
             ),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color(0xFF4A6CF7),
@@ -91,25 +124,42 @@ fun NameCaptureContent(
             )
         )
 
-        if (error != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = error,
-                fontSize = 12.sp,
-                color = Color.Red,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = uiState.email,
+            onValueChange = { onAction(NameCaptureIntent.EmailChanged(it)) },
+            label = { Text("Email address") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = !isLoading,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    focusManager.clearFocus()
+                    onAction(NameCaptureIntent.SubmitClicked)
+                }
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFF4A6CF7),
+                focusedLabelColor = Color(0xFF4A6CF7)
             )
-        }
+        )
 
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
-            onClick = onConfirm,
+            onClick = {
+                focusManager.clearFocus()
+                onAction(NameCaptureIntent.SubmitClicked)
+            },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A6CF7)),
             shape = RoundedCornerShape(8.dp),
-            enabled = name.isNotBlank() && !isLoading
+            enabled = uiState.name.isNotBlank() && !isLoading
         ) {
             if (isLoading) {
                 CircularProgressIndicator(

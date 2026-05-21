@@ -6,7 +6,7 @@ import org.example.project.home.data.local.FeedLocalDataSource
 import org.example.project.home.domain.models.MediaType
 import org.example.project.home.domain.models.Post
 import org.example.project.home.domain.models.PostLevel
-import org.example.project.home.domain.repository.FeedRepository
+import org.example.project.core.data.repository.FeedRepository
 
 /**
  * Fake implementation of FeedRepository that keeps REAL local data source but fakes remote API calls

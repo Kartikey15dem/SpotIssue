@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.ksp)
     alias(libs.plugins.androidx.room)
+    alias(libs.plugins.ktorfit)
 }
 
 val localPropsFile = rootProject.file("local.properties")
@@ -15,6 +16,9 @@ val localProps = Properties().apply {
     if (localPropsFile.exists()) {
         load(FileInputStream(localPropsFile))
     }
+}
+ktorfit {
+    compilerPluginVersion.set("2.3.3")
 }
 
 kotlin {
@@ -35,10 +39,25 @@ kotlin {
     }
     
     sourceSets {
+        androidMain.dependencies {
+
+
+            implementation(libs.coil.network.okhttp)
+
+            // OkHttp (network client used by the fetcher)
+            implementation(libs.okhttp)
+
+            // Ktor OkHttp engine for Android (needed by supabase-kt / Ktor client)
+            implementation(libs.ktor.client.okhttp)
+            implementation(libs.koin.android)
+          //  implementation(libs.androidx.room.sqlite.wrapper)
+        }
         commonMain.dependencies {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.datetime)
             implementation(libs.koin.core)
+            // Koin for Compose Multiplatform
+
 
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
@@ -51,6 +70,11 @@ kotlin {
             implementation(libs.auth.kt)
             implementation(libs.postgrest.kt)
             implementation(libs.realtime.kt)
+
+            implementation(libs.multiplatform.settings)
+            implementation(libs.multiplatform.settings.serialization)
+            implementation(libs.multiplatform.settings.coroutines)
+            implementation(libs.ktorfit.lib)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

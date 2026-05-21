@@ -9,7 +9,9 @@ import org.example.project.auth.presentation.screens.LocationFetchScreenWithPerm
 import org.example.project.auth.presentation.screens.LoginScreen
 import org.example.project.auth.presentation.screens.NameCaptureScreen
 import org.example.project.auth.presentation.screens.OTPScreen
+import org.example.project.auth.presentation.viewmodel.AuthViewModel
 import org.example.project.core.navigation.Route
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun AuthNavigation(
@@ -17,6 +19,7 @@ fun AuthNavigation(
     onLocationFetched : () -> Unit
 ) {
     val authBackStack = rememberNavBackStack(Route.Auth.Login)
+    val authViewModel : AuthViewModel = koinViewModel()
 
     NavDisplay(
         backStack = authBackStack,
@@ -25,37 +28,30 @@ fun AuthNavigation(
         entryProvider = entryProvider {
             entry<Route.Auth.Login> {
                 LoginScreen(
-                    onLoginClick = { email ->
-                        authBackStack.removeLastOrNull()
-                        authBackStack.add(Route.Auth.Otp(email = email))
-                    }
-                )
-            }
-            entry<Route.Auth.Otp> { key ->
-                OTPScreen(
-                    email = key.email,
-                    onVerifyClick = {
-                        authBackStack.removeLastOrNull()
-                        authBackStack.add(Route.Auth.NameCapture(email = key.email))
+                    onNavigateToOtp = {
+                        authBackStack.add(Route.Auth.Otp)
                     },
-                    onResendClick = {
-                        // Handle resend
-                    }
+                    viewModel = authViewModel
                 )
             }
-            entry<Route.Auth.NameCapture> { key ->
-                NameCaptureScreen(
-                    email = key.email,
-                    onNameConfirmed = { name ->
+            entry<Route.Auth.Otp> {
+                OTPScreen(
+                    onAuthSuccess = {
                         authBackStack.removeLastOrNull()
-                        authBackStack.add(Route.Auth.LocationFetch(name = name, email = key.email))
+                        authBackStack.add(Route.Auth.NameCapture)
+                    },
+                    viewModel = authViewModel
+                )
+            }
+            entry<Route.Auth.NameCapture> {
+                NameCaptureScreen(
+                    onNameConfirmed = {
+                        authBackStack.removeLastOrNull()
                     }
                 )
             }
-            entry<Route.Auth.LocationFetch> { key ->
+            entry<Route.Auth.LocationFetch> {
                 LocationFetchScreenWithPermissions(
-                    name = key.name,
-                    email = key.email,
                     onLocationFetched = onLocationFetched
                 )
             }

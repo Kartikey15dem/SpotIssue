@@ -1,11 +1,10 @@
 package org.example.project.profile.di
 
-import org.example.project.core.data.local.AppDatabase
-import org.example.project.core.data.local.getDatabase
+import org.example.project.core.database.IssueSpotDatabase
+import org.example.project.core.database.getDatabase
 import org.example.project.profile.data.local.ProfileLocalDataSource
 import org.example.project.profile.data.repository.FakeProfileRepositoryImpl
-import org.example.project.profile.data.repository.ProfileRepositoryImpl
-import org.example.project.profile.domain.repository.ProfileRepository
+import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.profile.domain.usecases.GetLikedPostsUseCase
 import org.example.project.profile.domain.usecases.GetProfileUseCase
 import org.example.project.profile.domain.usecases.GetUserPostsUseCase
@@ -21,12 +20,12 @@ import org.koin.dsl.module
  */
 val profileModule = module {
     // Database - single instance
-    single<AppDatabase> { getDatabase() }
+    single<IssueSpotDatabase> { getDatabase() }
 
     // DAOs - from database
-    single { get<AppDatabase>().profileDao() }
-    single { get<AppDatabase>().userPostDao() }
-    single { get<AppDatabase>().likedPostDao() }
+    single { get<IssueSpotDatabase>().profileDao() }
+    single { get<IssueSpotDatabase>().userPostDao() }
+    single { get<IssueSpotDatabase>().likedPostDao() }
 
     // Local data source (requires all 3 DAOs)
     single {

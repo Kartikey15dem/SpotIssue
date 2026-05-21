@@ -1,8 +1,9 @@
 package org.example.project.core.di
 
 import org.koin.dsl.module
-import org.example.project.auth.di.authModule
-import org.example.project.auth.di.supabaseModule
+import org.example.project.core.network.di.supabaseModule
+import org.example.project.core.data.di.RepositoryModule
+import org.example.project.core.domain.di.useCaseModule
 import org.example.project.home.di.homeModule
 import org.example.project.profile.di.profileModule
 import org.koin.core.module.Module
@@ -24,11 +25,12 @@ val appModules = listOf(
     coreDataModule,
     supabaseModule,
 
+    // Core (new pattern)
+    RepositoryModule,
+    useCaseModule,
+
     // Feature modules
-    authModule,
     homeModule,
     profileModule
 )
-
-
 

@@ -4,7 +4,7 @@ import co.touchlab.kermit.Logger
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import org.example.project.core.data.local.entities.ProfileEntity
+import org.example.project.core.database.entities.ProfileEntity
 import org.example.project.core.settings.AuthSettings
 import org.example.project.home.domain.models.MediaType
 import org.example.project.home.domain.models.Post
@@ -12,7 +12,7 @@ import org.example.project.home.domain.models.PostLevel
 import org.example.project.profile.data.local.ProfileLocalDataSource
 import org.example.project.profile.data.local.mapper.Sort
 import org.example.project.profile.domain.models.Profile
-import org.example.project.profile.domain.repository.ProfileRepository
+import org.example.project.core.data.repository.ProfileRepository
 import kotlin.time.Clock
 
 /**

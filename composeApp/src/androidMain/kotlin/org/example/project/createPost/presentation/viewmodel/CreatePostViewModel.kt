@@ -11,8 +11,8 @@ import kotlinx.coroutines.launch
 import org.example.project.home.domain.models.CreatePost
 import org.example.project.home.domain.models.MediaType
 import org.example.project.home.domain.models.PostLevel
-import org.example.project.home.domain.repository.PostRepository
-import org.example.project.profile.domain.repository.ProfileRepository
+import org.example.project.core.data.repository.PostRepository
+import org.example.project.core.data.repository.ProfileRepository
 
 class CreatePostViewModel(
     private val postRepository: PostRepository,

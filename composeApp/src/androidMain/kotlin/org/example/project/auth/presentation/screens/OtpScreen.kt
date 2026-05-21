@@ -23,66 +23,53 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.example.project.auth.presentation.viewmodel.AuthEffect
+import org.example.project.auth.presentation.viewmodel.AuthIntent
+import org.example.project.auth.presentation.viewmodel.AuthUiState
 import org.example.project.auth.presentation.viewmodel.AuthViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun OTPScreen(
-    email: String,
-    onVerifyClick: () -> Unit,
-    onResendClick: () -> Unit,
-    viewModel: AuthViewModel = koinViewModel()
+    onAuthSuccess: () -> Unit,
+    viewModel: AuthViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // derive digit list from viewmodel otp (survives config changes)
-    val otpString = uiState.otp
-
-    val focusRequesters = remember { List(6) { FocusRequester() } }
-    val focusManager = LocalFocusManager.current
-
-    // Auto-focus first field on screen load (safe access)
     LaunchedEffect(Unit) {
-        viewModel.onEmailChange(email)
-        kotlinx.coroutines.delay(300)
-        focusRequesters.getOrNull(0)?.requestFocus()
-    }
-
-    LaunchedEffect(uiState.error) {
-        if (uiState.error != null) {
-            kotlinx.coroutines.delay(3000)
-            viewModel.clearError()
+        viewModel.effect.collect { effect ->
+            if (effect is AuthEffect.NavigateToNextScreen) {
+                onAuthSuccess()
+            }
         }
     }
 
-    OTPContent(
-        email = email,
-        otp = otpString,
-        isLoading = uiState.isLoading,
-        error = uiState.error,
-        onOtpChange = { viewModel.onOtpChange(it) },
-        onVerifyClick = { viewModel.verifyOtp(onVerifyClick) },
-        onResendClick = onResendClick,
-        focusRequesters = focusRequesters,
-        focusManager = focusManager
-    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        OTPContent(
+            uiState = uiState,
+            onAction = { intent -> viewModel.handleIntent(intent) }
+        )
+
+        AuthDialogs(
+            dialogState = uiState.dialogState,
+            onDismiss = { viewModel.handleIntent(AuthIntent.DismissDialog) }
+        )
+    }
 }
 
 @Composable
 fun OTPContent(
-    email: String,
-    otp: String,
-    isLoading: Boolean,
-    error: String?,
-    onOtpChange: (String) -> Unit,
-    onVerifyClick: () -> Unit,
-    onResendClick: () -> Unit,
-    focusRequesters: List<FocusRequester>,
-    focusManager: androidx.compose.ui.focus.FocusManager
+    uiState: AuthUiState,
+    onAction: (AuthIntent) -> Unit
 ) {
-    val otpDigits = remember(otp) {
-        List(6) { index -> otp.getOrNull(index)?.toString() ?: "" }
+    val isLoading = uiState.dialogState == AuthUiState.DialogState.Loading
+    val otpString = uiState.otp
+    val otpDigits = remember(otpString) {
+        List(6) { index -> otpString.getOrNull(index)?.toString() ?: "" }
     }
+
+    val focusRequesters = remember { List(6) { FocusRequester() } }
+    val focusManager = LocalFocusManager.current
 
     Column(
         modifier = Modifier
@@ -103,7 +90,7 @@ fun OTPContent(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "We have sent you a 6 digit verification\ncode to $email",
+            text = "We have sent you a 6 digit verification\ncode to ${uiState.email}",
             fontSize = 14.sp,
             color = Color.Gray,
             textAlign = TextAlign.Center,
@@ -112,7 +99,6 @@ fun OTPContent(
 
         Spacer(modifier = Modifier.height(40.dp))
 
-        // OTP input fields
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(horizontal = 32.dp)
@@ -122,11 +108,10 @@ fun OTPContent(
                 OTPDigitField(
                     value = digit,
                     onValueChange = { newValue ->
-                        // build new otp from current digits and update viewmodel
                         val list = MutableList(6) { i -> otpDigits.getOrNull(i) ?: "" }
                         list[index] = newValue
                         val combined = list.joinToString(separator = "") { it }
-                        onOtpChange(combined)
+                        onAction(AuthIntent.OtpChanged(combined))
                     },
                     onNext = {
                         focusRequesters.getOrNull(index + 1)?.requestFocus() ?: focusManager.clearFocus()
@@ -141,30 +126,14 @@ fun OTPContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Error message
-        if (error != null) {
-            Text(
-                text = error,
-                fontSize = 12.sp,
-                color = Color.Red,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Verify button - enabled when viewmodel otp has 6 digits
         Button(
-            onClick = onVerifyClick,
+            onClick = { onAction(AuthIntent.VerifyOtpClicked) },
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF4A6CF7)
-            ),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A6CF7)),
             shape = RoundedCornerShape(8.dp),
-            enabled = otp.length == 6 && !isLoading
+            enabled = otpString.length == 6 && !isLoading
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
@@ -185,9 +154,8 @@ fun OTPContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Resend option
         TextButton(
-            onClick = onResendClick,
+            onClick = { onAction(AuthIntent.SendOtpClicked) },
             enabled = !isLoading
         ) {
             Text(
@@ -221,10 +189,8 @@ fun OTPDigitField(
         )
     }
 
-    // Keep a copy of previous text to detect deletions
     var previousText by remember { mutableStateOf(value) }
 
-    // Sync when value changes externally
     LaunchedEffect(value) {
         if (textFieldValue.text != value) {
             textFieldValue = TextFieldValue(
@@ -242,26 +208,22 @@ fun OTPDigitField(
 
             when {
                 newText.length == 1 -> {
-                    // user entered a digit
                     textFieldValue = TextFieldValue(text = newText, selection = TextRange(1))
                     onValueChange(newText)
                     onNext()
                 }
                 newText.length > 1 -> {
-                    // paste or multi-digit input: keep the first digit here and let caller propagate rest
                     val firstDigit = newText.first().toString()
                     textFieldValue = TextFieldValue(text = firstDigit, selection = TextRange(1))
                     onValueChange(firstDigit)
                     onNext()
                 }
                 newText.isEmpty() && previousText.isNotEmpty() -> {
-                    // backspace deleted the character
                     textFieldValue = TextFieldValue(text = "", selection = TextRange(0))
                     onValueChange("")
                     onPrevious()
                 }
                 else -> {
-                    // nothing or unsupported change
                     textFieldValue = TextFieldValue(text = newText, selection = TextRange(newText.length))
                 }
             }
@@ -310,9 +272,10 @@ fun OTPDigitField(
 @Preview
 @Composable
 fun OTPScreenPreview() {
-    OTPScreen(
-        email = "test@example.com",
-        onVerifyClick = {},
-        onResendClick = {}
-    )
+    MaterialTheme {
+        OTPContent(
+            uiState = AuthUiState(),
+            onAction = {}
+        )
+    }
 }

@@ -1,30 +1,8 @@
 package org.example.project.home.domain.models
 
-
-data class Post(
-    val id:String,
-    val userUrl: String,
-    val userName: String,
-    val timeAgo: String,
-    val postLevel: PostLevel,
-    val location: String,
-    val postText: String,
-    val mediaType: MediaType,
-    val mediaUrl: String,
-    val likes: Int,
-    val comments: Int,
-)
-enum class MediaType {
-    IMAGE,
-    VIDEO,
-    PDF
-}
-enum class PostLevel(val displayName: String){
-    LOCALITY("Locality"),
-    DISTRICT("District"),
-    STATE("State"),
-    NATIONAL("National")
-}
+typealias Post = org.example.project.core.model.home.Post
+typealias MediaType = org.example.project.core.model.home.MediaType
+typealias PostLevel = org.example.project.core.model.home.PostLevel
 
 fun PostLevel.getText(): String {
     return when (this) {
@@ -34,3 +12,4 @@ fun PostLevel.getText(): String {
         PostLevel.NATIONAL -> "Nationwide issues and concerns"
     }
 }
+
