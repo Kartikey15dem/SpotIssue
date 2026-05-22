@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +12,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.example.project.core.data.repository.FeedRepository
 import org.example.project.core.data.repository.PostRepository
@@ -42,14 +40,6 @@ class HomeViewModel(
                     postsFlow = feedRepository.getPagedPosts(level).cachedIn(viewModelScope)
                 ) }
                 observeActiveIssues(level)
-            }
-        }
-
-        // Periodic refresh loop every 10 minutes
-        viewModelScope.launch {
-            while (isActive) {
-                delay(10 * 60 * 1000L)
-                refresh()
             }
         }
     }
@@ -83,11 +73,15 @@ class HomeViewModel(
     private fun refresh() {
         val currentLevel = _uiState.value.postLevel
         viewModelScope.launch {
-            updateState { it.copy(isRefreshing = true) }
+                updateState { it.copy(isRefreshing = true) }
             
-            // Trigger background refresh
-            feedRepository.refreshPosts(currentLevel)
-            feedRepository.refreshActiveIssuesCount(currentLevel)
+            // Recreate paging flow so UI can treat this like a "pull-to-refresh" event.
+            // This mirrors the android-client approach where refresh re-requests the paging flow.
+            updateState {
+                it.copy(
+                    postsFlow = feedRepository.getPagedPosts(currentLevel, forceRefresh = true).cachedIn(viewModelScope),
+                )
+            }
 
             updateState { it.copy(isRefreshing = false) }
         }

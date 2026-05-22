@@ -13,22 +13,12 @@ import org.example.project.core.utils.DataState
  */
 interface FeedRepository {
     /**
-     * Get paged posts for a given post level (Room-backed with RemoteMediator)
+     * Get paged posts for a given post level (network PagingSource via Pager).
      */
-    fun getPagedPosts(postLevel: PostLevel): Flow<PagingData<Post>>
+    fun getPagedPosts(postLevel: PostLevel, forceRefresh: Boolean = false): Flow<PagingData<Post>>
 
     /**
-     * Observe active issues count for a given post level (Room-backed)
+     * Observe active issues count for a given post level (cached locally).
      */
     fun observeActiveIssuesCount(postLevel: PostLevel): Flow<DataState<Int>>
-
-    /**
-     * Force refresh posts from API
-     */
-    suspend fun refreshPosts(postLevel: PostLevel): DataState<Unit>
-
-    /**
-     * Force refresh active issues count from API
-     */
-    suspend fun refreshActiveIssuesCount(postLevel: PostLevel): DataState<Unit>
 }

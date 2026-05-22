@@ -9,12 +9,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.example.project.core.datastore.UserPreferencesRepository
-import org.example.project.core.utils.DataState
 
 class NameCaptureViewModel(
-    private val profileRepository: ProfileRepository,
     private val prefRepository: UserPreferencesRepository,
-    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(NameCaptureUiState())
@@ -54,21 +51,9 @@ class NameCaptureViewModel(
 
         viewModelScope.launch {
             showLoading()
-
-            when (val result = profileRepository.updateNameAndEmail(currentName, currentEmail, phoneNumber)) {
-                is DataState.Success<*> -> {
-                    hideLoading()
-                    prefRepository.updateName(currentName)
-                    prefRepository.setLoggedIn(true)
-
-                }
-                is DataState.Error -> {
-                    showError(result.exception.message ?: "Failed to save profile")
-                }
-                is DataState.Loading -> {
-                    showLoading()
-                }
-            }
+            prefRepository.updateName(currentName)
+            prefRepository.setLoggedIn(true)
+            hideLoading()
         }
     }
 

@@ -41,10 +41,26 @@ interface UserPostDao {
     @Query("DELETE FROM user_posts WHERE userId = :userId")
     suspend fun deleteAllUserPosts(userId: String = "current_user")
 
+    /**
+     * Keep only the newest [maxPosts] rows for this user, deleting the rest.
+     */
+    @Query(
+        """
+        DELETE FROM user_posts
+        WHERE userId = :userId
+          AND id NOT IN (
+            SELECT id FROM user_posts
+            WHERE userId = :userId
+            ORDER BY createdAt DESC
+            LIMIT :maxPosts
+          )
+        """,
+    )
+    suspend fun trimUserPosts(userId: String = "current_user", maxPosts: Int)
+
     @Query("UPDATE user_posts SET likes = :likes, isLiked = :isLiked WHERE id = :postId")
     suspend fun updatePostLikeStatus(postId: String, likes: Int, isLiked: Boolean)
 
     @Query("SELECT COUNT(*) FROM user_posts WHERE userId = :userId")
     suspend fun getUserPostCount(userId: String = "current_user"): Int
 }
-

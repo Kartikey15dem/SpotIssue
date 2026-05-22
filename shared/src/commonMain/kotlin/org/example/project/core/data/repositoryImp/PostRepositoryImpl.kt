@@ -2,7 +2,7 @@ package org.example.project.core.data.repositoryImp
 
 import org.example.project.core.data.repository.PostRepository
 import org.example.project.core.network.services.PostService
-import org.example.project.home.domain.models.CreatePost
+import org.example.project.core.model.createPost.CreatePost
 
 class PostRepositoryImpl(
     private val postService: PostService

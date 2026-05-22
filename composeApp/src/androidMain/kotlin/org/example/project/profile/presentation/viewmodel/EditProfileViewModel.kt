@@ -8,20 +8,19 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.example.project.profile.domain.usecases.GetProfileUseCase
-import org.example.project.profile.domain.usecases.UpdateProfileUseCase
+import org.example.project.core.data.repository.ProfileRepository
+import org.example.project.core.utils.DataState
 import org.example.project.profile.domain.models.Profile
 import org.example.project.utils.AndroidVideoPicker
-import kotlin.onSuccess
 
 /**
  * ViewModel for Edit Profile Screen with MVI pattern
  */
 class EditProfileViewModel(
-    private val getProfileUseCase: GetProfileUseCase,
-    private val updateProfileUseCase: UpdateProfileUseCase,
+    private val profileRepository: ProfileRepository,
     private val imagePicker: AndroidVideoPicker
 ) : ViewModel() {
 
@@ -32,6 +31,7 @@ class EditProfileViewModel(
     val sideEffects: SharedFlow<EditProfileSideEffect> = _sideEffects.asSharedFlow()
 
     init {
+        observeProfile()
         loadProfile()
     }
 
@@ -56,28 +56,44 @@ class EditProfileViewModel(
 
     private fun loadProfile() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-
-            getProfileUseCase()
-                .onSuccess { profile ->
-                    _uiState.update {
-                        it.copy(
-                            originalProfile = profile,
-                            imageUrl = profile.imageUrl,
-                            name = profile.name,
-                            locality = profile.locality,
-                            district = profile.district,
-                            state = profile.state,
-                            country = profile.country,
-                            isLoading = false,
-                            error = null
-                        )
-                    }
-                }
-                .onFailure { error ->
-                    handleError(error)
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            when (val res = profileRepository.refreshProfile()) {
+                is DataState.Error -> {
+                    handleError(res.exception)
                     _uiState.update { it.copy(isLoading = false) }
                 }
+                else -> Unit // observeProfile() will update state when data arrives
+            }
+        }
+    }
+
+    private fun observeProfile() {
+        viewModelScope.launch {
+            profileRepository.observeProfile().collect { state ->
+                when (state) {
+                    DataState.Loading -> _uiState.update { it.copy(isLoading = true) }
+                    is DataState.Error -> {
+                        handleError(state.exception)
+                        _uiState.update { it.copy(isLoading = false) }
+                    }
+                    is DataState.Success -> {
+                        val profile = state.data
+                        _uiState.update {
+                            it.copy(
+                                originalProfile = profile,
+                                imageUrl = profile.imageUrl,
+                                name = profile.name,
+                                locality = profile.locality,
+                                district = profile.district,
+                                state = profile.state,
+                                country = profile.country,
+                                isLoading = false,
+                                error = null,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -179,16 +195,18 @@ class EditProfileViewModel(
             )
 
             if (updatedProfile != null) {
-                updateProfileUseCase(updatedProfile)
-                    .onSuccess { profile ->
-                        _uiState.update { it.copy(isSaving = false, originalProfile = profile) }
+                when (val res = profileRepository.updateProfile(updatedProfile)) {
+                    is DataState.Success -> {
+                        _uiState.update { it.copy(isSaving = false, originalProfile = updatedProfile) }
                         _sideEffects.emit(EditProfileSideEffect.ProfileSaved)
                         _sideEffects.emit(EditProfileSideEffect.ShowSnackbar("Profile updated successfully"))
                     }
-                    .onFailure { error ->
-                        handleError(error)
+                    is DataState.Error -> {
+                        handleError(res.exception)
                         _uiState.update { it.copy(isSaving = false) }
                     }
+                    DataState.Loading -> Unit
+                }
             }
         }
     }
@@ -270,4 +288,3 @@ sealed interface EditProfileSideEffect {
     data object ProfileSaved : EditProfileSideEffect
     data object BackPreseed : EditProfileSideEffect
 }
-

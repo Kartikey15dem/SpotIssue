@@ -8,9 +8,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.example.project.home.domain.models.CreatePost
+import org.example.project.core.model.createPost.CreatePost
 import org.example.project.home.domain.models.MediaType
-import org.example.project.home.domain.models.PostLevel
 import org.example.project.core.data.repository.PostRepository
 import org.example.project.core.data.repository.ProfileRepository
 
@@ -24,11 +23,7 @@ class CreatePostViewModel(
     private val _sideEffects = MutableSharedFlow<CreatePostSideEffect>()
     val sideEffects: SharedFlow<CreatePostSideEffect> = _sideEffects
 
-    init{
-        viewModelScope.launch {
-            profileRepository.getProfile()
-        }
-    }
+    // Profile can be observed later when we need to prefill author fields.
 
     fun onIntent(intent: CreatePostIntent) {
         when (intent) {

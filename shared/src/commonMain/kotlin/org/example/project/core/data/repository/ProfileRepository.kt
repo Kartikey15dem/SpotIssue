@@ -2,6 +2,8 @@ package org.example.project.core.data.repository
 
 import androidx.paging.PagingData
 import kotlinx.coroutines.flow.Flow
+import org.example.project.core.model.home.Post
+import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
 
 /**
@@ -11,12 +13,12 @@ import org.example.project.core.utils.DataState
 interface ProfileRepository {
 
     /**
-     * Get paged user posts (Room-backed with RemoteMediator)
+     * Get paged user posts (network PagingSource via Pager).
      */
     fun getPagedUserPosts(userId: String? = null): Flow<PagingData<Post>>
 
     /**
-     * Get paged liked posts (Room-backed with RemoteMediator)
+     * Get paged liked posts (network PagingSource via Pager).
      */
     fun getPagedLikedPosts(userId: String? = null): Flow<PagingData<Post>>
 

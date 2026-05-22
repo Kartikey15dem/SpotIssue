@@ -50,7 +50,7 @@ import org.example.project.core.utils.DataState
 import org.example.project.home.domain.models.PostLevel
 import org.example.project.home.presentation.components.PostCard
 import org.example.project.home.presentation.components.PostLevelChip
-import org.example.project.profile.data.local.mapper.Sort
+import org.example.project.core.data.mappers.Sort
 import org.example.project.profile.domain.models.Profile
 import org.example.project.profile.presentation.viewmodel.ProfileIntent
 import org.example.project.profile.presentation.viewmodel.ProfileSideEffect
@@ -117,16 +117,6 @@ fun ProfileScreenContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            if (state.isRefreshing) {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = IssueSpotColors.Primary,
-                    trackColor = IssueSpotColors.SurfaceVariant
-                )
-            }
-        }
-
         item {
             when (val res = state.profileState) {
                 is DataState.Success -> ProfileHeader(res.data, onIntent)

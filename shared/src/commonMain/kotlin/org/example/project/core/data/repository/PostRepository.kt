@@ -1,6 +1,6 @@
 package org.example.project.core.data.repository
 
-import org.example.project.home.domain.models.CreatePost
+import org.example.project.core.model.createPost.CreatePost
 
 interface PostRepository {
     suspend fun likePost(postId: String): Result<Unit>

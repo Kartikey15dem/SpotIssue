@@ -41,6 +41,23 @@ interface PostDao {
     suspend fun deletePostsByLevel(postLevel: String)
 
     /**
+     * Keep only the newest [maxPosts] posts for a given level, deleting the rest.
+     */
+    @Query(
+        """
+        DELETE FROM posts
+        WHERE postLevel = :postLevel
+          AND id NOT IN (
+            SELECT id FROM posts
+            WHERE postLevel = :postLevel
+            ORDER BY cachedAt DESC
+            LIMIT :maxPosts
+          )
+        """,
+    )
+    suspend fun trimPostsByLevel(postLevel: String, maxPosts: Int)
+
+    /**
      * Clear all posts
      */
     @Query("DELETE FROM posts")
@@ -52,4 +69,3 @@ interface PostDao {
     @Query("SELECT COUNT(*) FROM posts WHERE postLevel = :postLevel")
     suspend fun getPostCountByLevel(postLevel: String): Int
 }
-

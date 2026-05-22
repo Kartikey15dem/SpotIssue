@@ -4,14 +4,11 @@ import co.touchlab.kermit.Logger
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
-import androidx.paging.map
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
-import androidx.paging.ExperimentalPagingApi
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.database.IssueSpotDatabase
 import org.example.project.core.database.entities.ProfileEntity
@@ -19,14 +16,12 @@ import org.example.project.core.database.entities.toProfile
 import org.example.project.core.database.entities.toEntity
 import org.example.project.core.network.services.ProfileService
 import org.example.project.home.domain.models.Post
-import org.example.project.core.data.local.ProfileLocalDataSource
+import org.example.project.profile.data.local.ProfileLocalDataSource
 import org.example.project.profile.domain.models.Profile
 import org.example.project.core.utils.DataState
 import org.example.project.core.utils.safeApiCall
 import kotlin.time.Clock
-import org.example.project.core.data.mappers.toPost
-import org.example.project.core.data.paging.ProfileLikedPostsRemoteMediator
-import org.example.project.core.data.paging.ProfileUserPostsRemoteMediator
+import org.example.project.profile.data.paging.ProfilePostsPagingSource
 
 class ProfileRepositoryImpl(
     private val profileService: ProfileService,
@@ -40,38 +35,32 @@ class ProfileRepositoryImpl(
         private const val CURRENT_USER_ID = "current_user"
     }
 
-    @OptIn(ExperimentalPagingApi::class, ExperimentalCoroutinesApi::class)
     override fun getPagedUserPosts(userId: String?): Flow<PagingData<Post>> {
         val targetUserId = userId ?: CURRENT_USER_ID
         return Pager(
             config = PagingConfig(pageSize = 20),
-            remoteMediator = ProfileUserPostsRemoteMediator(
-                userId = targetUserId,
-                profileService = profileService,
-                database = database,
-                localDataSource = localDataSource,
-            ),
-            pagingSourceFactory = { database.userPostDao().pagingSource(targetUserId) },
-        ).flow.map { pagingData ->
-            pagingData.map { entity -> entity.toPost() }
-        }
+            pagingSourceFactory = {
+                ProfilePostsPagingSource(
+                    profileService = profileService,
+                    userId = targetUserId,
+                    kind = ProfilePostsPagingSource.Kind.USER_POSTS,
+                )
+            },
+        ).flow
     }
 
-    @OptIn(ExperimentalPagingApi::class, ExperimentalCoroutinesApi::class)
     override fun getPagedLikedPosts(userId: String?): Flow<PagingData<Post>> {
         val targetUserId = userId ?: CURRENT_USER_ID
         return Pager(
             config = PagingConfig(pageSize = 20),
-            remoteMediator = ProfileLikedPostsRemoteMediator(
-                userId = targetUserId,
-                profileService = profileService,
-                database = database,
-                localDataSource = localDataSource,
-            ),
-            pagingSourceFactory = { database.likedPostDao().pagingSource(targetUserId) },
-        ).flow.map { pagingData ->
-            pagingData.map { entity -> entity.toPost() }
-        }
+            pagingSourceFactory = {
+                ProfilePostsPagingSource(
+                    profileService = profileService,
+                    userId = targetUserId,
+                    kind = ProfilePostsPagingSource.Kind.LIKED_POSTS,
+                )
+            },
+        ).flow
     }
 
     override fun observeProfile(userId: String?): Flow<DataState<Profile>> = flow {

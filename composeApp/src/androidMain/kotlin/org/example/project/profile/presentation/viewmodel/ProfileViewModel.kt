@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,15 +11,13 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.example.project.core.data.repository.PostRepository
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.home.domain.models.Post
-import org.example.project.profile.data.local.mapper.Sort
+import org.example.project.core.data.mappers.Sort
 import org.example.project.profile.domain.models.Profile
 import org.example.project.core.utils.DataState
 
@@ -38,14 +35,6 @@ class ProfileViewModel(
     init {
         observeProfile()
         observePosts()
-
-        // Periodic refresh loop every 10 minutes
-        viewModelScope.launch {
-            while (isActive) {
-                delay(10 * 60 * 1000L)
-                refresh()
-            }
-        }
     }
 
     private fun observeProfile() {
@@ -71,7 +60,6 @@ class ProfileViewModel(
 
     fun onIntent(intent: ProfileIntent) {
         when (intent) {
-            ProfileIntent.Refresh -> refresh()
             ProfileIntent.CreatePostClicked -> navigateToCreatePost()
             ProfileIntent.EditProfileClicked -> navigateToEditProfile()
             is ProfileIntent.TabChanged -> changeTab(intent.isMine)
@@ -87,14 +75,6 @@ class ProfileViewModel(
 
     private fun updateState(update: (ProfileState) -> ProfileState) {
         _uiState.update(update)
-    }
-
-    private fun refresh() {
-        viewModelScope.launch {
-            updateState { it.copy(isRefreshing = true) }
-            profileRepository.refreshProfile()
-            updateState { it.copy(isRefreshing = false) }
-        }
     }
 
     private fun changeTab(isMine: Boolean) {
@@ -170,7 +150,6 @@ class ProfileViewModel(
 }
 
 sealed interface ProfileIntent {
-    data object Refresh : ProfileIntent
     data object CreatePostClicked : ProfileIntent
     data object EditProfileClicked : ProfileIntent
     data class TabChanged(val isMine: Boolean) : ProfileIntent
@@ -189,7 +168,6 @@ data class ProfileState(
     val isMine: Boolean = true,
     val sort: Sort = Sort.LATEST,
     val isLoading: Boolean = false,
-    val isRefreshing: Boolean = false,
     val error: String? = null
 )
 
