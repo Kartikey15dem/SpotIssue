@@ -18,7 +18,7 @@ import org.koin.core.parameter.parametersOf
 @Composable
 fun AuthNavigation(
     modifier : Modifier = Modifier,
-    onLocationFetched : () -> Unit
+    onAuthSuccess : () -> Unit
 ) {
     val authBackStack = rememberNavBackStack(Route.Auth.Login)
     val authViewModel : AuthViewModel = koinViewModel()
@@ -42,7 +42,7 @@ fun AuthNavigation(
                         authBackStack.removeLastOrNull()
                         authBackStack.add(Route.Auth.NameCapture(email))
                     },
-                    navigateToNextScreen = {authBackStack.removeLastOrNull()},
+                    navigateToNextScreen = onAuthSuccess,
                     viewModel = authViewModel
                 )
             }
@@ -51,15 +51,8 @@ fun AuthNavigation(
                     parametersOf(route.email)
                 }
                 NameCaptureScreen(
-                    onNameConfirmed = {
-                        authBackStack.removeLastOrNull()
-                    },
+                    onNameConfirmed = onAuthSuccess,
                     viewModel = nameCaptureViewModel
-                )
-            }
-            entry<Route.Auth.LocationFetch> {
-                LocationFetchScreenWithPermissions(
-                    onLocationFetched = onLocationFetched
                 )
             }
         }

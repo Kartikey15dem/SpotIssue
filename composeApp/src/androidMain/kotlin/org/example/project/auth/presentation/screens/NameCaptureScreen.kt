@@ -47,7 +47,7 @@ fun NameCaptureScreen(
     }
 
     Scaffold(
-        snackbarHost = { 
+        snackbarHost = {
             SnackbarHost(snackbarHostState) { data ->
                 androidx.compose.material3.Snackbar(
                     snackbarData = data,
@@ -55,7 +55,7 @@ fun NameCaptureScreen(
                     contentColor = Color.White,
                     actionColor = Color(0xFF4A6CF7)
                 )
-            } 
+            }
         },
         containerColor = Color.White
     ) { padding ->

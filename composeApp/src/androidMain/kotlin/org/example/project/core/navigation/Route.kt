@@ -14,14 +14,11 @@ sealed interface Route:NavKey{
         data object Otp : Route
 
         @Serializable
-        data class LocationFetch(
-            val name: String,
-            val email: String
-        ) : Route
-
-        @Serializable
         data class NameCapture(val email : String) : Route
     }
+
+    @Serializable
+    data object LocationFetch : Route
 
     @Serializable
     data object Home: Route

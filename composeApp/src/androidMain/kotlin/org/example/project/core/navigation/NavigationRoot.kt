@@ -12,6 +12,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import org.example.project.auth.presentation.navigation.AuthNavigation
+import org.example.project.auth.presentation.screens.LocationFetchScreenWithPermissions
 import org.example.project.createPost.presentation.navigation.CreatePostNavigation
 import org.example.project.home.presentation.navigation.HomeNavigation
 import org.example.project.profile.presentation.navigation.ProfileNavigation
@@ -34,6 +35,14 @@ fun NavigationRoot(
         entryProvider = entryProvider {
             entry<Route.Auth> {
                 AuthNavigation(
+                    onAuthSuccess = {
+                        rootBackStack.clear()
+                        rootBackStack.add(Route.LocationFetch)
+                    }
+                )
+            }
+            entry<Route.LocationFetch> {
+                LocationFetchScreenWithPermissions(
                     onLocationFetched = {
                         rootBackStack.clear()
                         rootBackStack.add(Route.Home)

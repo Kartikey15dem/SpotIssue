@@ -107,7 +107,7 @@ fun ProfileScreen(
                     contentColor = Color.White,
                     actionColor = Color(0xFF4A6CF7)
                 )
-            } 
+            }
         },
         containerColor = IssueSpotColors.Background
     ) { padding ->
