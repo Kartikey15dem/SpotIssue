@@ -1,17 +1,26 @@
 package org.example.project.core.model.home
 
+data class Coordinates(
+    val latitude: Double,
+    val longitude: Double
+)
+
 data class Post(
     val id: String,
     val userUrl: String,
     val userName: String,
     val timeAgo: String,
     val postLevel: PostLevel,
-    val location: String,
     val postText: String,
     val mediaType: MediaType,
     val mediaUrl: String,
     val likes: Int,
     val comments: Int,
+    val locality: String? = null,
+    val district: String? = null,
+    val state: String? = null,
+    val country: String? = null,
+    val coordinates: Coordinates? = null
 )
 
 enum class MediaType {
@@ -36,6 +45,3 @@ fun PostLevel.getText(): String {
         PostLevel.NATIONAL -> "Nationwide issues and concerns"
     }
 }
-
-
-

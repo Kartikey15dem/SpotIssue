@@ -71,7 +71,7 @@ class LocationFetchViewModel(
 
                 val formattedAddress = userLocation.address
 
-                prefRepository.updateAddress(formattedAddress)
+                prefRepository.updateUserLocation(userLocation)
 
                 _uiState.update { state ->
                     state.copy(

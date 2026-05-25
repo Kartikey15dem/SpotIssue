@@ -15,125 +15,182 @@ import kotlinx.coroutines.withContext
 import org.example.project.core.model.auth.UserLocation
 import kotlin.coroutines.resume
 
-/**
- * Android actual implementation of [LocationProvider].
- *
- * This is intentionally simple and uses the last known location from the system services.
- * Permissions must be granted before calling [getCurrentLocation].
- * Use [LocationPermissionHandler] to request permissions before using this provider.
- */
-class LocationProvider(private val context: Context) {
+class LocationProvider(
+    private val context: Context
+) {
 
-    private val geocoder: Geocoder? = if (Geocoder.isPresent()) {
-        Geocoder(context)
-    } else null
-
-    @RequiresPermission(anyOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
-     suspend fun getCurrentLocation(): UserLocation? = withContext(Dispatchers.IO) {
-        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-            ?: return@withContext null
-
-        val providers = locationManager.getProviders(true)
-        var bestLocation: Location? = null
-        for (provider in providers) {
-            val l = locationManager.getLastKnownLocation(provider) ?: continue
-            if (bestLocation == null || l.accuracy < bestLocation.accuracy) {
-                bestLocation = l
-            }
+    private val geocoder: Geocoder? =
+        if (Geocoder.isPresent()) {
+            Geocoder(context)
+        } else {
+            null
         }
 
-        val loc = bestLocation ?: return@withContext null
+    @RequiresPermission(
+        anyOf = [
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ]
+    )
+    suspend fun getCurrentLocation(): UserLocation? =
+        withContext(Dispatchers.IO) {
 
-        // Perform reverse geocoding to get address
-        val address = reverseGeocode(loc.latitude, loc.longitude)
+            val locationManager =
+                context.getSystemService(Context.LOCATION_SERVICE)
+                        as? LocationManager
+                    ?: return@withContext null
 
-        address
-    }
+            val providers = locationManager.getProviders(true)
 
-    private suspend fun reverseGeocode(latitude: Double, longitude: Double): UserLocation {
+            var bestLocation: Location? = null
+
+            for (provider in providers) {
+
+                val location =
+                    locationManager.getLastKnownLocation(provider)
+                        ?: continue
+
+                if (
+                    bestLocation == null ||
+                    location.accuracy < bestLocation.accuracy
+                ) {
+                    bestLocation = location
+                }
+            }
+
+            val location = bestLocation
+                ?: return@withContext null
+
+            reverseGeocode(
+                location.latitude,
+                location.longitude
+            )
+        }
+
+    private suspend fun reverseGeocode(
+        latitude: Double,
+        longitude: Double
+    ): UserLocation {
+
         if (geocoder == null) {
-            Log.w("LocationProvider", "Geocoder not available")
             return UserLocation(
-                address = "$latitude, $longitude",
+                address = "$latitude,$longitude",
                 latitude = latitude,
                 longitude = longitude
             )
         }
 
         return try {
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                // Use new async API for Android 13+
+
                 suspendCancellableCoroutine { continuation ->
-                    geocoder.getFromLocation(latitude, longitude, 1) { addresses ->
-                        val userLocation = if (addresses.isNotEmpty()) {
-                            parseAddress(addresses[0], latitude, longitude)
-                        } else {
-                            UserLocation(
-                                address = "$latitude, $longitude",
-                                latitude = latitude,
-                                longitude = longitude
-                            )
-                        }
-                        continuation.resume(userLocation)
+
+                    geocoder.getFromLocation(
+                        latitude,
+                        longitude,
+                        1
+                    ) { addresses ->
+
+                        val result =
+                            if (addresses.isNotEmpty()) {
+                                parseAddress(
+                                    addresses[0],
+                                    latitude,
+                                    longitude
+                                )
+                            } else {
+                                UserLocation(
+                                    address = "$latitude,$longitude",
+                                    latitude = latitude,
+                                    longitude = longitude
+                                )
+                            }
+
+                        continuation.resume(result)
                     }
                 }
+
             } else {
-                // Use deprecated synchronous API for older versions
+
                 @Suppress("DEPRECATION")
-                val addresses = geocoder.getFromLocation(latitude, longitude, 1)
+                val addresses =
+                    geocoder.getFromLocation(
+                        latitude,
+                        longitude,
+                        1
+                    )
+
                 if (!addresses.isNullOrEmpty()) {
-                    parseAddress(addresses[0], latitude, longitude)
+                    parseAddress(
+                        addresses[0],
+                        latitude,
+                        longitude
+                    )
                 } else {
                     UserLocation(
-                        address = "$latitude, $longitude",
+                        address = "$latitude,$longitude",
                         latitude = latitude,
                         longitude = longitude
                     )
                 }
             }
+
         } catch (e: Exception) {
-            Log.e("LocationProvider", "Reverse geocoding failed", e)
+
+            Log.e(
+                "LocationProvider",
+                "Reverse geocoding failed",
+                e
+            )
+
             UserLocation(
-                address = "$latitude, $longitude",
+                address = "$latitude,$longitude",
                 latitude = latitude,
                 longitude = longitude
             )
         }
     }
 
-    private fun parseAddress(address: Address, latitude: Double, longitude: Double): UserLocation {
-        // Extract address components
-        val flatNumber = address.subThoroughfare ?: address.featureName // House/building number
-        val streetAddress = address.thoroughfare // Street name
-        val city = address.locality ?: address.subAdminArea // City
-        val state = address.adminArea // State
-        val postalCode = address.postalCode
-        val country = address.countryName
+    private fun parseAddress(
+        address: Address,
+        latitude: Double,
+        longitude: Double
+    ): UserLocation {
 
-        // Build formatted address: "Flat/House, Street, City, State"
-        val formattedParts = mutableListOf<String>()
-        flatNumber?.let { if (it.isNotBlank()) formattedParts.add(it) }
-        streetAddress?.let { if (it.isNotBlank()) formattedParts.add(it) }
-        city?.let { if (it.isNotBlank()) formattedParts.add(it) }
-        state?.let { if (it.isNotBlank()) formattedParts.add(it) }
+        val locality =
+            address.subLocality
+                ?: address.locality
 
-        val formattedAddress = if (formattedParts.isNotEmpty()) {
-            formattedParts.joinToString(", ")
-        } else {
-            "$latitude, $longitude"
-        }
+        val district =
+            address.subAdminArea
 
-        Log.d("LocationProvider", "Reverse geocoded: $formattedAddress")
+        val state =
+            address.adminArea
+
+        val country =
+            address.countryName
+
+        val formattedAddress =
+            listOf(
+                locality,
+                district,
+                state,
+                country
+            )
+                .filter {
+                    !it.isNullOrBlank()
+                }
+                .joinToString(", ")
 
         return UserLocation(
             address = formattedAddress,
             latitude = latitude,
             longitude = longitude,
-            flatNumber = flatNumber,
-            streetAddress = streetAddress,
-            city = city,
+
+            locality = locality,
+            district = district,
             state = state,
-            postalCode = postalCode,
             country = country
         )
     }

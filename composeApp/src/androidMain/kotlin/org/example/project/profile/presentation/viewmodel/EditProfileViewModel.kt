@@ -12,8 +12,8 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.example.project.core.data.repository.ProfileRepository
+import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
-import org.example.project.profile.domain.models.Profile
 import org.example.project.utils.AndroidVideoPicker
 
 /**
@@ -83,10 +83,6 @@ class EditProfileViewModel(
                                 originalProfile = profile,
                                 imageUrl = profile.imageUrl,
                                 name = profile.name,
-                                locality = profile.locality,
-                                district = profile.district,
-                                state = profile.state,
-                                country = profile.country,
                                 isLoading = false,
                                 error = null,
                             )
@@ -134,7 +130,7 @@ class EditProfileViewModel(
 //                    return@launch
 //                }
 //            }
-
+//
 //            val imageUri = imagePicker.pickImageFromGallery()
 //            if (imageUri != null) {
 //                _uiState.update { it.copy(imageUrl = imageUri, isLoadingImage = false) }
@@ -182,16 +178,13 @@ class EditProfileViewModel(
             val updatedProfile = currentState.originalProfile?.copy(
                 imageUrl = currentState.imageUrl,
                 name = currentState.name,
-                locality = currentState.locality,
-                district = currentState.district,
-                state = currentState.state,
-                country = currentState.country,
-                location = buildLocationString(
-                    currentState.locality,
-                    currentState.district,
-                    currentState.state,
-                    currentState.country
-                )
+
+//                location = buildLocationString(
+//                    currentState.locality,
+//                    currentState.district,
+//                    currentState.state,
+//                    currentState.country
+//                )
             )
 
             if (updatedProfile != null) {
@@ -218,10 +211,6 @@ class EditProfileViewModel(
                 it.copy(
                     imageUrl = original.imageUrl,
                     name = original.name,
-                    locality = original.locality,
-                    district = original.district,
-                    state = original.state,
-                    country = original.country
                 )
             }
         }

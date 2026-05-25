@@ -8,14 +8,18 @@ import org.example.project.core.network.dto.PostWithProfileDto
 import org.example.project.core.utils.ApiEndPoints
 
 interface HomeService {
-    @GET(ApiEndPoints.HOME + "/posts")
+    @GET(ApiEndPoints.POSTS)
     suspend fun getPosts(
         @Query("level") level: String,
+        @Query("locality") locality: String? = null,
+        @Query("district") district: String? = null,
+        @Query("state") state: String? = null,
+        @Query("country") country: String? = null,
         @Query("page") page: Int,
         @Query("limit") limit: Int
     ): PagedResponse<PostWithProfileDto>
 
-    @GET(ApiEndPoints.HOME + "/active-issues")
+    @GET(ApiEndPoints.ACTIVE_ISSUES)
     suspend fun getActiveIssuesCount(
         @Query("level") level: String
     ): ActiveIssuesDto

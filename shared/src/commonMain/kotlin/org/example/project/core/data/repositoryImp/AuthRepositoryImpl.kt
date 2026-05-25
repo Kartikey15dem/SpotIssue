@@ -2,6 +2,7 @@ package org.example.project.core.data.repositoryImp
 
 import org.example.project.core.data.repository.AuthRepository
 import org.example.project.core.datastore.UserPreferencesRepository
+import org.example.project.core.network.dto.AuthRequestOtpResponse
 import org.example.project.core.network.dto.LoginRequestDto
 import org.example.project.core.network.dto.VerifyRequestDto
 import org.example.project.core.network.dto.VerifyResponseDto
@@ -14,7 +15,7 @@ class AuthRepositoryImpl(
     private val userPreferencesRepository: UserPreferencesRepository,
 ) : AuthRepository {
 
-    override suspend fun requestOtp(email: String): DataState<String> = safeApiCall {
+    override suspend fun requestOtp(email: String): DataState<AuthRequestOtpResponse> = safeApiCall {
         val request = LoginRequestDto(email)
         authenticationService.requestOtp(request)
     }

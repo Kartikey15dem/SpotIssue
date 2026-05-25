@@ -10,8 +10,10 @@ import org.example.project.auth.presentation.screens.LoginScreen
 import org.example.project.auth.presentation.screens.NameCaptureScreen
 import org.example.project.auth.presentation.screens.OTPScreen
 import org.example.project.auth.presentation.viewmodel.AuthViewModel
+import org.example.project.auth.presentation.viewmodel.NameCaptureViewModel
 import org.example.project.core.navigation.Route
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 @Composable
 fun AuthNavigation(
@@ -36,18 +38,23 @@ fun AuthNavigation(
             }
             entry<Route.Auth.Otp> {
                 OTPScreen(
-                    onAuthSuccess = {
+                    navigateToNameCapture = { email ->
                         authBackStack.removeLastOrNull()
-                        authBackStack.add(Route.Auth.NameCapture)
+                        authBackStack.add(Route.Auth.NameCapture(email))
                     },
+                    navigateToNextScreen = {authBackStack.removeLastOrNull()},
                     viewModel = authViewModel
                 )
             }
-            entry<Route.Auth.NameCapture> {
+            entry<Route.Auth.NameCapture> {route ->
+                val nameCaptureViewModel: NameCaptureViewModel = koinViewModel {
+                    parametersOf(route.email)
+                }
                 NameCaptureScreen(
                     onNameConfirmed = {
                         authBackStack.removeLastOrNull()
-                    }
+                    },
+                    viewModel = nameCaptureViewModel
                 )
             }
             entry<Route.Auth.LocationFetch> {

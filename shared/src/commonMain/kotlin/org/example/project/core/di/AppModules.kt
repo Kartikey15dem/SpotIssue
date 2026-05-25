@@ -3,6 +3,8 @@ package org.example.project.core.di
 import org.koin.dsl.module
 import org.example.project.core.network.di.networkModule
 import org.example.project.core.data.di.RepositoryModule
+import org.example.project.core.database.di.DaoModule
+import org.example.project.core.datastore.di.preferencesModule
 import org.koin.core.module.Module
 
 
@@ -25,6 +27,8 @@ val appModules = listOf(
 
     // Core (new pattern)
     RepositoryModule,
+    preferencesModule,
+    DaoModule
     // useCaseModule // Commenting out as it seems to be missing or will be removed
 )
 

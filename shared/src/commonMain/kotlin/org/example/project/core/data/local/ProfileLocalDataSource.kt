@@ -5,11 +5,11 @@ import org.example.project.core.database.dao.LikedPostDao
 import org.example.project.core.database.dao.ProfileDao
 import org.example.project.core.database.dao.UserPostDao
 import org.example.project.core.database.entities.ProfileEntity
-import org.example.project.home.domain.models.Post
 import org.example.project.core.data.mappers.Sort
 import org.example.project.core.data.mappers.toLikedPostEntity
 import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.mappers.toUserPostEntity
+import org.example.project.core.model.home.Post
 import kotlin.time.Clock
 
 /**

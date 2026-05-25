@@ -1,5 +1,6 @@
 package org.example.project.auth.presentation.screens
 
+import androidx.compose.material3.Snackbar
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -32,51 +33,68 @@ fun LoginScreen(
     viewModel: AuthViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
         viewModel.effect.collect { effect ->
-            if (effect is AuthEffect.NavigateToOtpScreen) {
-                onNavigateToOtp()
+            when (effect) {
+                is AuthEffect.NavigateToOtpScreen -> onNavigateToOtp()
+                is AuthEffect.ShowSnackbar -> {
+                    snackbarHostState.showSnackbar(effect.message)
+                }
+                else -> Unit
             }
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        LoginContent(
-            uiState = uiState,
-            onAction = { intent -> viewModel.handleIntent(intent) }
-        )
-
-        // Unified Dialog rendering
-        AuthDialogs(
-            dialogState = uiState.dialogState,
-            onDismiss = { viewModel.handleIntent(AuthIntent.DismissDialog) }
-        )
-    }
-}
-
-@Composable
-fun AuthDialogs(
-    dialogState: AuthUiState.DialogState?,
-    onDismiss: () -> Unit
-) {
-    when (dialogState) {
-        is AuthUiState.DialogState.Error -> {
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = { Text(text = "Authentication Error") },
-                text = { Text(text = dialogState.message) },
-                confirmButton = {
-                    TextButton(onClick = onDismiss) {
-                        Text("OK", color = Color(0xFF4A6CF7))
-                    }
-                },
-                containerColor = Color.White
+    Scaffold(
+        snackbarHost = { 
+            SnackbarHost(snackbarHostState) { data ->
+                androidx.compose.material3.Snackbar(
+                    snackbarData = data,
+                    containerColor = Color(0xFF323232),
+                    contentColor = Color.White,
+                    actionColor = Color(0xFF4A6CF7)
+                )
+            } 
+        },
+        containerColor = Color.White
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            LoginContent(
+                uiState = uiState,
+                onAction = { intent -> viewModel.handleIntent(intent) }
             )
         }
-        else -> Unit // Loading is handled directly on the button for better UX
     }
 }
+
+//@Composable
+//fun AuthDialogs(
+//    dialogState: AuthUiState.DialogState?,
+//    onDismiss: () -> Unit
+//) {
+//    when (dialogState) {
+//        is AuthUiState.DialogState.Error -> {
+//            AlertDialog(
+//                onDismissRequest = onDismiss,
+//                title = { Text(text = "Authentication Error") },
+//                text = { Text(text = dialogState.message) },
+//                confirmButton = {
+//                    TextButton(onClick = onDismiss) {
+//                        Text("OK", color = Color(0xFF4A6CF7))
+//                    }
+//                },
+//                containerColor = Color.White
+//            )
+//        }
+//        else -> Unit // Loading is handled directly on the button for better UX
+//    }
+//}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

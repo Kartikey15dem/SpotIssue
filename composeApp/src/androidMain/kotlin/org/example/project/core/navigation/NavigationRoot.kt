@@ -35,7 +35,7 @@ fun NavigationRoot(
             entry<Route.Auth> {
                 AuthNavigation(
                     onLocationFetched = {
-                        rootBackStack.remove(Route.Auth)
+                        rootBackStack.clear()
                         rootBackStack.add(Route.Home)
                     }
                 )

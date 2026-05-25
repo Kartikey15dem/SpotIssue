@@ -5,7 +5,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.mapSaver
 import kotlinx.parcelize.Parcelize
-import org.example.project.home.domain.models.MediaType
+import org.example.project.core.model.home.MediaType
 
 // 1. The Controller Class
 class OverlayController {

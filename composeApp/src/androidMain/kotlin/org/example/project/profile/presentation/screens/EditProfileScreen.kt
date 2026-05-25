@@ -1,5 +1,6 @@
 package org.example.project.profile.presentation.screens
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -108,7 +109,16 @@ fun EditProfileScreen(
                 )
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { 
+            SnackbarHost(snackbarHostState) { data ->
+                androidx.compose.material3.Snackbar(
+                    snackbarData = data,
+                    containerColor = Color(0xFF323232),
+                    contentColor = Color.White,
+                    actionColor = Color(0xFF4A6CF7)
+                )
+            } 
+        },
         containerColor = IssueSpotColors.Background
     ) { paddingValues ->
         EditProfileContent(

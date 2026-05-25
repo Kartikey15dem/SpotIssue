@@ -7,8 +7,9 @@ import org.example.project.core.database.entities.ActiveIssuesEntity
 import org.example.project.core.database.entities.CacheMetadataEntity
 import org.example.project.core.database.entities.toEntity
 import org.example.project.core.data.mappers.toPost
-import org.example.project.home.domain.models.Post
-import org.example.project.home.domain.models.PostLevel
+import org.example.project.core.database.entities.toPost
+import org.example.project.core.model.home.Post
+import org.example.project.core.model.home.PostLevel
 import kotlin.time.Clock
 
 /**

@@ -2,9 +2,9 @@ package org.example.project.core.database.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import org.example.project.home.domain.models.MediaType
-import org.example.project.home.domain.models.Post
-import org.example.project.home.domain.models.PostLevel
+import org.example.project.core.model.home.MediaType
+import org.example.project.core.model.home.Post
+import org.example.project.core.model.home.PostLevel
 import kotlin.time.Clock
 
 /**
@@ -37,7 +37,6 @@ fun PostEntity.toPost(): Post {
         userName = userName,
         timeAgo = timeAgo,
         postLevel = PostLevel.valueOf(postLevel),
-        location = location,
         postText = postText,
         mediaType = MediaType.valueOf(mediaType),
         mediaUrl = mediaUrl,
@@ -56,13 +55,13 @@ fun Post.toEntity(cachedAt: Long = Clock.System.now().toEpochMilliseconds()): Po
         userName = userName,
         timeAgo = timeAgo,
         postLevel = postLevel.name,
-        location = location,
         postText = postText,
         mediaType = mediaType.name,
         mediaUrl = mediaUrl,
         likes = likes,
         comments = comments,
-        cachedAt = cachedAt
+        cachedAt = cachedAt,
+        location =  ""
     )
 }
 

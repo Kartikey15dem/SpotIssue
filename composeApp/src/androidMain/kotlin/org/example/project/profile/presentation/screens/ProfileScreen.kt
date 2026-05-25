@@ -24,6 +24,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,11 +49,11 @@ import androidx.paging.compose.itemKey
 import kotlinx.coroutines.flow.collectLatest
 import org.example.project.R
 import org.example.project.core.utils.DataState
-import org.example.project.home.domain.models.PostLevel
 import org.example.project.home.presentation.components.PostCard
 import org.example.project.home.presentation.components.PostLevelChip
 import org.example.project.core.data.mappers.Sort
-import org.example.project.profile.domain.models.Profile
+import org.example.project.core.model.home.PostLevel
+import org.example.project.core.model.profile.Profile
 import org.example.project.profile.presentation.viewmodel.ProfileIntent
 import org.example.project.profile.presentation.viewmodel.ProfileSideEffect
 import org.example.project.profile.presentation.viewmodel.ProfileState
@@ -96,11 +98,25 @@ fun ProfileScreen(
         }
     }
 
-    ProfileScreenContent(
-        modifier = modifier,
-        state = state,
-        onIntent = viewModel::onIntent
-    )
+    Scaffold(
+        snackbarHost = { 
+            SnackbarHost(snackbarHostState) { data ->
+                androidx.compose.material3.Snackbar(
+                    snackbarData = data,
+                    containerColor = Color(0xFF323232),
+                    contentColor = Color.White,
+                    actionColor = Color(0xFF4A6CF7)
+                )
+            } 
+        },
+        containerColor = IssueSpotColors.Background
+    ) { padding ->
+        ProfileScreenContent(
+            modifier = modifier.padding(padding),
+            state = state,
+            onIntent = viewModel::onIntent
+        )
+    }
 }
 
 @Composable
@@ -109,84 +125,84 @@ fun ProfileScreenContent(
     state: ProfileState,
     onIntent: (ProfileIntent) -> Unit = {}
 ) {
-    val pagingItems = state.postsFlow?.collectAsLazyPagingItems()
-
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            when (val res = state.profileState) {
-                is DataState.Success -> ProfileHeader(res.data, onIntent)
-                is DataState.Error -> Text("Error loading profile")
-                DataState.Loading -> LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-        }
-
-        item {
-            Column {
-                Text(
-                    text = "Posts by Area",
-                    style = IssueSpotTypography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                if (state.profileState is DataState.Success) {
-                    val profile = state.profileState.data
-                    PostLevel.entries.forEachIndexed { i, entry ->
-                        PostByAreaBar(
-                            postByArea = profile.postByArea.getOrElse(i) { 0 },
-                            postLevel = entry
-                        )
-                    }
-                }
-            }
-        }
-
-        item {
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { onIntent(ProfileIntent.CreatePostClicked) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = IssueSpotColors.PostButtonBackground,
-                    contentColor = IssueSpotColors.PostButtonText
-                )
-            ) {
-                Text(
-                    text = "+  Post New Issue",
-                    style = IssueSpotTypography.bodyLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        item {
-            ProfilePostTabsHeader(state, onIntent)
-        }
-
-        if (pagingItems != null) {
-            items(
-                count = pagingItems.itemCount,
-                key = pagingItems.itemKey { it.id }
-            ) { index ->
-                val post = pagingItems[index]
-                if (post != null) {
-                    PostCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        post = post,
-                        onLikeClick = { onIntent(ProfileIntent.LikeClicked(post.id)) },
-                        onCommentClick = { onIntent(ProfileIntent.CommentClicked(post.id)) },
-                        onShareClick = { onIntent(ProfileIntent.ShareClicked(post.id)) },
-                        onReportClick = { onIntent(ProfileIntent.ReportClicked(post.id)) },
-                        canDelete = state.isMine,
-                        onDeleteClick = { onIntent(ProfileIntent.DeletePostClicked(post.id)) }
-                    )
-                }
-            }
-        }
-    }
+//    val pagingItems = state.postsFlow?.collectAsLazyPagingItems()
+//
+//    LazyColumn(
+//        modifier = modifier
+//            .fillMaxSize()
+//            .padding(16.dp),
+//        verticalArrangement = Arrangement.spacedBy(12.dp)
+//    ) {
+//        item {
+//            when (val res = state.profileState) {
+//                is DataState.Success -> ProfileHeader(res.data, onIntent)
+//                is DataState.Error -> Text("Error loading profile")
+//                DataState.Loading -> LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+//            }
+//        }
+//
+//        item {
+//            Column {
+//                Text(
+//                    text = "Posts by Area",
+//                    style = IssueSpotTypography.bodyLarge,
+//                    fontWeight = FontWeight.SemiBold
+//                )
+//                Spacer(modifier = Modifier.height(4.dp))
+//                if (state.profileState is DataState.Success) {
+//                    val profile = state.profileState.data
+//                    PostLevel.entries.forEachIndexed { i, entry ->
+//                        PostByAreaBar(
+//                            postByArea = profile.postByArea.getOrElse(i) { 0 },
+//                            postLevel = entry
+//                        )
+//                    }
+//                }
+//            }
+//        }
+//
+//        item {
+//            Button(
+//                modifier = Modifier.fillMaxWidth(),
+//                onClick = { onIntent(ProfileIntent.CreatePostClicked) },
+//                colors = ButtonDefaults.buttonColors(
+//                    containerColor = IssueSpotColors.PostButtonBackground,
+//                    contentColor = IssueSpotColors.PostButtonText
+//                )
+//            ) {
+//                Text(
+//                    text = "+  Post New Issue",
+//                    style = IssueSpotTypography.bodyLarge,
+//                    fontWeight = FontWeight.Bold
+//                )
+//            }
+//        }
+//
+//        item {
+//            ProfilePostTabsHeader(state, onIntent)
+//        }
+//
+//        if (pagingItems != null) {
+//            items(
+//                count = pagingItems.itemCount,
+//                key = pagingItems.itemKey { it.id }
+//            ) { index ->
+//                val post = pagingItems[index]
+//                if (post != null) {
+//                    PostCard(
+//                        modifier = Modifier.fillMaxWidth(),
+//                        post = post,
+//                        onLikeClick = { onIntent(ProfileIntent.LikeClicked(post.id)) },
+//                        onCommentClick = { onIntent(ProfileIntent.CommentClicked(post.id)) },
+//                        onShareClick = { onIntent(ProfileIntent.ShareClicked(post.id)) },
+//                        onReportClick = { onIntent(ProfileIntent.ReportClicked(post.id)) },
+//                        canDelete = state.isMine,
+//                        onDeleteClick = { onIntent(ProfileIntent.DeletePostClicked(post.id)) }
+//                    )
+//                }
+//            }
+//        }
+//    }
 }
 
 @Composable
@@ -218,7 +234,7 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = profile.location,
+                    text = "",//profile.location,
                     style = IssueSpotTypography.bodyMedium,
                     color = IssueSpotColors.OnSurfaceVariant
                 )

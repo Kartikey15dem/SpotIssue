@@ -8,9 +8,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import org.example.project.home.domain.models.PostLevel
 import org.example.project.theme.IssueSpotTypography
 import org.example.project.R
+import org.example.project.core.model.home.PostLevel
 
 data class BottomNavItem(
     val level: PostLevel,

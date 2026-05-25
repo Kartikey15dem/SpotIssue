@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.example.project.home.domain.models.PostLevel
+import org.example.project.core.model.home.PostLevel
 
 class CurrentLevelManager {
     private val _currentLevel = MutableStateFlow(PostLevel.LOCALITY)

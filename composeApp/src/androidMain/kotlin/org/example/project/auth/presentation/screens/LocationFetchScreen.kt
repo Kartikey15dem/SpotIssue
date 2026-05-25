@@ -77,7 +77,6 @@ fun LocationFetchScreenWithPermissions(
     val lifecycleOwner = LocalLifecycleOwner.current
     val permissionHandler: LocationPermissionHandler = koinInject()
 
-    // Pass the VM instance from Koin so the Wrapper and the Screen share the exact same state
     val viewModel: LocationFetchViewModel = koinViewModel()
 
     val locationManager = remember { context.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
@@ -86,7 +85,6 @@ fun LocationFetchScreenWithPermissions(
     fun isGpsEnabled() = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
             locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
 
-    // The Master State Evaluator
     fun evaluateHardwareState() {
         val activity = context as? Activity ?: return
 
@@ -99,23 +97,19 @@ fun LocationFetchScreenWithPermissions(
         } else if (!isGpsEnabled()) {
             viewModel.handleIntent(LocationFetchIntent.GpsDisabled)
         } else {
-            // Permissions are granted AND GPS is On! Safe to fetch.
             viewModel.handleIntent(LocationFetchIntent.StartLocationFlow)
         }
     }
 
-    // React to the app entering the foreground (e.g., returning from Settings)
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 val activity = context as? Activity
 
-                // If it's the very first time opening the screen, trigger the OS permission popup automatically
                 if (activity != null && !hasRequestedInitialPermission && !permissionHandler.hasLocationPermission()) {
                     hasRequestedInitialPermission = true
                     permissionHandler.requestLocationPermission(activity)
                 } else {
-                    // Otherwise, evaluate what state the user is currently in
                     evaluateHardwareState()
                 }
             }
@@ -195,7 +189,6 @@ private fun LocationFetchContent(
                 LocationFetchStep.FETCHING -> LocationFetchingAnimation()
                 LocationFetchStep.COMPLETED -> LocationCompletedAnimation(uiState.address)
                 LocationFetchStep.ERROR -> {
-                    // IMAGE PLACEHOLDER FOR ERRORS
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(0.8f)
@@ -217,7 +210,6 @@ private fun LocationFetchContent(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Titles
         if (uiState.currentStep != LocationFetchStep.ERROR) {
             Text(
                 text = when (uiState.currentStep) {
@@ -233,7 +225,6 @@ private fun LocationFetchContent(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // Subtitles and Error Controls
         if (uiState.currentStep == LocationFetchStep.COMPLETED && uiState.address != null) {
             Text(
                 text = uiState.address,
@@ -243,7 +234,6 @@ private fun LocationFetchContent(
             )
         } else if (uiState.currentStep == LocationFetchStep.ERROR && uiState.errorState != null) {
 
-            // Error Message
             Text(
                 text = uiState.errorState.message,
                 fontSize = 15.sp,
@@ -253,7 +243,6 @@ private fun LocationFetchContent(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Primary Action Button (Settings / Turn On / Retry)
             Button(
                 onClick = { onIntent(LocationFetchIntent.ActionClicked) },
                 modifier = Modifier.fillMaxWidth(0.9f),
@@ -267,7 +256,6 @@ private fun LocationFetchContent(
                 )
             }
 
-            // Secondary Retry Button (Only for GPS_DISABLED, allows manual retry after pulling status bar)
             if (uiState.errorState.showSecondaryRetry) {
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedButton(
@@ -281,7 +269,6 @@ private fun LocationFetchContent(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Continue Without Location Hyperlink
             Text(
                 text = "Continue without location",
                 color = Color(0xFF4A6CF7),
@@ -296,7 +283,6 @@ private fun LocationFetchContent(
     }
 }
 
-// ... Keep your LocationFetchingAnimation and LocationCompletedAnimation here
 
 
 @Composable
@@ -308,7 +294,7 @@ private fun LocationFetchingAnimation() {
 
     LottieAnimation(
         composition = composition,
-        iterations = LottieConstants.IterateForever, // Loops infinitely
+        iterations = LottieConstants.IterateForever,
         speed = 1f,
         modifier = Modifier
             .fillMaxWidth(0.9f)
@@ -318,14 +304,13 @@ private fun LocationFetchingAnimation() {
 
 @Composable
 private fun LocationCompletedAnimation(address: String?) {
-    // Load the composition directly from the URL
     val composition by rememberLottieComposition(
         LottieCompositionSpec.Url("https://lottie.host/17c7befc-f9f2-4e6e-a977-b7c9f5455f17/2HFHUsSkt1.lottie")
     )
 
     LottieAnimation(
         composition = composition,
-        iterations = 1, // Plays only once
+        iterations = 1,
         speed = 1f,
         modifier = Modifier
             .fillMaxWidth(0.9f)

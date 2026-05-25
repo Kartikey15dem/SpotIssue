@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import org.example.project.R
-import org.example.project.home.domain.models.MediaType
+import org.example.project.core.model.home.MediaType
 
 @Composable
 fun OverlayProvider(

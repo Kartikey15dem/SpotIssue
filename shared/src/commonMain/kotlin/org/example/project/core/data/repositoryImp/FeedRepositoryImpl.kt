@@ -16,9 +16,10 @@ import org.example.project.core.database.IssueSpotDatabase
 import org.example.project.core.network.services.HomeService
 import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.local.FeedLocalDataSource
-import org.example.project.home.domain.models.Post
-import org.example.project.home.domain.models.PostLevel
 import org.example.project.core.data.repository.FeedRepository
+import org.example.project.core.database.entities.toPost
+import org.example.project.core.model.home.Post
+import org.example.project.core.model.home.PostLevel
 import org.example.project.core.utils.DataState
 
 class FeedRepositoryImpl(

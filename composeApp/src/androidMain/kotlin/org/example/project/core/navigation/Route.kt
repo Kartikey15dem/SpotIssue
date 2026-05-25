@@ -20,7 +20,7 @@ sealed interface Route:NavKey{
         ) : Route
 
         @Serializable
-        data object NameCapture : Route
+        data class NameCapture(val email : String) : Route
     }
 
     @Serializable

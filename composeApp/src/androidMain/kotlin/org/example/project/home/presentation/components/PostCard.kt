@@ -13,8 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import org.example.project.home.domain.models.MediaType
-import org.example.project.home.domain.models.Post
 import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTypography
 import androidx.compose.ui.res.painterResource
@@ -27,7 +25,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import org.example.project.home.domain.models.PostLevel
+import org.example.project.core.model.home.MediaType
+import org.example.project.core.model.home.Post
+import org.example.project.core.model.home.PostLevel
 import org.example.project.theme.IssueSpotTheme
 import org.example.project.home.presentation.getColor
 
@@ -42,7 +42,7 @@ fun PostCard(
     onReportClick: () -> Unit,
     onDeleteClick: () -> Unit = {},
 
-) {
+    ) {
     var fullscreenVisible by rememberSaveable { mutableStateOf(false) }
 
     // Estimate video aspect ratio (you should ideally get this from your Post model)
@@ -66,7 +66,7 @@ fun PostCard(
                         userName = post.userName,
                         timeAgo = post.timeAgo,
                         postLevel = post.postLevel,
-                        location = post.location
+                        location = ""//post.location
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -357,7 +357,7 @@ val samplePost = Post(
     id = "1",
     userName = "John Doe",
     userUrl = "https://example.com/avatar.jpg", // Replace with a real or placeholder image URL if needed for preview
-    location = "Downtown, Mumbai Central",
+//    location = "Downtown, Mumbai Central",
    // mediaUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
     mediaUrl = "https://gmcmasoonnpvjlvohzpt.supabase.co/storage/v1/object/public/vid/WhatsApp%20Video%202026-01-07%20at%2019.19.15.mp4",
     likes = 10,

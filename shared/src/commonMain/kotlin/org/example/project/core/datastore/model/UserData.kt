@@ -1,14 +1,13 @@
 package org.example.project.core.datastore.model
 
 import kotlinx.serialization.Serializable
+import org.example.project.core.model.auth.UserLocation
 
 @Serializable
 data class UserData(
-    val name: String = "",
-    val phoneNumber: String = "",
-    val address: String = "",
     val token: String = "",
-    val isLoggedIn: Boolean = false
+    val isLoggedIn: Boolean = false,
+    val userLocation : UserLocation? = null
 ) {
     companion object {
         val DEFAULT = UserData()

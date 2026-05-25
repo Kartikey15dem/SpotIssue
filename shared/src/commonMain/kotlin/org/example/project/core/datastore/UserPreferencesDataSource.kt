@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.example.project.core.datastore.model.UserData
+import org.example.project.core.model.auth.UserLocation
 
 @OptIn(ExperimentalSerializationApi::class, ExperimentalSettingsApi::class)
 class UserPreferencesDataSource(
@@ -45,20 +46,6 @@ class UserPreferencesDataSource(
         }
     }
 
-    suspend fun updateName(newName: String) {
-        val updatedData = userData.value.copy(name = newName)
-        updateUserData(updatedData)
-    }
-
-    suspend fun updatePhoneNumber(newPhone: String) {
-        val updatedData = userData.value.copy(phoneNumber = newPhone)
-        updateUserData(updatedData)
-    }
-
-    suspend fun updateAddress(newAddress: String) {
-        val updatedData = userData.value.copy(address = newAddress)
-        updateUserData(updatedData)
-    }
 
     suspend fun updateToken(newToken: String) {
         val updatedData = userData.value.copy(token = newToken)
@@ -67,6 +54,11 @@ class UserPreferencesDataSource(
 
     suspend fun setLoggedIn(isLoggedIn: Boolean) {
         val updatedData = userData.value.copy(isLoggedIn = isLoggedIn)
+        updateUserData(updatedData)
+    }
+
+    suspend fun updateUserLocation(userLocation: UserLocation) {
+        val updatedData = userData.value.copy(userLocation = userLocation)
         updateUserData(updatedData)
     }
     suspend fun clearUserData() {

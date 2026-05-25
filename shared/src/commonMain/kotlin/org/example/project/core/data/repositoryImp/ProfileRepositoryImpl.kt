@@ -14,19 +14,19 @@ import kotlinx.coroutines.flow.onStart
 import androidx.paging.ExperimentalPagingApi
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.database.IssueSpotDatabase
-import org.example.project.core.database.entities.ProfileEntity
 import org.example.project.core.database.entities.toProfile
-import org.example.project.core.database.entities.toEntity
 import org.example.project.core.network.services.ProfileService
-import org.example.project.home.domain.models.Post
+import org.example.project.core.model.home.Post
 import org.example.project.core.data.local.ProfileLocalDataSource
-import org.example.project.profile.domain.models.Profile
+import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
 import org.example.project.core.utils.safeApiCall
-import kotlin.time.Clock
 import org.example.project.core.data.mappers.toPost
+import org.example.project.core.data.mappers.toEntity
+import org.example.project.core.network.dto.UpsertProfileRequest
 import org.example.project.core.data.paging.ProfileLikedPostsRemoteMediator
 import org.example.project.core.data.paging.ProfileUserPostsRemoteMediator
+import org.example.project.core.network.dto.CoordinatesDto
 
 class ProfileRepositoryImpl(
     private val profileService: ProfileService,
@@ -41,73 +41,60 @@ class ProfileRepositoryImpl(
     }
 
     @OptIn(ExperimentalPagingApi::class, ExperimentalCoroutinesApi::class)
-    override fun getPagedUserPosts(userId: String?): Flow<PagingData<Post>> {
-        val targetUserId = userId ?: CURRENT_USER_ID
+    override fun getPagedUserPosts(): Flow<PagingData<Post>> {
         return Pager(
             config = PagingConfig(pageSize = 20),
             remoteMediator = ProfileUserPostsRemoteMediator(
-                userId = targetUserId,
                 profileService = profileService,
                 database = database,
                 localDataSource = localDataSource,
             ),
-            pagingSourceFactory = { database.userPostDao().pagingSource(targetUserId) },
+            pagingSourceFactory = { database.userPostDao().pagingSource(CURRENT_USER_ID) },
         ).flow.map { pagingData ->
             pagingData.map { entity -> entity.toPost() }
         }
     }
 
     @OptIn(ExperimentalPagingApi::class, ExperimentalCoroutinesApi::class)
-    override fun getPagedLikedPosts(userId: String?): Flow<PagingData<Post>> {
-        val targetUserId = userId ?: CURRENT_USER_ID
+    override fun getPagedLikedPosts(): Flow<PagingData<Post>> {
         return Pager(
             config = PagingConfig(pageSize = 20),
             remoteMediator = ProfileLikedPostsRemoteMediator(
-                userId = targetUserId,
                 profileService = profileService,
                 database = database,
                 localDataSource = localDataSource,
             ),
-            pagingSourceFactory = { database.likedPostDao().pagingSource(targetUserId) },
+            pagingSourceFactory = { database.likedPostDao().pagingSource(CURRENT_USER_ID) },
         ).flow.map { pagingData ->
             pagingData.map { entity -> entity.toPost() }
         }
     }
 
-    override fun observeProfile(userId: String?): Flow<DataState<Profile>> = flow {
-        val targetUserId = userId ?: CURRENT_USER_ID
+    override fun observeProfile(): Flow<DataState<Profile>> = flow {
         val dbFlow = localDataSource.getProfileFlow()
             .map { entity ->
                 if (entity != null) {
                     DataState.Success(entity.toProfile())
                 } else {
-                    DataState.Loading // Or a custom Empty state
+                    DataState.Loading
                 }
             }
 
         emitAll(dbFlow)
     }.onStart { emit(DataState.Loading) }
 
-    override suspend fun refreshProfile(userId: String?): DataState<Unit> = safeApiCall {
-        val targetUserId = userId ?: CURRENT_USER_ID
-        // Assume profile data is fetched. Mocking for now as ProfileService doesn't have it.
-        // val profileDto = profileService.getProfile(targetUserId)
-        // localDataSource.saveProfile(profileDto.toEntity())
-        
-        // Fake update to DB to trigger flow
-        val current = localDataSource.getProfile()
-            ?: ProfileEntity(userId = targetUserId, name = "User")
-        localDataSource.saveProfile(current.copy(updatedAt = Clock.System.now().toEpochMilliseconds()))
-        Unit
+    override suspend fun refreshProfile(): DataState<Unit> = safeApiCall {
+        val profileDto = profileService.getMyProfile()
+        localDataSource.saveProfile(profileDto.toEntity())
     }
 
     override suspend fun updateProfile(profile: Profile): DataState<Unit> = safeApiCall {
-        localDataSource.saveProfile(
-            profile
-                .toEntity(userId = CURRENT_USER_ID)
-                .copy(updatedAt = Clock.System.now().toEpochMilliseconds()),
+        val request = UpsertProfileRequest(
+            name = profile.name,
+            email = profile.email,
+            imageUrl = profile.imageUrl,
         )
-        // TODO: Sync with remote
-        Unit
+        val profileDto = profileService.updateMyProfile(request)
+        localDataSource.saveProfile(profileDto.toEntity())
     }
 }

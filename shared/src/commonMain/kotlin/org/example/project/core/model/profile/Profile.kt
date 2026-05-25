@@ -5,15 +5,10 @@ import org.example.project.core.model.home.Post
 data class Profile(
     val imageUrl: String,
     val name: String,
-    val location: String, // Full formatted location
-    val locality: String = "",
-    val district: String = "",
-    val state: String = "",
-    val country: String = "",
+    val email: String,
     val totalPosts: Int,
     val acks: Int,
-    val postByArea: List<Int>,
-    val myPosts: List<Post>,
-    val ackPosts: List<Post>,
+    val postByArea: List<Int> = listOf(0, 0, 0, 0),
+    val myPosts: List<Post> = emptyList(),
+    val ackPosts: List<Post> = emptyList()
 )
-

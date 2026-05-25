@@ -15,10 +15,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.example.project.core.data.repository.FeedRepository
 import org.example.project.core.data.repository.PostRepository
+import org.example.project.core.model.home.Post
+import org.example.project.core.model.home.PostLevel
 import org.example.project.core.utils.DataState
 import org.example.project.home.presentation.CurrentLevelManager
-import org.example.project.home.domain.models.Post
-import org.example.project.home.domain.models.PostLevel
+
 
 class HomeViewModel(
     private val feedRepository: FeedRepository,

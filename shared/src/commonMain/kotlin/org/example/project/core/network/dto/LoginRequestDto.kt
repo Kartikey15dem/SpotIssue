@@ -1,5 +1,8 @@
 package org.example.project.core.network.dto
 
-data class  LoginRequestDto(
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class LoginRequestDto(
     val email : String
 )

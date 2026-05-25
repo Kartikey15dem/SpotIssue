@@ -22,7 +22,6 @@ fun UserPostEntity.toPost(): Post = Post(
         else -> MediaType.IMAGE
     },
     mediaUrl = mediaUrl ?: "",
-    location = location,
     postLevel = when (postLevel) {
         "LOCALITY" -> PostLevel.LOCALITY
         "DISTRICT" -> PostLevel.DISTRICT
@@ -38,29 +37,6 @@ fun UserPostEntity.toPost(): Post = Post(
 /**
  * Map Post to UserPostEntity
  */
-fun Post.toUserPostEntity(
-    userId: String = "current_user",
-    createdAt: Long = Clock.System.now().toEpochMilliseconds()
-): UserPostEntity = UserPostEntity(
-    id = id,
-    userId = userId,
-    userName = userName,
-    userAvatar = userUrl,
-    postText = postText,
-    mediaType = mediaType.name,
-    mediaUrl = mediaUrl,
-    location = location,
-    locality = null,
-    district = null,
-    state = null,
-    postLevel = postLevel.name,
-    likes = likes,
-    comments = comments,
-    isLiked = false,
-    timeAgo = timeAgo,
-    createdAt = createdAt,
-    cachedAt = Clock.System.now().toEpochMilliseconds()
-)
 
 /**
  * Map LikedPostEntity to Post domain model
@@ -76,7 +52,6 @@ fun LikedPostEntity.toPost(): Post = Post(
         else -> MediaType.IMAGE
     },
     mediaUrl = mediaUrl ?: "",
-    location = location,
     postLevel = when (postLevel) {
         "LOCALITY" -> PostLevel.LOCALITY
         "DISTRICT" -> PostLevel.DISTRICT
@@ -104,7 +79,6 @@ fun Post.toLikedPostEntity(
     postText = postText,
     mediaType = mediaType.name,
     mediaUrl = mediaUrl,
-    location = location,
     locality = null,
     district = null,
     state = null,
@@ -115,7 +89,8 @@ fun Post.toLikedPostEntity(
     timeAgo = timeAgo,
     createdAt = createdAt,
     likedAt = likedAt,
-    cachedAt = Clock.System.now().toEpochMilliseconds()
+    cachedAt = Clock.System.now().toEpochMilliseconds(),
+    location = ""
 )
 
 enum class Sort {

@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 4,
-    "identityHash": "cf6c19404ff401c1f38c550fee881418",
+    "identityHash": "7efee249315087f9650a2354850409f2",
     "entities": [
       {
         "tableName": "profile",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `userId` TEXT NOT NULL, `email` TEXT, `name` TEXT NOT NULL, `imageUrl` TEXT, `location` TEXT, `locality` TEXT, `district` TEXT, `state` TEXT, `country` TEXT, `totalPosts` INTEGER NOT NULL, `acks` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastSyncedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `userId` TEXT NOT NULL, `email` TEXT, `name` TEXT NOT NULL, `imageUrl` TEXT, `totalPosts` INTEGER NOT NULL, `acks` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastSyncedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -34,31 +34,6 @@
           {
             "fieldPath": "imageUrl",
             "columnName": "imageUrl",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "location",
-            "columnName": "location",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "locality",
-            "columnName": "locality",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "district",
-            "columnName": "district",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "state",
-            "columnName": "state",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "country",
-            "columnName": "country",
             "affinity": "TEXT"
           },
           {
@@ -508,7 +483,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'cf6c19404ff401c1f38c550fee881418')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7efee249315087f9650a2354850409f2')"
     ]
   }
 }

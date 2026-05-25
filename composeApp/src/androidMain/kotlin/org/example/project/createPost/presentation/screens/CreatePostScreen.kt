@@ -37,6 +37,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -78,7 +80,7 @@ import coil3.compose.AsyncImage
 import org.example.project.core.components.LocalOverlayController
 import org.example.project.core.components.PdfPreviewContent
 import org.example.project.core.components.VideoPreviewPlayer
-import org.example.project.home.domain.models.MediaType
+import org.example.project.core.model.home.MediaType
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -132,11 +134,25 @@ fun CreatePostScreen(
         }
     }
 
-    CreatePostScreenContent(
-        modifier = modifier,
-        state = state,
-        onIntent = viewModel::onIntent
-    )
+    Scaffold(
+        snackbarHost = { 
+            SnackbarHost(snackbarHostState) { data ->
+                androidx.compose.material3.Snackbar(
+                    snackbarData = data,
+                    containerColor = Color(0xFF323232),
+                    contentColor = Color.White,
+                    actionColor = Color(0xFF4A6CF7)
+                )
+            } 
+        },
+        containerColor = IssueSpotColors.Surface
+    ) { padding ->
+        CreatePostScreenContent(
+            modifier = modifier.padding(padding),
+            state = state,
+            onIntent = viewModel::onIntent
+        )
+    }
 }
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -150,13 +166,11 @@ fun CreatePostScreenContent(
         color = IssueSpotColors.Surface
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Main scrollable content
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(12.dp)
             ) {
-                // Header with close button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -185,7 +199,7 @@ fun CreatePostScreenContent(
                         ) {
                             Image(
                                 painter = painterResource(R.drawable.ic_user_avatar),
-                                contentDescription = "s avatar",
+                                contentDescription = "avatar",
                                 modifier = Modifier
                                     .size(40.dp)
                                     .clip(CircleShape),
@@ -224,7 +238,6 @@ fun CreatePostScreenContent(
                         }
                     }
 
-                    // Right-aligned: Post button
                     Button(
                         onClick = { onIntent(CreatePostIntent.PostIssueClicked) },
                         colors = ButtonDefaults.buttonColors(
@@ -241,19 +254,13 @@ fun CreatePostScreenContent(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-
-
-// 2. THE BOX
-                // 1. STATE VARIABLES
                 var boxHeightPx by remember { mutableIntStateOf(0) }
                 var cursorYInText by remember { mutableFloatStateOf(0f) }
                 var textLayoutResultState by remember { mutableStateOf<TextLayoutResult?>(null) }
 
-// [NEW] Get Keyboard Height dynamically
                 val density = LocalDensity.current
                 val imeHeightPx = WindowInsets.ime.getBottom(density)
 
-// 2. THE BOX (Container)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -266,29 +273,17 @@ fun CreatePostScreenContent(
                 ) {
                     val scrollState = rememberScrollState()
 
-                    // 3. CALCULATE SCROLL NEEDED (Live Logic)
-                    // We use a derived state to constantly check if the keyboard is covering the cursor
                     val amountToScroll by remember(imeHeightPx, cursorYInText, boxHeightPx, scrollState.value) {
                         derivedStateOf {
-                            // A. Where is the cursor visually on screen?
                             val cursorScreenY = cursorYInText - scrollState.value
-
-                            // B. How much space is below the cursor?
                             val distanceToBottom = boxHeightPx - cursorScreenY
-
-                            // C. Compare: Is the keyboard taller than that space?
                             val overlap = imeHeightPx - distanceToBottom
-
-                            // If overlap is positive, we need to scroll that much to reveal the cursor
                             if (overlap > 0) overlap else 0f
                         }
                     }
 
-                    // 4. PERFORM THE SCROLL
                     LaunchedEffect(amountToScroll) {
                         if (amountToScroll > 0) {
-                            // "scrollBy" jumps instantly. "animateScrollBy" slides slowly.
-                            // Using scrollBy makes it feel like the keyboard pushed it up natively.
                             scrollState.scrollBy(amountToScroll)
                         }
                     }
@@ -297,14 +292,10 @@ fun CreatePostScreenContent(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(scrollState)
-                            // [IMPORTANT] Add padding at the bottom equal to keyboard height.
-                            // This acts as a "buffer" so you can always scroll up high enough.
                             .padding(bottom = with(density) { imeHeightPx.toDp() })
                     ) {
-                        // Local wrapper for text + cursor
                         var textFieldValue by remember { mutableStateOf(TextFieldValue(state.description)) }
 
-                        // Sync with ViewModel
                         LaunchedEffect(state.description) {
                             if (textFieldValue.text != state.description) {
                                 textFieldValue = textFieldValue.copy(text = state.description)
@@ -317,7 +308,6 @@ fun CreatePostScreenContent(
                                 textFieldValue = newValue
                                 onIntent(CreatePostIntent.DescriptionChanged(newValue.text))
 
-                                // [FIX] Update cursor position on clicks/typing
                                 val layoutResult = textLayoutResultState
                                 if (layoutResult != null) {
                                     val cursorIndex = newValue.selection.start
@@ -327,8 +317,6 @@ fun CreatePostScreenContent(
                                     }
                                 }
                             },
-
-                            // [FIX] Update cursor position on layout changes (paste/initial load)
                             onTextLayout = { result ->
                                 textLayoutResultState = result
                                 val cursorIndex = textFieldValue.selection.start
@@ -337,16 +325,13 @@ fun CreatePostScreenContent(
                                     cursorYInText = cursorRect.bottom
                                 }
                             },
-
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .defaultMinSize(minHeight = 150.dp)
                                 .padding(12.dp),
-
                             textStyle = IssueSpotTypography.bodyMedium.copy(
                                 color = MaterialTheme.colorScheme.onSurface
                             ),
-
                             decorationBox = { innerTextField ->
                                 Box(modifier = Modifier.fillMaxWidth()) {
                                     if (textFieldValue.text.isEmpty()) {
@@ -361,7 +346,6 @@ fun CreatePostScreenContent(
                             }
                         )
 
-                        // Media Preview
                         if (state.selectedMediaUri != null) {
                             MediaPreviewContent(
                                 mediaUri = state.selectedMediaUri,
@@ -371,35 +355,18 @@ fun CreatePostScreenContent(
                         }
                     }
                 }
-                if (state.error != null) {
-                    Text(
-                        text = state.error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = IssueSpotTypography.bodySmall,
-                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                    )
-                }
-
-
             }
-            if(state.selectedMediaUri == null) {
 
-                // STICKY BOTTOM BUTTONS - Attached to keyboard (Icon-only, transparent)
+            if(state.selectedMediaUri == null) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
                         .imePadding()
                         .background(Color.Transparent)
-                        .padding(
-                            bottom = 24.dp,
-                            start = 2.dp,
-                            top = 2.dp,
-                            end = 24.dp
-                        ),
+                        .padding(bottom = 24.dp, start = 2.dp, top = 2.dp, end = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
                 ) {
-                    // Media Icon Button
                     Box(
                         modifier = Modifier
                             .size(44.dp)
@@ -422,7 +389,6 @@ fun CreatePostScreenContent(
                         }
                     }
 
-                    // PDF Icon Button
                     Box(
                         modifier = Modifier
                             .size(44.dp)
@@ -446,8 +412,6 @@ fun CreatePostScreenContent(
                     }
                 }
             }
-
-
         }
     }
 }

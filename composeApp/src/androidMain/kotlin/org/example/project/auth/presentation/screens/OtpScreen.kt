@@ -27,33 +27,52 @@ import org.example.project.auth.presentation.viewmodel.AuthEffect
 import org.example.project.auth.presentation.viewmodel.AuthIntent
 import org.example.project.auth.presentation.viewmodel.AuthUiState
 import org.example.project.auth.presentation.viewmodel.AuthViewModel
-import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun OTPScreen(
-    onAuthSuccess: () -> Unit,
+    navigateToNameCapture: (String) -> Unit,
+    navigateToNextScreen:() -> Unit,
     viewModel: AuthViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
         viewModel.effect.collect { effect ->
-            if (effect is AuthEffect.NavigateToNextScreen) {
-                onAuthSuccess()
+            when (effect) {
+                is AuthEffect.NavigateToNameCaptureScreen -> navigateToNameCapture(effect.email)
+                is AuthEffect.NavigateToNextScreen -> navigateToNextScreen()
+                is AuthEffect.ShowSnackbar -> {
+                    snackbarHostState.showSnackbar(effect.message)
+                }
+                else -> Unit
             }
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        OTPContent(
-            uiState = uiState,
-            onAction = { intent -> viewModel.handleIntent(intent) }
-        )
-
-        AuthDialogs(
-            dialogState = uiState.dialogState,
-            onDismiss = { viewModel.handleIntent(AuthIntent.DismissDialog) }
-        )
+    Scaffold(
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                androidx.compose.material3.Snackbar(
+                    snackbarData = data,
+                    containerColor = Color(0xFF323232),
+                    contentColor = Color.White,
+                    actionColor = Color(0xFF4A6CF7)
+                )
+            }
+        },
+        containerColor = Color.White
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            OTPContent(
+                uiState = uiState,
+                onAction = { intent -> viewModel.handleIntent(intent) }
+            )
+        }
     }
 }
 

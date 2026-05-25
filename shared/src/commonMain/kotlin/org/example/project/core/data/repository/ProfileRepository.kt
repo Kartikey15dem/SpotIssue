@@ -15,22 +15,22 @@ interface ProfileRepository {
     /**
      * Get paged user posts (network PagingSource via Pager).
      */
-    fun getPagedUserPosts(userId: String? = null): Flow<PagingData<Post>>
+    fun getPagedUserPosts(): Flow<PagingData<Post>>
 
     /**
      * Get paged liked posts (network PagingSource via Pager).
      */
-    fun getPagedLikedPosts(userId: String? = null): Flow<PagingData<Post>>
+    fun getPagedLikedPosts(): Flow<PagingData<Post>>
 
     /**
      * Observe user profile (Room-backed)
      */
-    fun observeProfile(userId: String? = null): Flow<DataState<Profile>>
+    fun observeProfile(): Flow<DataState<Profile>>
 
     /**
      * Refresh profile data from remote
      */
-    suspend fun refreshProfile(userId: String? = null): DataState<Unit>
+    suspend fun refreshProfile(): DataState<Unit>
 
     /**
      * Update user profile

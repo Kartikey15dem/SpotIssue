@@ -9,9 +9,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.example.project.core.model.createPost.CreatePost
-import org.example.project.home.domain.models.MediaType
 import org.example.project.core.data.repository.PostRepository
 import org.example.project.core.data.repository.ProfileRepository
+import org.example.project.core.model.home.MediaType
 
 class CreatePostViewModel(
     private val postRepository: PostRepository,

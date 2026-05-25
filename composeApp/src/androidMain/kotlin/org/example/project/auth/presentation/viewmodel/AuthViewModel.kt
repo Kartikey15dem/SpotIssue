@@ -12,12 +12,40 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.example.project.core.data.repository.AuthRepository
+import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.utils.DataState
 import org.example.project.core.datastore.UserPreferencesRepository
+import org.example.project.core.model.profile.Profile
+
+sealed class AuthEffect {
+    data class NavigateToOtpScreen(val email: String) : AuthEffect()
+    data class NavigateToNameCaptureScreen(val email: String) : AuthEffect()
+    data object NavigateToNextScreen : AuthEffect()
+    data class ShowSnackbar(val message: String) : AuthEffect()
+}
+
+data class AuthUiState(
+    val email: String = "",
+    val otp: String = "",
+    val dialogState: DialogState? = null
+) {
+    sealed interface DialogState {
+        data object Loading : DialogState
+    }
+}
+
+sealed class AuthIntent{
+    data class EmailChanged(val email: String) : AuthIntent()
+    data class OtpChanged(val otp: String) : AuthIntent()
+    data object SendOtpClicked : AuthIntent()
+    data object VerifyOtpClicked : AuthIntent()
+    data object DismissDialog : AuthIntent()
+}
 
 class AuthViewModel(
     private val authRepository: AuthRepository,
-    private val prefRepository: UserPreferencesRepository
+    private val prefRepository: UserPreferencesRepository,
+    private val profileRepository: ProfileRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
@@ -67,6 +95,7 @@ class AuthViewModel(
                     _effect.emit(AuthEffect.NavigateToOtpScreen(email))
                 }
                 is DataState.Error -> {
+                    hideLoading()
                     showError(result.exception.message ?: "An unexpected error occurred")
                 }
                 DataState.Loading -> {
@@ -91,15 +120,28 @@ class AuthViewModel(
             when (val result = authRepository.verifyOtp(email, otp)) {
                 is DataState.Success -> {
                     isNewUser = result.data.isNewUser
-                    hideLoading()
-                    if(isNewUser) _effect.emit(AuthEffect.NavigateToNextScreen)
+                    if(isNewUser) _effect.emit(AuthEffect.NavigateToNameCaptureScreen(email))
                     else {
-                        // update profile
-                        prefRepository.setLoggedIn(true)
+                        when(val res = profileRepository.refreshProfile()){
+                            is DataState.Error -> {
+                                // to be handled properly
+                                showError(res.exception.message ?: "An unexpected error occurred")
+                            }
+                            DataState.Loading -> {
+                                showLoading()
+                            }
+                            is DataState.Success -> {
+                                hideLoading()
+                                _effect.emit(AuthEffect.NavigateToNextScreen)
+                                prefRepository.setLoggedIn(true)
+                            }
+                        }
+
                     }
 
                 }
                 is DataState.Error -> {
+                    hideLoading()
                     showError(result.exception.message ?: "An unexpected error occurred")
                 }
                 DataState.Loading -> {
@@ -122,30 +164,9 @@ class AuthViewModel(
     }
 
     private fun showError(message: String) {
-        _uiState.update { it.copy(dialogState = AuthUiState.DialogState.Error(message)) }
+        viewModelScope.launch {
+            _effect.emit(AuthEffect.ShowSnackbar(message))
+        }
     }
 }
 
-sealed class AuthIntent {
-    data class EmailChanged(val email: String) : AuthIntent()
-    data class OtpChanged(val otp: String) : AuthIntent()
-    data object SendOtpClicked : AuthIntent()
-    data object VerifyOtpClicked : AuthIntent()
-    data object DismissDialog : AuthIntent()
-}
-
-sealed class AuthEffect {
-    data class NavigateToOtpScreen(val email: String) : AuthEffect()
-    data object NavigateToNextScreen : AuthEffect()
-}
-
-data class AuthUiState(
-    val email: String = "",
-    val otp: String = "",
-    val dialogState: DialogState? = null
-) {
-    sealed interface DialogState {
-        data class Error(val message: String) : DialogState
-        data object Loading : DialogState
-    }
-}

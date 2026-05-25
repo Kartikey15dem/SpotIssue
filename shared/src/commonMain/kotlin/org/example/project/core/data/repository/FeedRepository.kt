@@ -2,8 +2,9 @@ package org.example.project.core.data.repository
 
 import androidx.paging.PagingData
 import kotlinx.coroutines.flow.Flow
-import org.example.project.home.domain.models.Post
-import org.example.project.home.domain.models.PostLevel
+import org.example.project.core.model.home.Post
+import org.example.project.core.model.home.PostLevel
+
 
 import org.example.project.core.utils.DataState
 

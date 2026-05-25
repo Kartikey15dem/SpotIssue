@@ -17,9 +17,6 @@ data class PostDto(
     @SerialName("post_level")
     val postLevel: String, // LOCALITY, DISTRICT, STATE, NATIONAL
 
-    @SerialName("location")
-    val location: String,
-
     @SerialName("post_text")
     val postText: String,
 
@@ -36,7 +33,22 @@ data class PostDto(
     val comments: Int = 0,
 
     @SerialName("created_at")
-    val createdAt: String
+    val createdAt: String,
+
+    @SerialName("locality")
+    val locality: String? = null,
+
+    @SerialName("district")
+    val district: String? = null,
+
+    @SerialName("state")
+    val state: String? = null,
+
+    @SerialName("country")
+    val country: String? = null,
+
+    @SerialName("coordinates")
+    val coordinates: CoordinatesDto? = null
 )
 
 /**
@@ -52,9 +64,6 @@ data class PostWithProfileDto(
 
     @SerialName("post_level")
     val postLevel: String,
-
-    @SerialName("location")
-    val location: String,
 
     @SerialName("post_text")
     val postText: String,
@@ -76,7 +85,22 @@ data class PostWithProfileDto(
 
     // Profile info
     @SerialName("profiles")
-    val profile: ProfileInfoDto? = null
+    val profile: ProfileInfoDto? = null,
+
+    @SerialName("locality")
+    val locality: String? = null,
+
+    @SerialName("district")
+    val district: String? = null,
+
+    @SerialName("state")
+    val state: String? = null,
+
+    @SerialName("country")
+    val country: String? = null,
+
+    @SerialName("coordinates")
+    val coordinates: CoordinatesDto? = null
 )
 
 @Serializable
@@ -90,4 +114,3 @@ data class ProfileInfoDto(
     @SerialName("image_url")
     val imageUrl: String?
 )
-

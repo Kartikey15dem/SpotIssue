@@ -8,14 +8,12 @@ import org.example.project.core.database.IssueSpotDatabase
 import org.example.project.core.database.entities.RemoteKeysEntity
 import org.example.project.core.database.entities.UserPostEntity
 import org.example.project.core.network.services.ProfileService
-import org.example.project.core.utils.parseIsoEpochMillis
 import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.local.ProfileLocalDataSource
 import org.example.project.core.data.mappers.toUserPostEntity
 
 @OptIn(ExperimentalPagingApi::class)
 class ProfileUserPostsRemoteMediator(
-    private val userId: String,
     private val profileService: ProfileService,
     private val database: IssueSpotDatabase,
     private val localDataSource: ProfileLocalDataSource,
@@ -24,12 +22,12 @@ class ProfileUserPostsRemoteMediator(
     private val remoteKeysDao = database.remoteKeysDao()
     private val userPostDao = database.userPostDao()
 
-    private val keyType = "USER_POSTS_$userId"
+    private val targetUserId = "current_user"
+    private val keyType = "USER_POSTS_$targetUserId"
     private val maxCachedPosts = 100
 
     override suspend fun initialize(): InitializeAction {
-        // Offline-first: show DB immediately; fetch if empty.
-        return if (localDataSource.getUserPostCount() == 0) {
+        return if (userPostDao.getUserPostCount(targetUserId) == 0) {
             InitializeAction.LAUNCH_INITIAL_REFRESH
         } else {
             InitializeAction.SKIP_INITIAL_REFRESH
@@ -38,10 +36,7 @@ class ProfileUserPostsRemoteMediator(
 
     override suspend fun load(loadType: LoadType, state: PagingState<Int, UserPostEntity>): MediatorResult {
         val page = when (loadType) {
-            LoadType.REFRESH -> {
-                val remoteKeys = getRemoteKeyClosestToCurrentPosition(state)
-                remoteKeys?.nextKey?.minus(1) ?: 1
-            }
+            LoadType.REFRESH -> 0
             LoadType.PREPEND -> return MediatorResult.Success(endOfPaginationReached = true)
             LoadType.APPEND -> {
                 val remoteKeys = getRemoteKeyForLastItem(state)
@@ -52,17 +47,15 @@ class ProfileUserPostsRemoteMediator(
         }
 
         return try {
-            val response = profileService.getUserPosts(
-                userId = userId,
+            val response = profileService.getMyPosts(
                 page = page,
-                limit = state.config.pageSize,
+                limit = state.config.pageSize
             )
 
             val entities = response.items.map { dto ->
                 val post = dto.toPost()
                 post.toUserPostEntity(
-                    userId = userId,
-                    createdAt = parseIsoEpochMillis(dto.createdAt),
+                    userId = targetUserId,
                 )
             }
 
@@ -70,7 +63,7 @@ class ProfileUserPostsRemoteMediator(
 
             if (loadType == LoadType.REFRESH) {
                 remoteKeysDao.clearRemoteKeys(keyType)
-                userPostDao.deleteAllUserPosts(userId)
+                userPostDao.deleteAllUserPosts(targetUserId)
             }
 
             remoteKeysDao.insertAll(
@@ -85,7 +78,7 @@ class ProfileUserPostsRemoteMediator(
             )
 
             userPostDao.insertPosts(entities)
-            userPostDao.trimUserPosts(userId = userId, maxPosts = maxCachedPosts)
+            userPostDao.trimUserPosts(userId = targetUserId, maxPosts = maxCachedPosts)
 
             MediatorResult.Success(endOfPaginationReached = endOfPaginationReached)
         } catch (t: Throwable) {

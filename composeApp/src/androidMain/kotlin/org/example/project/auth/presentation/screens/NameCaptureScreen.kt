@@ -1,5 +1,6 @@
 package org.example.project.auth.presentation.screens
 
+import androidx.compose.material3.Snackbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,6 +20,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.example.project.auth.presentation.viewmodel.AuthEffect
+import org.example.project.auth.presentation.viewmodel.NameCaptureEffect
 import org.example.project.auth.presentation.viewmodel.NameCaptureIntent
 import org.example.project.auth.presentation.viewmodel.NameCaptureUiState
 import org.example.project.auth.presentation.viewmodel.NameCaptureViewModel
@@ -27,45 +30,70 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun NameCaptureScreen(
     onNameConfirmed: () -> Unit,
-    viewModel: NameCaptureViewModel = koinViewModel()
+    viewModel: NameCaptureViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        NameCaptureContent(
-            uiState = uiState,
-            onAction = { intent -> viewModel.handleIntent(intent) }
-        )
-
-        NameCaptureDialogs(
-            dialogState = uiState.dialogState,
-            onDismiss = { viewModel.handleIntent(NameCaptureIntent.DismissDialog) }
-        )
+    LaunchedEffect(Unit) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is NameCaptureEffect.NavigateToNextScreen -> onNameConfirmed()
+                is NameCaptureEffect.ShowSnackbar -> {
+                    snackbarHostState.showSnackbar(effect.message)
+                }
+            }
+        }
     }
-}
 
-@Composable
-fun NameCaptureDialogs(
-    dialogState: NameCaptureUiState.DialogState?,
-    onDismiss: () -> Unit
-) {
-    when (dialogState) {
-        is NameCaptureUiState.DialogState.Error -> {
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = { Text(text = "Profile Error") },
-                text = { Text(text = dialogState.message) },
-                confirmButton = {
-                    TextButton(onClick = onDismiss) {
-                        Text("OK", color = Color(0xFF4A6CF7))
-                    }
-                },
-                containerColor = Color.White
+    Scaffold(
+        snackbarHost = { 
+            SnackbarHost(snackbarHostState) { data ->
+                androidx.compose.material3.Snackbar(
+                    snackbarData = data,
+                    containerColor = Color(0xFF323232),
+                    contentColor = Color.White,
+                    actionColor = Color(0xFF4A6CF7)
+                )
+            } 
+        },
+        containerColor = Color.White
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            NameCaptureContent(
+                uiState = uiState,
+                onAction = { intent -> viewModel.handleIntent(intent) }
             )
         }
-        else -> Unit
     }
 }
+
+//@Composable
+//fun NameCaptureDialogs(
+//    dialogState: NameCaptureUiState.DialogState?,
+//    onDismiss: () -> Unit
+//) {
+//    when (dialogState) {
+//        is NameCaptureUiState.DialogState.Error -> {
+//            AlertDialog(
+//                onDismissRequest = onDismiss,
+//                title = { Text(text = "Profile Error") },
+//                text = { Text(text = dialogState.message) },
+//                confirmButton = {
+//                    TextButton(onClick = onDismiss) {
+//                        Text("OK", color = Color(0xFF4A6CF7))
+//                    }
+//                },
+//                containerColor = Color.White
+//            )
+//        }
+//        else -> Unit
+//    }
+//}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,7 +114,7 @@ fun NameCaptureContent(
         Spacer(modifier = Modifier.height(80.dp))
 
         Text(
-            text = "Tell us about yourself",
+            text = "Tell us the name by which you want to post issues",
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             color = Color.Black
@@ -94,14 +122,6 @@ fun NameCaptureContent(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Text(
-            text = "We'll use this on your bookings and messages.",
-            fontSize = 14.sp,
-            color = Color.Gray,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
 
         OutlinedTextField(
             value = uiState.name,
@@ -125,31 +145,6 @@ fun NameCaptureContent(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = uiState.email,
-            onValueChange = { onAction(NameCaptureIntent.EmailChanged(it)) },
-            label = { Text("Email address") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            enabled = !isLoading,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Email,
-                imeAction = ImeAction.Done
-            ),
-            keyboardActions = KeyboardActions(
-                onDone = {
-                    focusManager.clearFocus()
-                    onAction(NameCaptureIntent.SubmitClicked)
-                }
-            ),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFF4A6CF7),
-                focusedLabelColor = Color(0xFF4A6CF7)
-            )
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
 
         Button(
             onClick = {
