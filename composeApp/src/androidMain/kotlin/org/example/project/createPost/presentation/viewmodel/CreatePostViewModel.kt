@@ -12,10 +12,14 @@ import org.example.project.core.model.createPost.CreatePost
 import org.example.project.core.data.repository.PostRepository
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.model.home.MediaType
+import org.example.project.core.utils.DataState
+import org.example.project.core.model.home.PostLevel
+import org.example.project.core.datastore.UserPreferencesRepository
 
 class CreatePostViewModel(
     private val postRepository: PostRepository,
-    private val profileRepository : ProfileRepository
+    private val profileRepository : ProfileRepository,
+    private val prefRepository: UserPreferencesRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CreatePostState())
     val uiState: StateFlow<CreatePostState> = _uiState.asStateFlow()
@@ -55,23 +59,33 @@ class CreatePostViewModel(
     private fun createPost(){
         viewModelScope.launch {
             if (_uiState.value.description.isBlank()) {
-                // Show error
-                _uiState.value = _uiState.value.copy(error = "Please describe the issue")
-
-            }else {
-                postRepository.createPost(
+                _sideEffects.emit(CreatePostSideEffect.ShowError("Please describe the issue"))
+            } else {
+                _uiState.value = _uiState.value.copy(isLoading = true)
+                val userLocation = prefRepository.userData.value.userLocation
+                                when(val result = postRepository.createPost(
                     CreatePost(
                         userId = "",
                         userUrl = "",
                         userName = "",
+                        postLevel = PostLevel.LOCALITY,
                         postText = _uiState.value.description,
-                        mediaType = MediaType.VIDEO,
-                        mediaUrl = "",
+                        mediaType = _uiState.value.selectedMediaType ?: MediaType.IMAGE,
+                        mediaUrl = _uiState.value.selectedMediaUri,
+                        location = userLocation
                     )
-                )
-                _uiState.value = _uiState.value.copy(isLoading = true)
-                // Simulate posting
-                _uiState.value = _uiState.value.copy(isLoading = false)
+                )) {
+                    is DataState.Success -> {
+                        _uiState.value = _uiState.value.copy(isLoading = false)
+                        _sideEffects.emit(CreatePostSideEffect.PostCreated("new_post"))
+                        onNavigateBack()
+                    }
+                    is DataState.Error -> {
+                        _uiState.value = _uiState.value.copy(isLoading = false)
+                        _sideEffects.emit(CreatePostSideEffect.ShowError(result.exception.message ?: "Failed to create post"))
+                    }
+                    else -> Unit
+                }
             }
         }
     }

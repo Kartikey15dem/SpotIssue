@@ -1,5 +1,6 @@
 package org.example.project.core.datastore
 
+import co.touchlab.kermit.Logger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import org.example.project.core.datastore.model.UserData
@@ -22,6 +23,7 @@ class UserPreferencesRepositoryImpl(
 
     override suspend fun updateUserLocation(userLocation: UserLocation) {
         localDataSource.updateUserLocation(userLocation)
+        Logger.d { "User location updated: $userLocation" }
     }
 
     override suspend fun logOut() {

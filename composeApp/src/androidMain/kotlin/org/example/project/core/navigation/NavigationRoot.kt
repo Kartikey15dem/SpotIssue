@@ -23,6 +23,23 @@ fun NavigationRoot(
 ) {
     val rootBackStack = rememberNavBackStack(start)
 
+//    composable(
+//        route = "post_details/{postId}",
+//        arguments = listOf(navArgument("postId") { type = NavType.StringType }),
+//
+//        // 👇 Tell compose to catch incoming URLs that match this pattern
+//        deepLinks = listOf(
+//            navDeepLink {
+//                uriPattern = "https://www.issuespot.com/post/{postId}"
+//                action = Intent.ACTION_VIEW
+//            }
+//        )
+//    ) { backStackEntry ->
+//        val postId = backStackEntry.arguments?.getString("postId")
+//        // Navigate to your specific Post Details screen
+//        PostDetailScreen(postId = postId)
+//    }
+
     LaunchedEffect(start) {
         if (rootBackStack.firstOrNull() != start) {
             rootBackStack.clear()
@@ -34,12 +51,7 @@ fun NavigationRoot(
         onBack = { rootBackStack.removeLastOrNull()},
         entryProvider = entryProvider {
             entry<Route.Auth> {
-                AuthNavigation(
-                    onAuthSuccess = {
-                        rootBackStack.clear()
-                        rootBackStack.add(Route.LocationFetch)
-                    }
-                )
+                AuthNavigation()
             }
             entry<Route.LocationFetch> {
                 LocationFetchScreenWithPermissions(

@@ -29,7 +29,6 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun NameCaptureScreen(
-    onNameConfirmed: () -> Unit,
     viewModel: NameCaptureViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -38,7 +37,6 @@ fun NameCaptureScreen(
     LaunchedEffect(Unit) {
         viewModel.effect.collect { effect ->
             when (effect) {
-                is NameCaptureEffect.NavigateToNextScreen -> onNameConfirmed()
                 is NameCaptureEffect.ShowSnackbar -> {
                     snackbarHostState.showSnackbar(effect.message)
                 }

@@ -15,6 +15,8 @@ interface HomeService {
         @Query("district") district: String? = null,
         @Query("state") state: String? = null,
         @Query("country") country: String? = null,
+        @Query("lat") lat: Double? = null,
+        @Query("lon") lon: Double? = null,
         @Query("page") page: Int,
         @Query("limit") limit: Int
     ): PagedResponse<PostWithProfileDto>

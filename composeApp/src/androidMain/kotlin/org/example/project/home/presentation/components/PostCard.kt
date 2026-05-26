@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import org.example.project.core.components.ReportPostDialog
 import org.example.project.core.model.home.MediaType
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
@@ -34,22 +35,32 @@ import org.example.project.home.presentation.getColor
 @Composable
 fun PostCard(
     post: Post,
+    isLiked: Boolean,
+    likesCount: Int,
+    commentsCount: Int,
+    isReported: Boolean, // 👇 Add parameter
     modifier: Modifier = Modifier,
-    canDelete : Boolean = false,
+    canDelete: Boolean = false,
     onLikeClick: () -> Unit,
-    onCommentClick: () -> Unit,
+    onCommentClick: (String) -> Unit,
     onShareClick: () -> Unit,
-    onReportClick: () -> Unit,
+    onReportClick: (String) -> Unit,
     onDeleteClick: () -> Unit = {},
+) {
+    var showCommentInput by rememberSaveable { mutableStateOf(false) }
+    var commentText by rememberSaveable { mutableStateOf("") }
+    var showReportDialog by rememberSaveable { mutableStateOf(false) }
 
-    ) {
+
     var fullscreenVisible by rememberSaveable { mutableStateOf(false) }
 
-    // Estimate video aspect ratio (you should ideally get this from your Post model)
+
+
+    // Estimate video aspect ratio
     val videoAspect = when {
         post.mediaUrl.contains("landscape", ignoreCase = true) -> 16f / 9f
         post.mediaUrl.contains("portrait", ignoreCase = true) -> 9f / 16f
-        else -> 9f / 16f // default to landscape
+        else -> 9f / 16f
     }
 
     Box {
@@ -59,14 +70,13 @@ fun PostCard(
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             Box(Modifier.fillMaxWidth()) {
-                // Main content
                 Column(modifier = Modifier.padding(16.dp)) {
                     Spacer(modifier = Modifier.height(16.dp))
                     PostHeader(
                         userName = post.userName,
                         timeAgo = post.timeAgo,
                         postLevel = post.postLevel,
-                        location = ""//post.location
+                        location = ""
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -81,38 +91,12 @@ fun PostCard(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(220.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { },
+                                    .clip(RoundedCornerShape(8.dp)),
                                 contentScale = ContentScale.Crop
                             )
                         }
-
-                        MediaType.VIDEO -> {
-//                            Box(
-//                                modifier = Modifier
-//                                    .fillMaxWidth()
-//                                    .height(220.dp)
-//                                    .clip(RoundedCornerShape(8.dp))
-//                            ) {
-//                                VideoPlayer(
-//                                    url = post.mediaUrl,
-//                                    modifier = Modifier.fillMaxSize(),
-//                                    autoPlay = true,
-//                                    showControls = false
-//                                )
-//
-//                                // 👇 CLICK LAYER (this is critical)
-//                                Box(
-//                                    modifier = Modifier
-//                                        .matchParentSize()
-//                                        .clickable {
-//                                            fullscreenVisible = true
-//                                        }
-//                                )
-//                            }
-
-                        }
-                        MediaType.PDF -> {}
+                        MediaType.VIDEO -> { /* Implementation */ }
+                        MediaType.PDF -> { /* Implementation */ }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -121,44 +105,58 @@ fun PostCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_like),
+                            painter = painterResource(
+                                id = if (isLiked) R.drawable.ic_like else R.drawable.ic_like
+                            ),
                             contentDescription = "Like",
                             modifier = Modifier
                                 .clickable { onLikeClick() }
                                 .size(20.dp)
-                                .padding(end = 2.dp)
+                                .padding(end = 2.dp),
+                            tint = if (isLiked) IssueSpotColors.Primary else IssueSpotColors.OnSurfaceVariant
                         )
                         Text(
-                            text = post.likes.toString(),
+                            text = likesCount.toString(),
                             style = IssueSpotTypography.bodyLarge,
-                            color = IssueSpotColors.OnSurfaceVariant
+                            color = if (isLiked) IssueSpotColors.Primary else IssueSpotColors.OnSurfaceVariant
                         )
 
                         Spacer(modifier = Modifier.width(10.dp))
 
+                        // Toggle comment input visibility
                         Icon(
                             painter = painterResource(R.drawable.ic_comment),
                             contentDescription = "Comment",
                             modifier = Modifier
-                                .clickable { onCommentClick() }
+                                .clickable { showCommentInput = !showCommentInput }
                                 .size(20.dp)
-                                .padding(end = 2.dp)
+                                .padding(end = 2.dp),
+                            tint = IssueSpotColors.OnSurfaceVariant
                         )
                         Text(
-                            text = post.comments.toString(),
+                            text = commentsCount.toString(),
                             style = IssueSpotTypography.bodyLarge,
                             color = IssueSpotColors.OnSurfaceVariant
                         )
 
                         Spacer(modifier = Modifier.weight(1f))
 
+                        // Trigger report dialog
                         Icon(
                             painter = painterResource(R.drawable.ic_report),
                             contentDescription = "Report",
                             modifier = Modifier
-                                .clickable { onReportClick() }
+                                .clickable(enabled = !isReported) {
+                                    // Open dialog only if not reported yet
+                                    showReportDialog = true
+                                }
                                 .size(20.dp)
-                                .padding(end = 2.dp)
+                                .padding(end = 2.dp),
+                            tint = if (isReported) {
+                                IssueSpotColors.Error // Changes to red/orange on success
+                            } else {
+                                IssueSpotColors.OnSurfaceVariant // Gray by default
+                            }
                         )
 
                         Spacer(modifier = Modifier.width(10.dp))
@@ -172,8 +170,50 @@ fun PostCard(
                                 .padding(end = 2.dp)
                         )
                     }
-                }
 
+                    // --- NEW: Comment Input Field ---
+                    if (showCommentInput) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(color = IssueSpotColors.SurfaceVariant, thickness = 1.dp)
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = commentText,
+                                onValueChange = { commentText = it },
+                                placeholder = { Text("Add a comment...") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(24.dp),
+                                maxLines = 3,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = IssueSpotColors.Primary,
+                                    unfocusedBorderColor = IssueSpotColors.SurfaceVariant
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(
+                                onClick = {
+                                    if (commentText.isNotBlank()) {
+                                        onCommentClick(commentText)
+                                        commentText = "" // Clear after sending
+                                        showCommentInput = false // Hide input optionally
+                                    }
+                                },
+                                enabled = commentText.isNotBlank()
+                            ) {
+                                // Assuming you have an ic_send drawable
+                                Icon(
+                                    painter = painterResource(android.R.drawable.ic_menu_send),
+                                    contentDescription = "Post Comment",
+                                    tint = if (commentText.isNotBlank()) IssueSpotColors.Primary else IssueSpotColors.OnSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
                 if (canDelete) {
                     IconButton(
                         onClick = onDeleteClick,
@@ -192,6 +232,15 @@ fun PostCard(
                         )
                     }
                 }
+            }
+            if (showReportDialog) {
+                ReportPostDialog(
+                    onDismiss = { showReportDialog = false },
+                    onSubmit = { reason ->
+                        onReportClick(reason)
+                        showReportDialog = false
+                    }
+                )
             }
         }
 
@@ -348,7 +397,13 @@ fun PostCardPreview() {
             onLikeClick = {},
             onCommentClick = {},
             onShareClick = {},
-            onReportClick = {}
+            onReportClick = {},
+            isLiked = true,
+            likesCount = 34,
+            commentsCount = 56,
+            isReported = false,
+
+            onDeleteClick = {}
         )
     }
     }

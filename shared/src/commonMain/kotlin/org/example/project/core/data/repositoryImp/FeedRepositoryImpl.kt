@@ -18,6 +18,7 @@ import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.local.FeedLocalDataSource
 import org.example.project.core.data.repository.FeedRepository
 import org.example.project.core.database.entities.toPost
+import org.example.project.core.model.auth.UserLocation
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
 import org.example.project.core.utils.DataState
@@ -30,11 +31,12 @@ class FeedRepositoryImpl(
     private val logger = Logger.Companion.withTag("FeedRepository")
 
     @OptIn(ExperimentalPagingApi::class)
-    override fun getPagedPosts(postLevel: PostLevel, forceRefresh: Boolean): Flow<PagingData<Post>> {
+    override fun getPagedPosts(postLevel: PostLevel, userLocation: UserLocation?, forceRefresh: Boolean): Flow<PagingData<Post>> {
         return Pager(
             config = PagingConfig(pageSize = 20),
             remoteMediator = FeedPostsRemoteMediator(
                 postLevel = postLevel,
+                userLocation = userLocation,
                 homeService = homeService,
                 database = database,
                 localDataSource = localDataSource,

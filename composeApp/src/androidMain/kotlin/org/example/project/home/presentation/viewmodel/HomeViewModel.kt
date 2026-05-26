@@ -19,11 +19,13 @@ import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
 import org.example.project.core.utils.DataState
 import org.example.project.home.presentation.CurrentLevelManager
-
+import org.example.project.core.datastore.UserPreferencesRepository
+import kotlinx.coroutines.flow.combine
 
 class HomeViewModel(
     private val feedRepository: FeedRepository,
     private val postRepository: PostRepository,
+    private val prefRepository: UserPreferencesRepository,
     private val currentLevelManager: CurrentLevelManager
 ) : ViewModel() {
 
@@ -35,10 +37,15 @@ class HomeViewModel(
 
     init {
         viewModelScope.launch {
-            currentLevelManager.currentLevel.collect { level ->
+            combine(
+                currentLevelManager.currentLevel,
+                prefRepository.userData
+            ) { level, userData ->
+                level to userData.userLocation
+            }.collect { (level, location) ->
                 updateState { it.copy(
                     postLevel = level,
-                    postsFlow = feedRepository.getPagedPosts(level).cachedIn(viewModelScope)
+                    postsFlow = feedRepository.getPagedPosts(level, location).cachedIn(viewModelScope)
                 ) }
                 observeActiveIssues(level)
             }
@@ -60,8 +67,8 @@ class HomeViewModel(
             HomeIntent.CreatePostClicked -> navigateToCreatePost()
             HomeIntent.ProfileClicked -> navigateToProfile()
             is HomeIntent.ReportClicked -> report(intent.postId, intent.reason)
-            is HomeIntent.LikeClicked -> like(intent.postId)
-            is HomeIntent.CommentClicked -> comment(intent.postId, intent.comment)
+            is HomeIntent.LikeClicked -> like(intent.postId,intent.currentIsLiked,intent.currentLikesCount)
+            is HomeIntent.CommentSubmitted -> comment(intent.postId, intent.commentText,intent.currentCommentCount)
             is HomeIntent.ShareClicked -> share(intent.post)
             HomeIntent.ErrorShown -> clearError()
         }
@@ -73,17 +80,14 @@ class HomeViewModel(
 
     private fun refresh() {
         val currentLevel = _uiState.value.postLevel
+        val currentLocation = prefRepository.userData.value.userLocation
         viewModelScope.launch {
-                updateState { it.copy(isRefreshing = true) }
-            
-            // Recreate paging flow so UI can treat this like a "pull-to-refresh" event.
-            // This mirrors the android-client approach where refresh re-requests the paging flow.
+            updateState { it.copy(isRefreshing = true) }
             updateState {
                 it.copy(
-                    postsFlow = feedRepository.getPagedPosts(currentLevel, forceRefresh = true).cachedIn(viewModelScope),
+                    postsFlow = feedRepository.getPagedPosts(currentLevel, currentLocation, forceRefresh = true).cachedIn(viewModelScope),
                 )
             }
-
             updateState { it.copy(isRefreshing = false) }
         }
     }
@@ -104,36 +108,53 @@ class HomeViewModel(
         }
     }
 
-    private fun like(postId: String) {
+    private fun like(postId: String, currentIsLiked: Boolean, currentLikesCount: Int) {
+        val targetIsLiked = !currentIsLiked
+        val targetLikesCount = if (targetIsLiked) currentLikesCount + 1 else (currentLikesCount - 1).coerceAtLeast(0)
+        updateOverride(postId, isLiked = targetIsLiked, likesCount = targetLikesCount)
+
         viewModelScope.launch {
-            postRepository.likePost(postId)
-                .onFailure { handleError(it) }
+            when (val result = postRepository.likePost(postId)) {
+                is DataState.Error -> {
+                    updateOverride(postId, isLiked = currentIsLiked, likesCount = currentLikesCount)
+                    handleError(Throwable("Failed to update like status. Please try again."))
+                }
+                else -> Unit
+            }
         }
     }
 
     private fun report(postId: String, reason: String?) {
         viewModelScope.launch {
-            postRepository.reportPost(postId, reason)
-                .onSuccess {
-                    _sideEffects.emit(HomeSideEffect.ShowSnackbar("Post reported successfully"))
-                }
-                .onFailure { handleError(it) }
+            when (val result = postRepository.reportPost(postId, reason)) {
+                is DataState.Success -> _sideEffects.emit(HomeSideEffect.ShowSnackbar("Post reported successfully"))
+                is DataState.Error -> handleError(Throwable("Failed to submit report. Please check your connection."))
+                else -> Unit
+            }
         }
     }
 
-    private fun comment(postId: String, comment: String) {
+    private fun comment(postId: String, comment: String, currentCommentCount: Int) {
+        updateOverride(postId, commentsCount = currentCommentCount + 1)
         viewModelScope.launch {
-            postRepository.addComment(postId, comment)
-                .onFailure { handleError(it) }
+            when (val result = postRepository.addComment(postId, comment)) {
+                is DataState.Success -> _sideEffects.emit(HomeSideEffect.ShowSnackbar("Comment posted successfully!"))
+                is DataState.Error -> {
+                    updateOverride(postId, commentsCount = currentCommentCount)
+                    handleError(Throwable("Could not post comment. Connection lost."))
+                }
+                else -> Unit
+            }
         }
     }
 
     private fun share(post: Post) {
         viewModelScope.launch {
-            if (post != null) {
-                val shareText = "${post.userName}: ${post.postText}\n\nShared from IssueSpot"
-                _sideEffects.emit(HomeSideEffect.SharePost(shareText))
-            }
+
+            val postUrl = "https://www.issuespot.com/post/${post.id}"
+
+            val shareText = "${post.userName} posted an issue: ${post.postText}\n\nView it here: $postUrl"
+            _sideEffects.emit(HomeSideEffect.SharePost(shareText))
         }
     }
 
@@ -146,6 +167,25 @@ class HomeViewModel(
         updateState { it.copy(error = message) }
         _sideEffects.emit(HomeSideEffect.ShowError(message))
     }
+
+    private fun updateOverride(
+        postId: String,
+        isLiked: Boolean? = null,
+        likesCount: Int? = null,
+        commentsCount: Int? = null,
+        isReported: Boolean? = null
+    ) {
+        updateState { currentState ->
+            val existingOverride = currentState.postOverrides[postId]
+            val newOverride = PostOverride(
+                isLiked = isLiked ?: existingOverride?.isLiked ?: false,
+                likesCount = likesCount ?: existingOverride?.likesCount ?: 0,
+                commentsCount = commentsCount ?: existingOverride?.commentsCount ?: 0,
+                isReported = isReported ?: existingOverride?.isReported ?: false
+            )
+            currentState.copy(postOverrides = currentState.postOverrides + (postId to newOverride))
+        }
+    }
 }
 
 sealed interface HomeIntent {
@@ -153,9 +193,10 @@ sealed interface HomeIntent {
     data class SearchQueryChanged(val query: String) : HomeIntent
     data object CreatePostClicked : HomeIntent
     data object ProfileClicked : HomeIntent
-    data class ReportClicked(val postId: String, val reason: String? = null) : HomeIntent
-    data class LikeClicked(val postId: String) : HomeIntent
-    data class CommentClicked(val postId: String, val comment: String) : HomeIntent
+    data class ReportClicked(val postId: String, val reason: String) : HomeIntent
+
+    data class LikeClicked(val postId: String, val currentIsLiked: Boolean, val currentLikesCount: Int) : HomeIntent
+    data class CommentSubmitted(val postId: String, val commentText: String, val currentCommentCount: Int) : HomeIntent
     data class ShareClicked(val post: Post) : HomeIntent
     data object ErrorShown : HomeIntent
 }
@@ -166,7 +207,8 @@ data class HomeState(
     val isRefreshing: Boolean = false,
     val postsFlow: Flow<PagingData<Post>>? = null,
     val query: String = "",
-    val error: String? = null
+    val error: String? = null,
+    val postOverrides: Map<String, PostOverride> = emptyMap()
 )
 
 sealed interface HomeSideEffect {
@@ -176,3 +218,10 @@ sealed interface HomeSideEffect {
     data class ShowSnackbar(val message: String) : HomeSideEffect
     data class SharePost(val text: String) : HomeSideEffect
 }
+
+data class PostOverride(
+    val isLiked: Boolean,
+    val likesCount: Int,
+    val commentsCount: Int,
+    val isReported: Boolean
+)

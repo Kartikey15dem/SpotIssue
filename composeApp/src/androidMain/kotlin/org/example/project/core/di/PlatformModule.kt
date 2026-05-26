@@ -13,5 +13,5 @@ val platformModule: Module = module {
     single { AndroidImagePicker(get<Context>()) }
     single { AndroidVideoPicker(get<Context>()) }
     single { LocationPermissionHandler(get<Context>()) }
-    single{ LocationProvider(get<Context>()) }
+    single { LocationProvider(get<Context>()) }
 }

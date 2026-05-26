@@ -31,7 +31,6 @@ import org.example.project.auth.presentation.viewmodel.AuthViewModel
 @Composable
 fun OTPScreen(
     navigateToNameCapture: (String) -> Unit,
-    navigateToNextScreen:() -> Unit,
     viewModel: AuthViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -41,7 +40,6 @@ fun OTPScreen(
         viewModel.effect.collect { effect ->
             when (effect) {
                 is AuthEffect.NavigateToNameCaptureScreen -> navigateToNameCapture(effect.email)
-                is AuthEffect.NavigateToNextScreen -> navigateToNextScreen()
                 is AuthEffect.ShowSnackbar -> {
                     snackbarHostState.showSnackbar(effect.message)
                 }

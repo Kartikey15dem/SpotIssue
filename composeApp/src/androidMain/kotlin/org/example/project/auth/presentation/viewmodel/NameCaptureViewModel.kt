@@ -19,7 +19,6 @@ import org.example.project.core.navigation.Route
 import org.example.project.core.utils.DataState
 
 sealed class NameCaptureEffect {
-    data object NavigateToNextScreen : NameCaptureEffect()
     data class ShowSnackbar(val message: String) : NameCaptureEffect()
 }
 
@@ -90,7 +89,6 @@ class NameCaptureViewModel(
             
             when (val result = profileRepository.updateProfile(profile)) {
                 is DataState.Success -> {
-                    _effect.emit(NameCaptureEffect.NavigateToNextScreen)
                     prefRepository.setLoggedIn(true)
 
                 }

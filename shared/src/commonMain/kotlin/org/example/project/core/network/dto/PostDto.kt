@@ -24,7 +24,7 @@ data class PostDto(
     val mediaType: String, // IMAGE, VIDEO, GIF
 
     @SerialName("media_url")
-    val mediaUrl: String,
+    val mediaUrl: String? = null,
 
     @SerialName("likes")
     val likes: Int = 0,
@@ -72,7 +72,7 @@ data class PostWithProfileDto(
     val mediaType: String,
 
     @SerialName("media_url")
-    val mediaUrl: String,
+    val mediaUrl: String? = null,
 
     @SerialName("likes")
     val likes: Int = 0,

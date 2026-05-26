@@ -2,9 +2,9 @@ package org.example.project.core.data.repository
 
 import androidx.paging.PagingData
 import kotlinx.coroutines.flow.Flow
+import org.example.project.core.model.auth.UserLocation
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
-
 
 import org.example.project.core.utils.DataState
 
@@ -16,7 +16,7 @@ interface FeedRepository {
     /**
      * Get paged posts for a given post level (network PagingSource via Pager).
      */
-    fun getPagedPosts(postLevel: PostLevel, forceRefresh: Boolean = false): Flow<PagingData<Post>>
+    fun getPagedPosts(postLevel: PostLevel, userLocation: UserLocation? = null, forceRefresh: Boolean = false): Flow<PagingData<Post>>
 
     /**
      * Observe active issues count for a given post level (cached locally).

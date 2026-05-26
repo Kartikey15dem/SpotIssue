@@ -20,7 +20,6 @@ import org.example.project.core.model.profile.Profile
 sealed class AuthEffect {
     data class NavigateToOtpScreen(val email: String) : AuthEffect()
     data class NavigateToNameCaptureScreen(val email: String) : AuthEffect()
-    data object NavigateToNextScreen : AuthEffect()
     data class ShowSnackbar(val message: String) : AuthEffect()
 }
 
@@ -132,7 +131,6 @@ class AuthViewModel(
                             }
                             is DataState.Success -> {
                                 hideLoading()
-                                _effect.emit(AuthEffect.NavigateToNextScreen)
                                 prefRepository.setLoggedIn(true)
                             }
                         }

@@ -1,5 +1,6 @@
 package org.example.project.home.presentation.screens
 
+import android.content.Intent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,6 +43,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import kotlinx.coroutines.flow.collectLatest
 import org.example.project.R
+import org.example.project.core.model.home.getText
 import org.example.project.core.utils.DataState
 import org.example.project.home.presentation.components.PostCard
 import org.example.project.home.presentation.components.PostLevelChip
@@ -64,6 +67,7 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     // Handle side effects
     LaunchedEffect(viewModel) {
@@ -78,7 +82,13 @@ fun HomeScreen(
                     snackbarHostState.showSnackbar(effect.message)
                 }
                 is HomeSideEffect.SharePost -> {
-                    snackbarHostState.showSnackbar("Share: ${effect.text}")
+                    val sendIntent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_TEXT, effect.text)
+                        type = "text/plain"
+                    }
+                    val shareIntent = Intent.createChooser(sendIntent, "Share Issue via...")
+                    context.startActivity(shareIntent)
                 }
             }
         }
@@ -114,58 +124,75 @@ fun HomeContent(
     state: HomeState,
     onIntent: (HomeIntent) -> Unit,
 ) {
-//    val pagingItems = state.postsFlow?.collectAsLazyPagingItems()
-//
-//    Column(
-//        modifier = modifier
-//            .fillMaxSize()
-//            .background(IssueSpotColors.Background)
-//    ) {
-//        HomeHeader(
-//            modifier = Modifier.fillMaxWidth(),
-//            state = state,
-//            onIntent = onIntent
-//        )
-//
-//        // Progress indicator for refresh state
-//        if (state.isRefreshing) {
-//            LinearProgressIndicator(
-//                modifier = Modifier.fillMaxWidth(),
-//                color = IssueSpotColors.Primary,
-//                trackColor = IssueSpotColors.SurfaceVariant
-//            )
-//        }
-//
-//        LazyColumn(
-//            modifier = Modifier.fillMaxSize(),
-//            verticalArrangement = Arrangement.spacedBy(12.dp)
-//        ) {
-//            item { Spacer(Modifier.height(8.dp)) }
-//
-//            if (pagingItems != null) {
-//                items(
-//                    count = pagingItems.itemCount,
-//                    key = pagingItems.itemKey { it.id }
-//                ) { index ->
-//                    val post = pagingItems[index]
-//                    if (post != null) {
-//                        PostCard(
-//                            modifier = Modifier
-//                                .fillMaxWidth()
-//                                .padding(horizontal = 12.dp),
-//                            post = post,
-//                            onLikeClick = { onIntent(HomeIntent.LikeClicked(post.id)) },
-//                            onCommentClick = { onIntent(HomeIntent.CommentClicked(post.id, "")) },
-//                            onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
-//                            onReportClick = { onIntent(HomeIntent.ReportClicked(post.id)) },
-//                        )
-//                    }
-//                }
-//            }
-//
-//            item { Spacer(Modifier.height(16.dp)) }
-//        }
-//    }
+    val pagingItems = state.postsFlow?.collectAsLazyPagingItems()
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(IssueSpotColors.Background)
+    ) {
+        HomeHeader(
+            modifier = Modifier.fillMaxWidth(),
+            state = state,
+            onIntent = onIntent
+        )
+
+        // Progress indicator for refresh state
+        if (state.isRefreshing) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = IssueSpotColors.Primary,
+                trackColor = IssueSpotColors.SurfaceVariant
+            )
+        }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item { Spacer(Modifier.height(8.dp)) }
+
+            if (pagingItems != null) {
+                items(
+                    count = pagingItems.itemCount,
+                    key = pagingItems.itemKey { it.id }
+                ) { index ->
+                    val post = pagingItems[index]
+                    if (post != null) {
+                        val override = state.postOverrides[post.id]
+
+                        val isLiked = override?.isLiked ?: false
+                        val resolvedLikes = override?.likesCount ?: post.likes
+                        val resolvedComments = override?.commentsCount ?: post.comments
+                        val isReported = override?.isReported ?: false // 👇 Extract value
+
+                        PostCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp),
+                            post = post,
+                            isLiked = isLiked,
+                            likesCount = resolvedLikes,
+                            commentsCount = resolvedComments,
+                            isReported = isReported,
+                            onLikeClick = {
+                                onIntent(HomeIntent.LikeClicked(post.id, isLiked, resolvedLikes))
+                            },
+                            onCommentClick = { text ->
+                                onIntent(HomeIntent.CommentSubmitted(post.id, text, resolvedComments))
+                            },
+                            onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
+                            onReportClick = { reason ->
+                                onIntent(HomeIntent.ReportClicked(post.id, reason))
+                            },
+                        )
+                    }
+                }
+            }
+
+            item { Spacer(Modifier.height(16.dp)) }
+        }
+    }
 }
 
 @Composable
@@ -270,19 +297,19 @@ private fun HomeHeader(
 
         Spacer(Modifier.height(12.dp))
 
-//        Text(
-//            text = "${state.postLevel.displayName} Issues",
-//            style = IssueSpotTypography.bodyLarge,
-//            color = IssueSpotColors.OnSurface,
-//            fontWeight = FontWeight.Bold
-//        )
-//
-//        Spacer(Modifier.height(6.dp))
-//
-//        Text(
-//            text = state.postLevel.getText(),
-//            style = IssueSpotTypography.bodyLarge,
-//            color = IssueSpotColors.OnSurfaceVariant
-//        )
+        Text(
+            text = "${state.postLevel.displayName} Issues",
+            style = IssueSpotTypography.bodyLarge,
+            color = IssueSpotColors.OnSurface,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(Modifier.height(6.dp))
+
+        Text(
+            text = state.postLevel.getText(),
+            style = IssueSpotTypography.bodyLarge,
+            color = IssueSpotColors.OnSurfaceVariant
+        )
     }
 }

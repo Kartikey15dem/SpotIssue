@@ -14,11 +14,13 @@ import org.example.project.core.utils.parseIsoEpochMillis
 import kotlin.time.Clock
 import org.example.project.core.data.local.FeedLocalDataSource
 import org.example.project.core.data.mappers.toPost
+import org.example.project.core.model.auth.UserLocation
 import org.example.project.core.model.home.PostLevel
 
 @OptIn(ExperimentalPagingApi::class)
 class FeedPostsRemoteMediator(
     private val postLevel: PostLevel,
+    private val userLocation: UserLocation?,
     private val homeService: HomeService,
     private val database: IssueSpotDatabase,
     private val localDataSource: FeedLocalDataSource,
@@ -68,6 +70,12 @@ class FeedPostsRemoteMediator(
 
             val response = homeService.getPosts(
                 level = postLevel.name,
+                locality = userLocation?.locality,
+                district = userLocation?.district,
+                state = userLocation?.state,
+                country = userLocation?.country,
+                lat = userLocation?.latitude,
+                lon = userLocation?.longitude,
                 page = page,
                 limit = state.config.pageSize,
             )

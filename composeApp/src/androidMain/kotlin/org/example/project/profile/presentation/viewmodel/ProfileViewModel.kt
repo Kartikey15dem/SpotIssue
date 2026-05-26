@@ -87,20 +87,24 @@ class ProfileViewModel(
 
     private fun deletePost(postId: String) {
         viewModelScope.launch {
-            postRepository.deletePost(postId)
-                .onSuccess {
+            when (val result = postRepository.deletePost(postId)) {
+                is DataState.Success -> {
                     _sideEffects.emit(ProfileSideEffect.ShowSnackbar("Post deleted successfully"))
                 }
-                .onFailure { error ->
-                    handleError(error)
+                is DataState.Error -> {
+                    handleError(result.exception)
                 }
+                else -> Unit
+            }
         }
     }
 
     private fun likePost(postId: String) {
         viewModelScope.launch {
-            postRepository.likePost(postId)
-                .onFailure { handleError(it) }
+            when (val result = postRepository.likePost(postId)) {
+                is DataState.Error -> handleError(result.exception)
+                else -> Unit
+            }
         }
     }
 
@@ -112,11 +116,15 @@ class ProfileViewModel(
 
     private fun reportPost(postId: String) {
         viewModelScope.launch {
-            postRepository.reportPost(postId, null)
-                .onSuccess {
+            when (val result = postRepository.reportPost(postId, null)) {
+                is DataState.Success -> {
                     _sideEffects.emit(ProfileSideEffect.ShowSnackbar("Post reported successfully"))
                 }
-                .onFailure { handleError(it) }
+                is DataState.Error -> {
+                    handleError(result.exception)
+                }
+                else -> Unit
+            }
         }
     }
 

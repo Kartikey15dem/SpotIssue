@@ -5,21 +5,26 @@ import de.jensklingenberg.ktorfit.http.DELETE
 import de.jensklingenberg.ktorfit.http.POST
 import de.jensklingenberg.ktorfit.http.Path
 import org.example.project.core.utils.ApiEndPoints
-import org.example.project.core.model.createPost.CreatePost
+import org.example.project.core.network.dto.CreatePostRequestDto
+import org.example.project.core.network.dto.*
+import org.example.project.core.network.dto.PostWithProfileDto
 
 interface PostService {
-    @POST(ApiEndPoints.HOME + "/posts/{id}/like")
-    suspend fun likePost(@Path("id") id: String): Unit
+    @POST(ApiEndPoints.POSTS + "/{id}/like")
+    suspend fun likePost(@Path("id") id: String)
 
-    @POST(ApiEndPoints.HOME + "/posts/{id}/report")
-    suspend fun reportPost(@Path("id") id: String, @Body reason: String?): Unit
+    @POST(ApiEndPoints.POSTS + "/{id}/report")
+    suspend fun reportPost(@Path("id") id: String, @Body request: ReportPostRequestDto)
 
-    @POST(ApiEndPoints.HOME + "/posts/{id}/comment")
-    suspend fun addComment(@Path("id") id: String, @Body comment: String): Unit
+    @POST(ApiEndPoints.POSTS + "/{id}/comments")
+    suspend fun addComment(@Path("id") id: String, @Body request: AddCommentRequestDto)
 
-    @POST(ApiEndPoints.HOME + "/posts")
-    suspend fun createPost(@Body post: CreatePost): Unit
+    @POST(ApiEndPoints.POSTS + "/{id}/share")
+    suspend fun sharePost(@Path("id") id: String)
 
-    @DELETE(ApiEndPoints.HOME + "/posts/{id}")
-    suspend fun deletePost(@Path("id") id: String): Unit
+    @POST(ApiEndPoints.POSTS)
+    suspend fun createPost(@Body request: CreatePostRequestDto): PostWithProfileDto
+
+    @DELETE(ApiEndPoints.POSTS + "/{id}")
+    suspend fun deletePost(@Path("id") id: String)
 }
