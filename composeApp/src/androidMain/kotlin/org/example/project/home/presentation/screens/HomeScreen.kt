@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +29,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.paging.LoadState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -53,6 +58,7 @@ import org.example.project.home.presentation.viewmodel.HomeState
 import org.example.project.home.presentation.viewmodel.HomeViewModel
 import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTypography
+import org.example.project.core.components.CommentsBottomSheet
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -118,6 +124,7 @@ fun HomeScreen(
 /**
  * State-hoisted composable (pure UI).
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeContent(
     modifier: Modifier = Modifier,
@@ -125,26 +132,34 @@ fun HomeContent(
     onIntent: (HomeIntent) -> Unit,
 ) {
     val pagingItems = state.postsFlow?.collectAsLazyPagingItems()
+    val isRefreshing = pagingItems?.loadState?.refresh is LoadState.Loading || state.isRefreshing
 
-    Column(
+    // Handle remote refresh errors
+    LaunchedEffect(pagingItems?.loadState?.refresh) {
+        if (pagingItems?.loadState?.refresh is LoadState.Error) {
+            val errorState = pagingItems.loadState.refresh as LoadState.Error
+            // Send intent to ViewModel to handle or emit error
+            // (Assuming HomeViewModel has error side-effects wired, here we just observe)
+        }
+    }
+
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = { onIntent(HomeIntent.Refresh) },
         modifier = modifier
             .fillMaxSize()
             .background(IssueSpotColors.Background)
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
         HomeHeader(
             modifier = Modifier.fillMaxWidth(),
             state = state,
             onIntent = onIntent
         )
 
-        // Progress indicator for refresh state
-        if (state.isRefreshing) {
-            LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth(),
-                color = IssueSpotColors.Primary,
-                trackColor = IssueSpotColors.SurfaceVariant
-            )
-        }
+
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -164,7 +179,11 @@ fun HomeContent(
                         val isLiked = override?.isLiked ?: false
                         val resolvedLikes = override?.likesCount ?: post.likes
                         val resolvedComments = override?.commentsCount ?: post.comments
-                        val isReported = override?.isReported ?: false // 👇 Extract value
+                        val isReported = override?.isReported ?: false
+
+                        // 👇 Extract comment states
+                        val loadedComments = override?.loadedComments
+                        val isLoadingComments = override?.isLoadingComments ?: false
 
                         PostCard(
                             modifier = Modifier
@@ -175,12 +194,25 @@ fun HomeContent(
                             likesCount = resolvedLikes,
                             commentsCount = resolvedComments,
                             isReported = isReported,
+
+                            // 👇 Pass them to the PostCard
+                            loadedComments = loadedComments,
+                            isLoadingComments = isLoadingComments,
+
                             onLikeClick = {
                                 onIntent(HomeIntent.LikeClicked(post.id, isLiked, resolvedLikes))
                             },
-                            onCommentClick = { text ->
+
+                            // 👇 Trigger comment fetch when the icon is clicked
+                            onCommentIconClick = {
+                                onIntent(HomeIntent.LoadCommentsClicked(post.id))
+                            },
+
+                            // 👇 Handle the actual text submission
+                            onCommentSubmit = { text ->
                                 onIntent(HomeIntent.CommentSubmitted(post.id, text, resolvedComments))
                             },
+
                             onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
                             onReportClick = { reason ->
                                 onIntent(HomeIntent.ReportClicked(post.id, reason))
@@ -188,11 +220,24 @@ fun HomeContent(
                         )
                     }
                 }
+
             }
 
             item { Spacer(Modifier.height(16.dp)) }
+            
+            // Show initial loading state for first-time fetch
+            if (pagingItems?.loadState?.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                        androidx.compose.material3.CircularProgressIndicator(color = IssueSpotColors.Primary)
+                    }
+                }
+            }
         }
     }
+    }
+
+
 }
 
 @Composable

@@ -25,7 +25,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import org.example.project.core.components.CommentsBottomSheet
 import org.example.project.core.components.ReportPostDialog
+import org.example.project.core.model.home.Comment
 import org.example.project.core.model.home.MediaType
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
@@ -38,16 +40,19 @@ fun PostCard(
     isLiked: Boolean,
     likesCount: Int,
     commentsCount: Int,
-    isReported: Boolean, // 👇 Add parameter
+    isReported: Boolean,
     modifier: Modifier = Modifier,
     canDelete: Boolean = false,
     onLikeClick: () -> Unit,
-    onCommentClick: (String) -> Unit,
+    loadedComments: List<Comment>?,
+    isLoadingComments: Boolean,
+    onCommentIconClick: () -> Unit,
+    onCommentSubmit: (String) -> Unit,
     onShareClick: () -> Unit,
     onReportClick: (String) -> Unit,
     onDeleteClick: () -> Unit = {},
 ) {
-    var showCommentInput by rememberSaveable { mutableStateOf(false) }
+    var showBottomSheet by rememberSaveable { mutableStateOf(false) }
     var commentText by rememberSaveable { mutableStateOf("") }
     var showReportDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -76,7 +81,7 @@ fun PostCard(
                         userName = post.userName,
                         timeAgo = post.timeAgo,
                         postLevel = post.postLevel,
-                        location = ""
+                        location = post.locality +"," +post.district +"," +post.state +"," +post.country
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -123,12 +128,14 @@ fun PostCard(
 
                         Spacer(modifier = Modifier.width(10.dp))
 
-                        // Toggle comment input visibility
                         Icon(
                             painter = painterResource(R.drawable.ic_comment),
                             contentDescription = "Comment",
                             modifier = Modifier
-                                .clickable { showCommentInput = !showCommentInput }
+                                .clickable {
+                                    showBottomSheet = true
+                                    onCommentIconClick() // Trigger the ViewModel to start fetching
+                                }
                                 .size(20.dp)
                                 .padding(end = 2.dp),
                             tint = IssueSpotColors.OnSurfaceVariant
@@ -171,49 +178,7 @@ fun PostCard(
                         )
                     }
 
-                    // --- NEW: Comment Input Field ---
-                    if (showCommentInput) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        HorizontalDivider(color = IssueSpotColors.SurfaceVariant, thickness = 1.dp)
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            OutlinedTextField(
-                                value = commentText,
-                                onValueChange = { commentText = it },
-                                placeholder = { Text("Add a comment...") },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(24.dp),
-                                maxLines = 3,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = IssueSpotColors.Primary,
-                                    unfocusedBorderColor = IssueSpotColors.SurfaceVariant
-                                )
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            IconButton(
-                                onClick = {
-                                    if (commentText.isNotBlank()) {
-                                        onCommentClick(commentText)
-                                        commentText = "" // Clear after sending
-                                        showCommentInput = false // Hide input optionally
                                     }
-                                },
-                                enabled = commentText.isNotBlank()
-                            ) {
-                                // Assuming you have an ic_send drawable
-                                Icon(
-                                    painter = painterResource(android.R.drawable.ic_menu_send),
-                                    contentDescription = "Post Comment",
-                                    tint = if (commentText.isNotBlank()) IssueSpotColors.Primary else IssueSpotColors.OnSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
                 if (canDelete) {
                     IconButton(
                         onClick = onDeleteClick,
@@ -233,6 +198,16 @@ fun PostCard(
                     }
                 }
             }
+
+            if (showBottomSheet) {
+                CommentsBottomSheet(
+                    comments = loadedComments,
+                    isLoading = isLoadingComments,
+                    onDismiss = { showBottomSheet = false },
+                    onSubmit = onCommentSubmit
+                )
+            }
+            
             if (showReportDialog) {
                 ReportPostDialog(
                     onDismiss = { showReportDialog = false },
@@ -395,7 +370,8 @@ fun PostCardPreview() {
         PostCard(
             post = samplePost,
             onLikeClick = {},
-            onCommentClick = {},
+            onCommentIconClick = {},
+            onCommentSubmit = {},
             onShareClick = {},
             onReportClick = {},
             isLiked = true,
@@ -403,7 +379,10 @@ fun PostCardPreview() {
             commentsCount = 56,
             isReported = false,
 
-            onDeleteClick = {}
+            onDeleteClick = {},
+
+            loadedComments = emptyList(),
+            isLoadingComments = false
         )
     }
     }

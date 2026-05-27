@@ -12,6 +12,6 @@ val platformModule: Module = module {
     // Platform-specific dependencies for Android
     single { AndroidImagePicker(get<Context>()) }
     single { AndroidVideoPicker(get<Context>()) }
-    single { LocationPermissionHandler(get<Context>()) }
+    factory{ LocationPermissionHandler(get<Context>()) }
     single { LocationProvider(get<Context>()) }
 }

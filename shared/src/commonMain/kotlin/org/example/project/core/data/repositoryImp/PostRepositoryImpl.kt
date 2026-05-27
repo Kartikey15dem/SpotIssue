@@ -8,12 +8,19 @@ import org.example.project.core.network.dto.CoordinatesDto
 import org.example.project.core.network.dto.CreatePostRequestDto
 import org.example.project.core.network.dto.AddCommentRequestDto
 import org.example.project.core.network.dto.ReportPostRequestDto
+import org.example.project.core.network.dto.PagedResponse
+import androidx.paging.PagingData
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import kotlinx.coroutines.flow.Flow
+import org.example.project.core.data.paging.CommentPagingSource
+import org.example.project.core.network.dto.CommentDto
+import org.example.project.core.model.home.Comment
 import org.example.project.core.utils.DataState
 import org.example.project.core.utils.safeApiCall
 
 class PostRepositoryImpl(
     private val postService: PostService,
-    private val prefRepository: UserPreferencesRepository
 ) : PostRepository {
 
     override suspend fun likePost(postId: String): DataState<Unit> = safeApiCall {
@@ -26,6 +33,19 @@ class PostRepositoryImpl(
 
     override suspend fun sharePost(postId: String): DataState<Unit> = safeApiCall {
         postService.sharePost(postId)
+    }
+
+
+    
+    override fun getPagedComments(postId: String): Flow<PagingData<Comment>> {
+        return Pager(
+            config = PagingConfig(pageSize = 20),
+            pagingSourceFactory = { CommentPagingSource(postService, postId) }
+        ).flow
+    }
+
+    override suspend fun getComments(postId: String, page: Int, limit: Int): DataState<PagedResponse<CommentDto>> = safeApiCall {
+        postService.getComments(postId, page, limit)
     }
 
     override suspend fun addComment(postId: String, comment: String): DataState<Unit> = safeApiCall {

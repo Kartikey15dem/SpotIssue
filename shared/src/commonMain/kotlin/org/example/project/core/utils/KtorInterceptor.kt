@@ -7,9 +7,11 @@ import io.ktor.client.request.header
 import io.ktor.client.statement.HttpResponsePipeline
 import io.ktor.http.HttpStatusCode
 import io.ktor.util.AttributeKey
+import org.example.project.core.datastore.UserPreferencesRepository
 
 class KtorInterceptor(
     private val getToken: () -> String?,
+    private val logout: suspend () -> Unit,
 ) {
     companion object Plugin : HttpClientPlugin<Config, KtorInterceptor> {
 
@@ -33,19 +35,20 @@ class KtorInterceptor(
             }
 
             // 2. Intercept incoming responses
-//            scope.responsePipeline.intercept(HttpResponsePipeline.After) {
-//                // This is where you will handle expired JWT tokens later!
-//                if (context.response.status == HttpStatusCode.Unauthorized) {
-//
-//                }
-//                proceed()
-//            }
+            scope.responsePipeline.intercept(HttpResponsePipeline.After) {
+                // This is where you will handle expired JWT tokens later!
+                if (context.response.status == HttpStatusCode.Unauthorized) {
+                    plugin.logout()
+                }
+                proceed()
+            }
         }
 
         override fun prepare(block: Config.() -> Unit): KtorInterceptor {
             val config = Config().apply(block)
             return KtorInterceptor(
                 getToken = config.getToken,
+                logout = config.logout
             )
         }
     }
@@ -53,4 +56,5 @@ class KtorInterceptor(
 
 class Config {
     lateinit var getToken: () -> String?
+    lateinit var logout: suspend () -> Unit
 }

@@ -21,6 +21,7 @@ val networkModule = module {
             install(KtorInterceptor) {
 
                 getToken = { preferencesRepository.userData.value.token }
+                logout = { preferencesRepository.logOut() }
 
             }
         }
