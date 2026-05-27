@@ -44,15 +44,11 @@ fun PostCard(
     modifier: Modifier = Modifier,
     canDelete: Boolean = false,
     onLikeClick: () -> Unit,
-    loadedComments: List<Comment>?,
-    isLoadingComments: Boolean,
-    onCommentIconClick: () -> Unit,
-    onCommentSubmit: (String) -> Unit,
+    onCommentIconClick: () -> Unit, // 👇 Simply trigger the click
     onShareClick: () -> Unit,
     onReportClick: (String) -> Unit,
     onDeleteClick: () -> Unit = {},
 ) {
-    var showBottomSheet by rememberSaveable { mutableStateOf(false) }
     var commentText by rememberSaveable { mutableStateOf("") }
     var showReportDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -132,10 +128,7 @@ fun PostCard(
                             painter = painterResource(R.drawable.ic_comment),
                             contentDescription = "Comment",
                             modifier = Modifier
-                                .clickable {
-                                    showBottomSheet = true
-                                    onCommentIconClick() // Trigger the ViewModel to start fetching
-                                }
+                                .clickable { onCommentIconClick() }
                                 .size(20.dp)
                                 .padding(end = 2.dp),
                             tint = IssueSpotColors.OnSurfaceVariant
@@ -199,14 +192,7 @@ fun PostCard(
                 }
             }
 
-            if (showBottomSheet) {
-                CommentsBottomSheet(
-                    comments = loadedComments,
-                    isLoading = isLoadingComments,
-                    onDismiss = { showBottomSheet = false },
-                    onSubmit = onCommentSubmit
-                )
-            }
+
             
             if (showReportDialog) {
                 ReportPostDialog(
@@ -371,7 +357,6 @@ fun PostCardPreview() {
             post = samplePost,
             onLikeClick = {},
             onCommentIconClick = {},
-            onCommentSubmit = {},
             onShareClick = {},
             onReportClick = {},
             isLiked = true,
@@ -381,8 +366,6 @@ fun PostCardPreview() {
 
             onDeleteClick = {},
 
-            loadedComments = emptyList(),
-            isLoadingComments = false
         )
     }
     }

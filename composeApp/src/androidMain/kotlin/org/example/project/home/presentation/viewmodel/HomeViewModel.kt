@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import kotlinx.coroutines.delay
+import androidx.paging.insertHeaderItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,17 +12,18 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.example.project.core.data.repository.FeedRepository
 import org.example.project.core.data.repository.PostRepository
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
+import org.example.project.core.model.home.Comment
 import org.example.project.core.utils.DataState
 import org.example.project.home.presentation.CurrentLevelManager
 import org.example.project.core.datastore.UserPreferencesRepository
 import kotlinx.coroutines.flow.combine
-import org.example.project.core.model.home.Comment
 
 class HomeViewModel(
     private val feedRepository: FeedRepository,
@@ -69,13 +70,10 @@ class HomeViewModel(
             HomeIntent.CreatePostClicked -> navigateToCreatePost()
             HomeIntent.ProfileClicked -> navigateToProfile()
             is HomeIntent.ReportClicked -> report(intent.postId, intent.reason)
-            is HomeIntent.LikeClicked -> like(intent.postId, intent.currentIsLiked, intent.currentLikesCount)
-
-            // 👇 Handle bottom sheet open/close
             is HomeIntent.CommentsIconClicked -> openComments(intent.postId)
             HomeIntent.DismissCommentsSheet -> dismissComments()
-
-            is HomeIntent.CommentSubmitted -> submitComment(intent.postId, intent.commentText, intent.currentCommentCount)
+            is HomeIntent.LikeClicked -> like(intent.postId, intent.currentIsLiked, intent.currentLikesCount)
+            is HomeIntent.CommentSubmitted -> comment(intent.postId, intent.commentText, intent.currentCommentCount)
             is HomeIntent.ShareClicked -> share(intent.post)
             HomeIntent.ErrorShown -> clearError()
         }
@@ -137,72 +135,45 @@ class HomeViewModel(
         }
     }
 
-    // 👇 Opens the sheet AND triggers loading
     private fun openComments(postId: String) {
+        val existingFlow = _uiState.value.postOverrides[postId]?.commentsFlow
+        if (existingFlow == null) {
+            val flow = postRepository.getPagedComments(postId).cachedIn(viewModelScope)
+            updateOverride(postId, commentsFlow = flow)
+        }
         updateState { it.copy(showCommentsSheetForPostId = postId) }
-        loadComments(postId)
     }
 
-    // 👇 Closes the sheet
     private fun dismissComments() {
         updateState { it.copy(showCommentsSheetForPostId = null) }
     }
 
-    private fun loadComments(postId: String) {
-        val currentOverride = _uiState.value.postOverrides[postId]
-        if (currentOverride?.loadedComments != null) return // Already loaded
-
-        updateOverride(postId, isLoadingComments = true)
-
-        viewModelScope.launch {
-            // Simulate network delay
-            delay(800)
-            val mockComments = listOf(
-                Comment(
-                    "c1", "Alex Smith", "This is a great point!", "1h ago",
-                    userName = "",
-                    userImageUrl = ""
-                ),
-                Comment(
-                    "c2", "Sarah Jenkins", "I totally agree with this issue.", "2h ago",
-                    userName = "",
-                    userImageUrl = ""
-                )
+    private fun comment(postId: String, comment: String, currentCommentCount: Int) {
+        updateOverride(postId, commentsCount = currentCommentCount + 1)
+        
+        val currentFlow = _uiState.value.postOverrides[postId]?.commentsFlow
+        if (currentFlow != null) {
+            val optimisticComment = Comment(
+                id = "temp_${System.currentTimeMillis()}",
+                postId = postId,
+                text = comment,
+                timeAgo = "Just now",
+                userName = "You",
+                userImageUrl = null
             )
-
-            updateOverride(postId, loadedComments = mockComments, isLoadingComments = false)
+            val updatedFlow = currentFlow.map { pagingData ->
+                pagingData.insertHeaderItem(item = optimisticComment)
+            }
+            updateOverride(postId, commentsFlow = updatedFlow)
         }
-    }
-
-    private fun submitComment(postId: String, commentText: String, currentCommentCount: Int) {
-        val optimisticComment = Comment(
-            id = "temp_${System.currentTimeMillis()}",
-            userName = "You",
-            text = commentText,
-            timeAgo = "Just now",
-            user
-        )
-
-        val currentComments = _uiState.value.postOverrides[postId]?.loadedComments ?: emptyList()
-        val newCommentsList = listOf(optimisticComment) + currentComments
-
-        updateOverride(
-            postId = postId,
-            commentsCount = currentCommentCount + 1,
-            loadedComments = newCommentsList
-        )
 
         viewModelScope.launch {
-            when (val result = postRepository.addComment(postId, commentText)) {
+            when (val result = postRepository.addComment(postId, comment)) {
                 is DataState.Success -> {
                     _sideEffects.emit(HomeSideEffect.ShowSnackbar("Comment posted successfully!"))
                 }
                 is DataState.Error -> {
-                    updateOverride(
-                        postId = postId,
-                        commentsCount = currentCommentCount,
-                        loadedComments = currentComments
-                    )
+                    updateOverride(postId, commentsCount = currentCommentCount)
                     handleError(Throwable("Could not post comment. Connection lost."))
                 }
                 else -> Unit
@@ -234,8 +205,7 @@ class HomeViewModel(
         likesCount: Int? = null,
         commentsCount: Int? = null,
         isReported: Boolean? = null,
-        loadedComments: List<Comment>? = null,
-        isLoadingComments: Boolean? = null
+        commentsFlow: Flow<PagingData<Comment>>? = null
     ) {
         updateState { currentState ->
             val existingOverride = currentState.postOverrides[postId]
@@ -244,8 +214,7 @@ class HomeViewModel(
                 likesCount = likesCount ?: existingOverride?.likesCount ?: 0,
                 commentsCount = commentsCount ?: existingOverride?.commentsCount ?: 0,
                 isReported = isReported ?: existingOverride?.isReported ?: false,
-                loadedComments = loadedComments ?: existingOverride?.loadedComments,
-                isLoadingComments = isLoadingComments ?: existingOverride?.isLoadingComments ?: false
+                commentsFlow = commentsFlow ?: existingOverride?.commentsFlow
             )
             currentState.copy(postOverrides = currentState.postOverrides + (postId to newOverride))
         }
@@ -258,9 +227,8 @@ sealed interface HomeIntent {
     data object CreatePostClicked : HomeIntent
     data object ProfileClicked : HomeIntent
     data class ReportClicked(val postId: String, val reason: String) : HomeIntent
-
-    data class CommentsIconClicked(val postId: String) : HomeIntent // 👇 Triggers sheet + fetch
-    data object DismissCommentsSheet : HomeIntent // 👇 Triggers close
+    data class CommentsIconClicked(val postId: String) : HomeIntent
+    data object DismissCommentsSheet : HomeIntent
 
     data class LikeClicked(val postId: String, val currentIsLiked: Boolean, val currentLikesCount: Int) : HomeIntent
     data class CommentSubmitted(val postId: String, val commentText: String, val currentCommentCount: Int) : HomeIntent
@@ -276,7 +244,7 @@ data class HomeState(
     val query: String = "",
     val error: String? = null,
     val postOverrides: Map<String, PostOverride> = emptyMap(),
-    val showCommentsSheetForPostId: String? = null // 👇 Tracks which post's sheet is open
+    val showCommentsSheetForPostId: String? = null
 )
 
 sealed interface HomeSideEffect {
@@ -292,6 +260,5 @@ data class PostOverride(
     val likesCount: Int,
     val commentsCount: Int,
     val isReported: Boolean,
-    val loadedComments: List<Comment>? = null,
-    val isLoadingComments: Boolean = false
+    val commentsFlow: Flow<PagingData<Comment>>? = null
 )

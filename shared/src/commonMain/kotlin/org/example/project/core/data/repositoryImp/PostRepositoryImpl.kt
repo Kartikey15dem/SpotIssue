@@ -37,6 +37,11 @@ class PostRepositoryImpl(
 
 
     
+    
+    override suspend fun getComments(postId: String, page: Int, limit: Int): DataState<PagedResponse<CommentDto>> = safeApiCall {
+        postService.getComments(postId, page, limit)
+    }
+
     override fun getPagedComments(postId: String): Flow<PagingData<Comment>> {
         return Pager(
             config = PagingConfig(pageSize = 20),
@@ -44,9 +49,6 @@ class PostRepositoryImpl(
         ).flow
     }
 
-    override suspend fun getComments(postId: String, page: Int, limit: Int): DataState<PagedResponse<CommentDto>> = safeApiCall {
-        postService.getComments(postId, page, limit)
-    }
 
     override suspend fun addComment(postId: String, comment: String): DataState<Unit> = safeApiCall {
         postService.addComment(postId, AddCommentRequestDto(comment))

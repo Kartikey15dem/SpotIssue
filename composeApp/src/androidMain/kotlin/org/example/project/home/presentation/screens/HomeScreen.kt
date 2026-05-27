@@ -22,7 +22,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -31,7 +30,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.paging.LoadState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -134,12 +132,10 @@ fun HomeContent(
     val pagingItems = state.postsFlow?.collectAsLazyPagingItems()
     val isRefreshing = pagingItems?.loadState?.refresh is LoadState.Loading || state.isRefreshing
 
-    // Handle remote refresh errors
     LaunchedEffect(pagingItems?.loadState?.refresh) {
         if (pagingItems?.loadState?.refresh is LoadState.Error) {
             val errorState = pagingItems.loadState.refresh as LoadState.Error
-            // Send intent to ViewModel to handle or emit error
-            // (Assuming HomeViewModel has error side-effects wired, here we just observe)
+            // Handle error if needed
         }
     }
 
@@ -153,91 +149,91 @@ fun HomeContent(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-        HomeHeader(
-            modifier = Modifier.fillMaxWidth(),
-            state = state,
-            onIntent = onIntent
-        )
+            HomeHeader(
+                modifier = Modifier.fillMaxWidth(),
+                state = state,
+                onIntent = onIntent
+            )
 
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item { Spacer(Modifier.height(8.dp)) }
 
+                if (pagingItems != null) {
+                    items(
+                        count = pagingItems.itemCount,
+                        key = pagingItems.itemKey { it.id }
+                    ) { index ->
+                        val post = pagingItems[index]
+                        if (post != null) {
+                            val override = state.postOverrides[post.id]
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item { Spacer(Modifier.height(8.dp)) }
+                            val isLiked = override?.isLiked ?: false
+                            val resolvedLikes = override?.likesCount ?: post.likes
+                            val resolvedComments = override?.commentsCount ?: post.comments
+                            val isReported = override?.isReported ?: false
 
-            if (pagingItems != null) {
-                items(
-                    count = pagingItems.itemCount,
-                    key = pagingItems.itemKey { it.id }
-                ) { index ->
-                    val post = pagingItems[index]
-                    if (post != null) {
-                        val override = state.postOverrides[post.id]
+                            PostCard(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp),
+                                post = post,
+                                isLiked = isLiked,
+                                likesCount = resolvedLikes,
+                                commentsCount = resolvedComments,
+                                isReported = isReported,
 
-                        val isLiked = override?.isLiked ?: false
-                        val resolvedLikes = override?.likesCount ?: post.likes
-                        val resolvedComments = override?.commentsCount ?: post.comments
-                        val isReported = override?.isReported ?: false
-
-                        // 👇 Extract comment states
-                        val loadedComments = override?.loadedComments
-                        val isLoadingComments = override?.isLoadingComments ?: false
-
-                        PostCard(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp),
-                            post = post,
-                            isLiked = isLiked,
-                            likesCount = resolvedLikes,
-                            commentsCount = resolvedComments,
-                            isReported = isReported,
-
-                            // 👇 Pass them to the PostCard
-                            loadedComments = loadedComments,
-                            isLoadingComments = isLoadingComments,
-
-                            onLikeClick = {
-                                onIntent(HomeIntent.LikeClicked(post.id, isLiked, resolvedLikes))
-                            },
-
-                            // 👇 Trigger comment fetch when the icon is clicked
-                            onCommentIconClick = {
-                                onIntent(HomeIntent.LoadCommentsClicked(post.id))
-                            },
-
-                            // 👇 Handle the actual text submission
-                            onCommentSubmit = { text ->
-                                onIntent(HomeIntent.CommentSubmitted(post.id, text, resolvedComments))
-                            },
-
-                            onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
-                            onReportClick = { reason ->
-                                onIntent(HomeIntent.ReportClicked(post.id, reason))
-                            },
-                        )
+                                onLikeClick = {
+                                    onIntent(HomeIntent.LikeClicked(post.id, isLiked, resolvedLikes))
+                                },
+                                // 👇 Only pass the Intent, remove local states from PostCard!
+                                onCommentIconClick = {
+                                    onIntent(HomeIntent.CommentsIconClicked(post.id))
+                                },
+                                onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
+                                onReportClick = { reason ->
+                                    onIntent(HomeIntent.ReportClicked(post.id, reason))
+                                },
+                            )
+                        }
                     }
                 }
 
-            }
+                item { Spacer(Modifier.height(16.dp)) }
 
-            item { Spacer(Modifier.height(16.dp)) }
-            
-            // Show initial loading state for first-time fetch
-            if (pagingItems?.loadState?.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        androidx.compose.material3.CircularProgressIndicator(color = IssueSpotColors.Primary)
+                if (pagingItems?.loadState?.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                            androidx.compose.material3.CircularProgressIndicator(color = IssueSpotColors.Primary)
+                        }
                     }
                 }
             }
         }
     }
+
+    // 👇 Render Bottom Sheet at the screen level based on ViewModel state
+    if (state.showCommentsSheetForPostId != null) {
+        val activePostId = state.showCommentsSheetForPostId
+        val activeOverride = state.postOverrides[activePostId]
+        val commentsPagingItems = activeOverride?.commentsFlow?.collectAsLazyPagingItems()
+
+        CommentsBottomSheet(
+            comments = commentsPagingItems,
+            onDismiss = { onIntent(HomeIntent.DismissCommentsSheet) },
+            onSubmit = { text ->
+                onIntent(
+                    HomeIntent.CommentSubmitted(
+                        postId = activePostId,
+                        commentText = text,
+                        currentCommentCount = activeOverride?.commentsCount ?: 0 // Fetch actual count to bump it
+                    )
+                )
+            }
+        )
     }
-
-
 }
 
 @Composable
