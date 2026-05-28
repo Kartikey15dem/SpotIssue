@@ -7,10 +7,8 @@ import androidx.compose.runtime.saveable.mapSaver
 import kotlinx.parcelize.Parcelize
 import org.example.project.core.model.home.MediaType
 
-// 1. The Controller Class
 class OverlayController {
-    // If this is null, the overlay is hidden.
-    // If it has data, the overlay is visible.
+
     var currentOverlay by mutableStateOf<OverlayData?>(null)
         private set
 

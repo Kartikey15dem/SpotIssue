@@ -466,8 +466,7 @@ fun MediaPreviewContent(
                         images = mediaItems,
                         onRemove = onRemoveImage,
                         onImageClick = { clickedIndex ->
-                            // Pass the list and the index to your overlay controller
-                            // (You might need to adjust your overlay to accept a list of URIs + index)
+
                             overlayController.show(
                                 type = MediaType.IMAGE,
                                 urls = mediaItems.map { it.uri },
@@ -600,7 +599,6 @@ fun ImageGrid(
     }
 }
 
-// Helper to draw an individual image tile with a close button
 @Composable
 fun GridImageItem(
     uri: String,
@@ -618,7 +616,6 @@ fun GridImageItem(
             modifier = Modifier.fillMaxSize().clickable(onClick = onClick),
             contentScale = contentScale
         )
-        // Individual Close Button
         IconButton(
             onClick = onRemove,
             modifier = Modifier
