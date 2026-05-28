@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -81,6 +82,7 @@ import org.example.project.core.components.LocalOverlayController
 import org.example.project.core.components.PdfPreviewContent
 import org.example.project.core.components.VideoPreviewPlayer
 import org.example.project.core.model.home.MediaType
+import org.example.project.createPost.presentation.viewmodel.SelectedMediaItem
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -94,15 +96,17 @@ fun CreatePostScreen(
     val context = LocalContext.current
 
     val mediaPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        uri?.let {
-            // Get actual MIME type from ContentResolver
-            val mimeType = context.contentResolver.getType(it)
-            viewModel.setVisualMedia(it.toString(), mimeType)
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5)
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            // Map the URIs to include their MIME types
+            val mediaData = uris.map { uri ->
+                val mimeType = context.contentResolver.getType(uri)
+                Pair(uri.toString(), mimeType)
+            }
+            viewModel.setVisualMedia(mediaData)
         }
     }
-
     // PDF/Document picker launcher
     val pdfPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -346,18 +350,18 @@ fun CreatePostScreenContent(
                             }
                         )
 
-                        if (state.selectedMediaUri != null) {
+                        if (state.selectedMedia != null) {
                             MediaPreviewContent(
-                                mediaUri = state.selectedMediaUri,
-                                mediaType = state.selectedMediaType,
-                                onRemove = { onIntent(CreatePostIntent.RemoveMedia) }
+                                mediaItems = state.selectedMedia,
+                                onRemove = { onIntent(CreatePostIntent.RemoveMedia) },
+                                onRemoveImage = { onIntent(CreatePostIntent.RemoveImage(it)) }
                             )
                         }
                     }
                 }
             }
 
-            if(state.selectedMediaUri == null) {
+            if(state.selectedMedia == null) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -418,14 +422,13 @@ fun CreatePostScreenContent(
 
 @Composable
 fun MediaPreviewContent(
-    mediaUri: String,
-    mediaType: MediaType?,
+    mediaItems: List<SelectedMediaItem>,
     onRemove: () -> Unit,
+    onRemoveImage: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val overlayController = LocalOverlayController.current
     var aspectRatio by remember { mutableFloatStateOf(1f) }
-    // 1. Change main container to Column to stack items vertically
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -456,33 +459,23 @@ fun MediaPreviewContent(
                 .aspectRatio(aspectRatio)
                 .clip(RoundedCornerShape(8.dp))
         ) {
-            when (mediaType) {
+            when (mediaItems.first().type) {
                 MediaType.IMAGE -> {
 
-                    AsyncImage(
-                        model = mediaUri.toUri(),
-                        contentDescription = "Selected Image",
-                        onSuccess = { state ->
-                            // 1. Get the intrinsic size of the loaded drawable
-                            val width = state.painter.intrinsicSize.width
-                            val height = state.painter.intrinsicSize.height
-
-                            // 2. Calculate Ratio (prevent divide by zero)
-                            if (height != 0f) {
-                                aspectRatio = width / height
-                                if(aspectRatio < 1f) aspectRatio = 1f
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                            .clickable(onClick = {
-                                overlayController.show(
-                                    type = MediaType.IMAGE,
-                                    url = mediaUri
-                                )
-
-                            }),
-                        contentScale = ContentScale.Fit
+                    ImageGrid(
+                        images = mediaItems,
+                        onRemove = onRemoveImage,
+                        onImageClick = { clickedIndex ->
+                            // Pass the list and the index to your overlay controller
+                            // (You might need to adjust your overlay to accept a list of URIs + index)
+                            overlayController.show(
+                                type = MediaType.IMAGE,
+                                urls = mediaItems.map { it.uri },
+                                initialIndex = clickedIndex
+                            )
+                        }
                     )
+
                 }
                 MediaType.VIDEO -> {
                     Box(
@@ -490,13 +483,13 @@ fun MediaPreviewContent(
                         contentAlignment = Alignment.Center
                     ) {
                         VideoPreviewPlayer(
-                            videoUri = mediaUri,
+                            videoUri = mediaItems.first().uri,
                             modifier = Modifier.fillMaxSize(),
                             onFullscreenClick = {
                                 // Trigger the global overlay when fullscreen icon is clicked
                                 overlayController.show(
                                     type = MediaType.VIDEO,
-                                    url = mediaUri
+                                    urls = mediaItems.map { it.uri },
                                 )
                             },
                             onAspectRatioAvailable = { newRatio ->
@@ -508,15 +501,139 @@ fun MediaPreviewContent(
 
                 MediaType.PDF -> {
                     PdfPreviewContent(
-                        pdfUri = mediaUri.toUri(),
+                        pdfUri = mediaItems.first().uri.toUri(),
                         onFullscreenClick = {
-                            overlayController.show(MediaType.PDF, mediaUri)
+                            overlayController.show(MediaType.PDF, mediaItems.map { it.uri })
                         }
                     )
                 }
 
                 else -> {}
             }
+        }
+    }
+}
+
+@Composable
+fun ImageGrid(
+    images: List<SelectedMediaItem>,
+    onRemove: (String) -> Unit,
+    onImageClick: (Int) -> Unit
+) {
+    val count = images.size
+    val gridHeight = 300.dp // Fixed height for multi-image grids to look uniform
+    val spacing = 4.dp
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        when (count) {
+            1 -> {
+                // Single Image - Original logic
+                var singleAspectRatio by remember { mutableFloatStateOf(1f) }
+                GridImageItem(
+                    uri = images[0].uri,
+                    onRemove = { onRemove(images[0].uri) },
+                    onClick = { onImageClick(0) },
+                    modifier = Modifier.fillMaxWidth().aspectRatio(singleAspectRatio),
+                    contentScale = ContentScale.Fit,
+                    onSuccess = { state ->
+                        val width = state.painter.intrinsicSize.width
+                        val height = state.painter.intrinsicSize.height
+                        if (height != 0f) {
+                            singleAspectRatio = width / height
+                            if (singleAspectRatio < 1f) singleAspectRatio = 1f
+                        }
+                    }
+                )
+            }
+            2 -> {
+                // Two Images - Side by side
+                Row(modifier = Modifier.fillMaxWidth().height(gridHeight), horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                    GridImageItem(uri = images[0].uri, onRemove = { onRemove(images[0].uri) }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                    GridImageItem(uri = images[1].uri, onRemove = { onRemove(images[1].uri) }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                }
+            }
+            3 -> {
+                // Three Images - 1 Large Left, 2 Small Right vertically stacked
+                Row(modifier = Modifier.fillMaxWidth().height(gridHeight), horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                    GridImageItem(uri = images[0].uri, onRemove = { onRemove(images[0].uri) }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                    Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(spacing)) {
+                        GridImageItem(uri = images[1].uri, onRemove = { onRemove(images[1].uri) }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxWidth())
+                        GridImageItem(uri = images[2].uri, onRemove = { onRemove(images[2].uri) }, onClick = { onImageClick(2) }, modifier = Modifier.weight(1f).fillMaxWidth())
+                    }
+                }
+            }
+            else -> {
+                // Four or More Images - 2x2 Grid with +N overlay on the 4th
+                Column(modifier = Modifier.fillMaxWidth().height(gridHeight), verticalArrangement = Arrangement.spacedBy(spacing)) {
+                    Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                        GridImageItem(uri = images[0].uri, onRemove = { onRemove(images[0].uri) }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                        GridImageItem(uri = images[1].uri, onRemove = { onRemove(images[1].uri) }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                    }
+                    Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                        GridImageItem(uri = images[2].uri, onRemove = { onRemove(images[2].uri) }, onClick = { onImageClick(2) }, modifier = Modifier.weight(1f).fillMaxHeight())
+
+                        // 4th Image with Overlay
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            GridImageItem(uri = images[3].uri, onRemove = { onRemove(images[3].uri) }, onClick = { onImageClick(3) }, modifier = Modifier.fillMaxSize())
+
+                            if (count > 4) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.5f))
+                                        .clickable { onImageClick(3) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "+${count - 4}",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Helper to draw an individual image tile with a close button
+@Composable
+fun GridImageItem(
+    uri: String,
+    onRemove: () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    onSuccess: ((coil3.compose.AsyncImagePainter.State.Success) -> Unit)? = null
+) {
+    Box(modifier = modifier.clip(RoundedCornerShape(8.dp))) {
+        AsyncImage(
+            model = uri.toUri(),
+            contentDescription = "Selected Image",
+            onSuccess = onSuccess,
+            modifier = Modifier.fillMaxSize().clickable(onClick = onClick),
+            contentScale = contentScale
+        )
+        // Individual Close Button
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.6f))
+                .size(24.dp)
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_close),
+                contentDescription = "Remove",
+                modifier = Modifier.size(14.dp),
+                tint = Color.White
+            )
         }
     }
 }

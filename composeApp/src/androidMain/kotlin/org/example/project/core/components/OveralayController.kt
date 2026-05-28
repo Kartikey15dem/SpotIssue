@@ -14,8 +14,8 @@ class OverlayController {
     var currentOverlay by mutableStateOf<OverlayData?>(null)
         private set
 
-    fun show(type: MediaType, url: String) {
-        currentOverlay = OverlayData(type, url)
+    fun show(type: MediaType, urls: List<String>,initialIndex : Int = 0) {
+        currentOverlay = OverlayData(type, urls,initialIndex)
     }
 
     fun hide() {
@@ -44,5 +44,6 @@ val LocalOverlayController = staticCompositionLocalOf<OverlayController> {
 @Parcelize
 data class OverlayData(
     val type: MediaType,
-    val url: String
+    val url: List<String>,
+    val initialIndex : Int
 ) : Parcelable

@@ -26,8 +26,7 @@ data class Post(
 enum class MediaType {
     IMAGE,
     VIDEO,
-    PDF,
-    GIF
+    PDF
 }
 
 enum class PostLevel(val displayName: String) {

@@ -21,7 +21,6 @@ fun PostWithProfileDto.toPost(): Post {
             "IMAGE" -> MediaType.IMAGE
             "VIDEO" -> MediaType.VIDEO
             "PDF" -> MediaType.PDF
-            "GIF" -> MediaType.GIF
             else -> MediaType.IMAGE
         },
         mediaUrl = mediaUrl ?: "",

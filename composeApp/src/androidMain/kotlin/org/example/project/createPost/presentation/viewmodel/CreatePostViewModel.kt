@@ -16,9 +16,13 @@ import org.example.project.core.utils.DataState
 import org.example.project.core.model.home.PostLevel
 import org.example.project.core.datastore.UserPreferencesRepository
 
+data class SelectedMediaItem(
+    val uri: String,
+    val type: MediaType
+)
+
 class CreatePostViewModel(
     private val postRepository: PostRepository,
-    private val profileRepository : ProfileRepository,
     private val prefRepository: UserPreferencesRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CreatePostState())
@@ -27,28 +31,16 @@ class CreatePostViewModel(
     private val _sideEffects = MutableSharedFlow<CreatePostSideEffect>()
     val sideEffects: SharedFlow<CreatePostSideEffect> = _sideEffects
 
-    // Profile can be observed later when we need to prefill author fields.
-
     fun onIntent(intent: CreatePostIntent) {
         when (intent) {
             CreatePostIntent.CloseClicked -> onNavigateBack()
             CreatePostIntent.CancelClicked -> onNavigateBack()
-
-            is CreatePostIntent.DescriptionChanged -> {
-                changeDescription(description = intent.description)
-            }
-            CreatePostIntent.AddMediaClicked -> {
-                handleAddMedia()
-            }
-            CreatePostIntent.AddPdfClicked -> {
-                handleAddPdf()
-            }
-            CreatePostIntent.RemoveMedia -> {
-                removeMedia()
-            }
-            CreatePostIntent.PostIssueClicked -> {
-                createPost()
-            }
+            is CreatePostIntent.DescriptionChanged -> changeDescription(intent.description)
+            CreatePostIntent.AddMediaClicked -> handleAddMedia()
+            CreatePostIntent.AddPdfClicked -> handleAddPdf()
+            CreatePostIntent.RemoveMedia -> removeMedia()
+            is CreatePostIntent.RemoveImage -> removeImage(intent.uri)
+            CreatePostIntent.PostIssueClicked -> createPost()
         }
     }
 
@@ -56,91 +48,104 @@ class CreatePostViewModel(
         _uiState.value = _uiState.value.copy(description = description)
     }
 
-    private fun createPost(){
+    private fun createPost() {
         viewModelScope.launch {
             if (_uiState.value.description.isBlank()) {
                 _sideEffects.emit(CreatePostSideEffect.ShowError("Please describe the issue"))
-            } else {
-                _uiState.value = _uiState.value.copy(isLoading = true)
-                val userLocation = prefRepository.userData.value.userLocation
-                                when(val result = postRepository.createPost(
-                    CreatePost(
-                        userId = "",
-                        userUrl = "",
-                        userName = "",
-                        postLevel = PostLevel.LOCALITY,
-                        postText = _uiState.value.description,
-                        mediaType = _uiState.value.selectedMediaType ?: MediaType.IMAGE,
-                        mediaUrl = _uiState.value.selectedMediaUri,
-                        location = userLocation
-                    )
-                )) {
-                    is DataState.Success -> {
-                        _uiState.value = _uiState.value.copy(isLoading = false)
-                        _sideEffects.emit(CreatePostSideEffect.PostCreated("new_post"))
-                        onNavigateBack()
-                    }
-                    is DataState.Error -> {
-                        _uiState.value = _uiState.value.copy(isLoading = false)
-                        _sideEffects.emit(CreatePostSideEffect.ShowError(result.exception.message ?: "Failed to create post"))
-                    }
-                    else -> Unit
+                return@launch
+            }
+
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            val userLocation = prefRepository.userData.value.userLocation
+
+            when (val result = postRepository.createPost(
+                CreatePost(
+                    userId = "",
+                    userUrl = "",
+                    userName = "",
+                    postLevel = PostLevel.LOCALITY,
+                    postText = _uiState.value.description,
+                    mediaType = _uiState.value.selectedMedia?.firstOrNull()?.type ?: MediaType.IMAGE,
+                    mediaUrls = _uiState.value.selectedMedia?.map { it.uri },
+                    location = userLocation
+                )
+            )) {
+                is DataState.Success -> {
+                    _uiState.value = _uiState.value.copy(isLoading = false)
+                    _sideEffects.emit(CreatePostSideEffect.PostCreated("new_post"))
+                    onNavigateBack()
                 }
+                is DataState.Error -> {
+                    _uiState.value = _uiState.value.copy(isLoading = false)
+                    _sideEffects.emit(CreatePostSideEffect.ShowError(result.exception.message ?: "Failed to create post"))
+                }
+                else -> Unit
             }
         }
     }
 
     private fun handleAddMedia() {
-        viewModelScope.launch {
-            _sideEffects.emit(CreatePostSideEffect.ShowMediaPicker)
-        }
+        viewModelScope.launch { _sideEffects.emit(CreatePostSideEffect.ShowMediaPicker) }
     }
 
     private fun handleAddPdf() {
-        viewModelScope.launch {
-            _sideEffects.emit(CreatePostSideEffect.ShowPdfPicker)
-        }
+        viewModelScope.launch { _sideEffects.emit(CreatePostSideEffect.ShowPdfPicker) }
     }
 
     private fun onNavigateBack() {
-        viewModelScope.launch {
-            _sideEffects.emit(CreatePostSideEffect.NavigateBack)
-        }
+        viewModelScope.launch { _sideEffects.emit(CreatePostSideEffect.NavigateBack) }
     }
 
-    // --- Set visual media with mime type detection ---
-    fun setVisualMedia(uri: String, mimeType: String?) {
-        // Validate media first
-        if (!validateMedia(mimeType)) {
-            viewModelScope.launch {
-                _sideEffects.emit(CreatePostSideEffect.ShowError("Unsupported media format"))
+    fun setVisualMedia(mediaItems: List<Pair<String, String?>>) {
+        val maxItems = 10
+
+        val processedItems = mediaItems.mapNotNull { (uri, mimeType) ->
+            if (!validateMedia(mimeType)) return@mapNotNull null
+            val type = when {
+                mimeType?.startsWith("image/") == true -> MediaType.IMAGE
+                mimeType?.startsWith("video/") == true -> MediaType.VIDEO
+                else -> null
             }
-            return
+            if (type != null) SelectedMediaItem(uri, type) else null
         }
 
-        val type = when {
-            mimeType?.startsWith("image/") == true -> MediaType.IMAGE
-            mimeType?.startsWith("video/") == true -> MediaType.VIDEO
-            else -> null
+        val videosCount = processedItems.count { it.type == MediaType.VIDEO }
+        val imagesCount = processedItems.count { it.type == MediaType.IMAGE }
+
+        when {
+            videosCount > 1 -> {
+                emitError("You can only select 1 video per post.")
+            }
+            videosCount == 1 && imagesCount > 0 -> {
+                emitError("You cannot mix images and video. Please select one or the other.")
+            }
+            processedItems.size > maxItems -> {
+                emitError("You can only select up to $maxItems items.")
+            }
+            processedItems.isNotEmpty() -> {
+                // Rules passed! Replace the existing selection with the new one
+                _uiState.value = _uiState.value.copy(selectedMedia = processedItems)
+            }
         }
-        _uiState.value = _uiState.value.copy(selectedMediaUri = uri, selectedMediaType = type)
     }
 
-    // --- Set PDF document ---
     fun setDocumentUrl(uri: String) {
-        // Validate PDF format
         if (!validateMedia("application/pdf")) {
-            viewModelScope.launch {
-                _sideEffects.emit(CreatePostSideEffect.ShowError("PDF format is not supported"))
-            }
+            emitError("PDF format is not supported")
             return
         }
-        _uiState.value = _uiState.value.copy(selectedMediaUri = uri, selectedMediaType = MediaType.PDF)
+        _uiState.value = _uiState.value.copy(
+            selectedMedia = listOf(SelectedMediaItem(uri, MediaType.PDF))
+        )
     }
 
-    // --- Helper for Validation ---
+    private fun emitError(message: String) {
+        viewModelScope.launch {
+            _sideEffects.emit(CreatePostSideEffect.ShowError(message))
+        }
+    }
+
     fun validateMedia(mimeType: String?): Boolean {
-        // Production supported types
         val supportedTypes = listOf(
             "image/jpeg", "image/png", "image/webp",
             "video/mp4", "video/mpeg", "video/quicktime",
@@ -149,28 +154,12 @@ class CreatePostViewModel(
         return mimeType != null && supportedTypes.any { mimeType.startsWith(it) }
     }
 
-    // --- Legacy methods for backward compatibility ---
-    @Deprecated("Use setVisualMedia instead")
-    fun setImageUrl(imageUrl: String) {
-        _uiState.value = _uiState.value.copy(
-            selectedMediaUri = imageUrl,
-            selectedMediaType = MediaType.IMAGE
-        )
-    }
-
-    @Deprecated("Use setVisualMedia instead")
-    fun setVideoUrl(videoUrl: String) {
-        _uiState.value = _uiState.value.copy(
-            selectedMediaUri = videoUrl,
-            selectedMediaType = MediaType.VIDEO
-        )
-    }
-
     private fun removeMedia(){
-        _uiState.value = _uiState.value.copy(
-            selectedMediaUri = null,
-            selectedMediaType = null
-        )
+        _uiState.value = _uiState.value.copy(selectedMedia = null)
+    }
+    private fun removeImage(uriToRemove: String) {
+        val updatedList = _uiState.value.selectedMedia?.filterNot { it.uri == uriToRemove }
+        _uiState.value = _uiState.value.copy(selectedMedia = updatedList)
     }
 }
 
@@ -180,20 +169,19 @@ sealed interface CreatePostIntent {
     data object AddMediaClicked : CreatePostIntent
     data object AddPdfClicked : CreatePostIntent
     data object RemoveMedia : CreatePostIntent
+    data class RemoveImage(val uri: String) : CreatePostIntent
     data object CancelClicked : CreatePostIntent
     data object PostIssueClicked : CreatePostIntent
 }
 
-// MVI - State
 data class CreatePostState(
-    val userName: String = "Current User", // TODO: Get from auth
-    val location: String = "Current Location", // TODO: Get from location service
+    val userName: String = "Current User",
+    val location: String = "Current Location",
     val description: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
     val showIssueScopeDropdown: Boolean = false,
-    val selectedMediaUri: String? = "",
-    val selectedMediaType: MediaType? = MediaType.IMAGE
+    val selectedMedia: List<SelectedMediaItem>? = null
 )
 
 sealed interface CreatePostSideEffect {

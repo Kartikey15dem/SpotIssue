@@ -11,8 +11,8 @@ data class CreatePostRequestDto(
     val postText: String,
     @SerialName("media_type")
     val mediaType: String,
-    @SerialName("media_url")
-    val mediaUrl: String? = null,
+    @SerialName("media_urls")
+    val mediaUrls: List<String>? = null,
     @SerialName("locality")
     val locality: String? = null,
     @SerialName("district")

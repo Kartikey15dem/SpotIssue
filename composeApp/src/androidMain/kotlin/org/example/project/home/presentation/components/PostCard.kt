@@ -85,7 +85,7 @@ fun PostCard(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     when (post.mediaType) {
-                        MediaType.IMAGE, MediaType.GIF -> {
+                        MediaType.IMAGE -> {
                             Image(
                                 painter = painterResource(R.drawable.img_post_placeholder),
                                 contentDescription = "Post media",

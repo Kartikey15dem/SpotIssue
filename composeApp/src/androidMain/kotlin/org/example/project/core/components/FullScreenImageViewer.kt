@@ -1,96 +1,162 @@
 package org.example.project.core.components
 
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.IntSize
-import coil3.compose.SubcomposeAsyncImage
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import kotlinx.coroutines.launch
+import org.example.project.R
+import org.example.project.theme.IssueSpotTypography
 
-
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun FullScreenImageViewer(url: String) {
-    // 1. State for Zoom (Scale) and Pan (Offset)
+fun FullScreenImageViewer(
+    imageUrls: List<String>,
+    initialPage: Int = 0
+) {
+    val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(
+        initialPage = initialPage,
+        pageCount = { imageUrls.size }
+    )
+
+    // --- ZOOM STATE ---
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
 
-    // 2. Track the size of the image container to calculate bounds
-    var size by remember { mutableStateOf(IntSize.Zero) }
+    // Reset zoom when page changes
+    LaunchedEffect(pagerState.currentPage) {
+        scale = 1f
+        offset = Offset.Zero
+    }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            // 3. Measure the container size
-            .onSizeChanged { size = it }
-            // 4. Handle Gestures
-            .pointerInput(Unit) {
-                // DETECT PINCH AND DRAG
-                detectTransformGestures { _, pan, zoom, _ ->
-                    // A. Calculate New Scale
-                    val newScale = (scale * zoom).coerceIn(1f, 4f) // Min 1x, Max 4x
-                    scale = newScale
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        // 1. The Carousel (Pager)
+        HorizontalPager(
+            state = pagerState,
+            userScrollEnabled = scale == 1f, // Lock scrolling if zoomed in
+            modifier = Modifier.fillMaxSize()
+        ) { pageIndex ->
 
-                    // B. Calculate New Offset (Pan)
-                    // We only allow panning if we are zoomed in
-                    if (scale > 1f) {
-                        // Calculate the maximum drag limit based on how much we are zoomed in
-                        val maxX = (size.width * (scale - 1)) / 2
-                        val maxY = (size.height * (scale - 1)) / 2
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            val newScale = (scale * zoom).coerceIn(1f, 4f)
+                            scale = newScale
 
-                        val newOffset = offset + pan
-
-                        // Coerce the offset so we can't drag the image off-screen
-                        offset = Offset(
-                            x = newOffset.x.coerceIn(-maxX, maxX),
-                            y = newOffset.y.coerceIn(-maxY, maxY)
-                        )
-                    } else {
-                        // If zoomed out, reset offset to center
-                        offset = Offset.Zero
-                    }
-                }
-            }
-            .pointerInput(Unit) {
-                // DETECT DOUBLE TAP
-                detectTapGestures(
-                    onDoubleTap = {
-                        if (scale > 1f) {
-                            // Reset to normal
-                            scale = 1f
-                            offset = Offset.Zero
-                        } else {
-                            // Zoom in to 2x
-                            scale = 2f
+                            if (scale > 1f) {
+                                val maxX = (size.width * (scale - 1)) / 2
+                                val maxY = (size.height * (scale - 1)) / 2
+                                val newOffset = offset + pan
+                                offset = Offset(
+                                    x = newOffset.x.coerceIn(-maxX, maxX),
+                                    y = newOffset.y.coerceIn(-maxY, maxY)
+                                )
+                            } else {
+                                offset = Offset.Zero
+                            }
                         }
-                    }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = imageUrls[pageIndex],
+                    contentDescription = "Image ${pageIndex + 1}",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        // APPLY TRANSFORMATIONS HERE
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offset.x
+                            translationY = offset.y
+                        },
+                    contentScale = ContentScale.Fit
                 )
             }
-    ) {
-        SubcomposeAsyncImage(
-            model = url,
-            contentDescription = "Full screen image",
-            modifier = Modifier
-                .fillMaxSize()
-                .align(Alignment.Center)
-                // 5. Apply the transformations to the Image Layer
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    translationX = offset.x
-                    translationY = offset.y
-                },
-            loading = {
-                OverlayLoadingSpinner()
-            },
-            contentScale = ContentScale.Fit
-        )
+        }
+
+        // 2. Navigation Arrows & Indicator
+        if (scale == 1f && imageUrls.size > 1) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.Center)
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // LEFT ARROW
+                if (pagerState.currentPage > 0) {
+                    IconButton(
+                        onClick = {
+                            scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
+                        },
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_back_arrow),
+                            contentDescription = "Previous",
+                            tint = Color.White
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.size(48.dp))
+                }
+
+                // RIGHT ARROW
+                if (pagerState.currentPage < imageUrls.size - 1) {
+                    IconButton(
+                        onClick = {
+                            scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                        },
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_next_arrow),
+                            contentDescription = "Next",
+                            tint = Color.White
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.size(48.dp))
+                }
+            }
+
+            // PAGE INDICATOR
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 32.dp)
+                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "${pagerState.currentPage + 1} / ${imageUrls.size}",
+                    color = Color.White,
+                    style = IssueSpotTypography.bodyMedium
+                )
+            }
+        }
     }
 }

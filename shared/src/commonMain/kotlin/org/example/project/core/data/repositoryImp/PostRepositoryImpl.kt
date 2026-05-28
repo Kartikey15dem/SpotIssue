@@ -59,7 +59,7 @@ class PostRepositoryImpl(
             postLevel = post.postLevel.name,
             postText = post.postText,
             mediaType = post.mediaType.name,
-            mediaUrl = post.mediaUrl,
+            mediaUrls = post.mediaUrls,
             locality = post.location?.locality,
             district = post.location?.district,
             state = post.location?.state,
