@@ -6,7 +6,8 @@ import kotlin.time.Instant
 /**
  * Helpers to keep DB ordering stable for offline-first paging.
  */
-fun parseIsoEpochMillis(iso: String): Long {
+fun parseIsoEpochMillis(iso: String?): Long {
+    if (iso == null) return Clock.System.now().toEpochMilliseconds()
     return try {
         Instant.parse(iso).toEpochMilliseconds()
     } catch (_: Throwable) {

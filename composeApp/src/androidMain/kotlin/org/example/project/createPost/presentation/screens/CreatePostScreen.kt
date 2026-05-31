@@ -78,6 +78,9 @@ import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.core.net.toUri
 import coil3.compose.AsyncImage
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import org.example.project.createPost.work.PostUploadWorker
 import org.example.project.core.components.LocalOverlayController
 import org.example.project.core.components.PdfPreviewContent
 import org.example.project.core.components.VideoPreviewPlayer
@@ -133,6 +136,10 @@ fun CreatePostScreen(
                 }
                 is CreatePostSideEffect.PostCreated -> {
                     snackbarHostState.showSnackbar("Post created successfully!")
+                }
+                CreatePostSideEffect.StartBackgroundUpload -> {
+                    val workRequest = OneTimeWorkRequestBuilder<PostUploadWorker>().build()
+                    WorkManager.getInstance(context).enqueue(workRequest)
                 }
             }
         }
@@ -261,6 +268,8 @@ fun CreatePostScreenContent(
                 var boxHeightPx by remember { mutableIntStateOf(0) }
                 var cursorYInText by remember { mutableFloatStateOf(0f) }
                 var textLayoutResultState by remember { mutableStateOf<TextLayoutResult?>(null) }
+                
+
 
                 val density = LocalDensity.current
                 val imeHeightPx = WindowInsets.ime.getBottom(density)
@@ -358,6 +367,16 @@ fun CreatePostScreenContent(
                             )
                         }
                     }
+                }
+            }
+
+
+            if (state.isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)).clickable(enabled = false) {}, 
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(color = IssueSpotColors.Primary)
                 }
             }
 

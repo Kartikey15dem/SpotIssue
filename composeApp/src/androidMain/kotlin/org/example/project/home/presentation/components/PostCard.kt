@@ -59,8 +59,8 @@ fun PostCard(
 
     // Estimate video aspect ratio
     val videoAspect = when {
-        post.mediaUrl.contains("landscape", ignoreCase = true) -> 16f / 9f
-        post.mediaUrl.contains("portrait", ignoreCase = true) -> 9f / 16f
+        post.mediaUrls?.firstOrNull()?.contains("landscape", ignoreCase = true) == true -> 16f / 9f
+        post.mediaUrls?.firstOrNull()?.contains("portrait", ignoreCase = true) == true -> 9f / 16f
         else -> 9f / 16f
     }
 
@@ -208,7 +208,7 @@ fun PostCard(
         // Overlay placed OUTSIDE Card so it covers entire screen
         if (fullscreenVisible) {
             FullscreenVideoOverlay(
-                url = post.mediaUrl,
+                url = post.mediaUrls?.firstOrNull() ?: "",
                 videoAspectRatio = videoAspect,
                 visible = fullscreenVisible,
                 onDismiss = { fullscreenVisible = false }
@@ -375,8 +375,8 @@ val samplePost = Post(
     userName = "John Doe",
     userUrl = "https://example.com/avatar.jpg", // Replace with a real or placeholder image URL if needed for preview
 //    location = "Downtown, Mumbai Central",
-   // mediaUrl = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-    mediaUrl = "https://gmcmasoonnpvjlvohzpt.supabase.co/storage/v1/object/public/vid/WhatsApp%20Video%202026-01-07%20at%2019.19.15.mp4",
+   // mediaUrls = listOf("https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4"),
+    mediaUrls = listOf("https://gmcmasoonnpvjlvohzpt.supabase.co/storage/v1/object/public/vid/WhatsApp%20Video%202026-01-07%20at%2019.19.15.mp4"),
     likes = 10,
     comments = 5,
     timeAgo ="14d ago",

@@ -13,7 +13,7 @@ data class Post(
     val postLevel: PostLevel,
     val postText: String,
     val mediaType: MediaType,
-    val mediaUrl: String,
+    val mediaUrls: List<String>? = null,
     val likes: Int,
     val comments: Int,
     val locality: String? = null,

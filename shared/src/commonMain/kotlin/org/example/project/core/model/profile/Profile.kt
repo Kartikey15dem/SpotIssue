@@ -6,6 +6,7 @@ data class Profile(
     val imageUrl: String,
     val name: String,
     val email: String,
+    val location: String? = null,
     val totalPosts: Int,
     val acks: Int,
     val postByArea: List<Int> = listOf(0, 0, 0, 0),

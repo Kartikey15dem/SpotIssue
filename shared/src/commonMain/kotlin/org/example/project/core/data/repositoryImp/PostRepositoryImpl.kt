@@ -8,6 +8,16 @@ import org.example.project.core.network.dto.CoordinatesDto
 import org.example.project.core.network.dto.CreatePostRequestDto
 import org.example.project.core.network.dto.AddCommentRequestDto
 import org.example.project.core.network.dto.ReportPostRequestDto
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
+import io.ktor.client.request.forms.append
+import io.ktor.http.Headers
+import io.ktor.http.HttpHeaders
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import okio.FileSystem
+import okio.Path.Companion.toPath
+import okio.buffer
 import org.example.project.core.network.dto.PagedResponse
 import androidx.paging.PagingData
 import androidx.paging.Pager
@@ -59,7 +69,6 @@ class PostRepositoryImpl(
             postLevel = post.postLevel.name,
             postText = post.postText,
             mediaType = post.mediaType.name,
-            mediaUrls = post.mediaUrls,
             locality = post.location?.locality,
             district = post.location?.district,
             state = post.location?.state,
@@ -70,7 +79,24 @@ class PostRepositoryImpl(
                 }
             }
         )
-        postService.createPost(request)
+        
+        val multipartData = formData {
+            append("request", Json.encodeToString(request), Headers.build {
+                append(HttpHeaders.ContentType, "application/json")
+            })
+            
+            post.mediaFilePaths.forEach { filePath ->
+                val path = filePath.toPath()
+                val fileName = path.name
+                val bytes = FileSystem.SYSTEM.source(path).buffer().readByteArray()
+                
+                append("files", bytes, Headers.build {
+                    append(HttpHeaders.ContentDisposition, "filename=")
+                })
+            }
+        }
+        
+        postService.createPost(MultiPartFormDataContent(multipartData))
         Unit
     }
 

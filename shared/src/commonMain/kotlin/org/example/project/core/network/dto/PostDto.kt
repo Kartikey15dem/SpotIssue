@@ -23,8 +23,8 @@ data class PostDto(
     @SerialName("media_type")
     val mediaType: String, // IMAGE, VIDEO, GIF
 
-    @SerialName("media_url")
-    val mediaUrl: String? = null,
+    @SerialName("media_urls")
+    val mediaUrls: List<String>? = null,
 
     @SerialName("likes")
     val likes: Int = 0,
@@ -33,7 +33,7 @@ data class PostDto(
     val comments: Int = 0,
 
     @SerialName("created_at")
-    val createdAt: String,
+    val createdAt: String? = null,
 
     @SerialName("locality")
     val locality: String? = null,
@@ -71,8 +71,8 @@ data class PostWithProfileDto(
     @SerialName("media_type")
     val mediaType: String,
 
-    @SerialName("media_url")
-    val mediaUrl: String? = null,
+    @SerialName("media_urls")
+    val mediaUrls: List<String>? = null,
 
     @SerialName("likes")
     val likes: Int = 0,
@@ -81,7 +81,7 @@ data class PostWithProfileDto(
     val comments: Int = 0,
 
     @SerialName("created_at")
-    val createdAt: String,
+    val createdAt: String? = null,
 
     // Profile info
     @SerialName("profiles")

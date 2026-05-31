@@ -3,6 +3,9 @@ package org.example.project.core.network.services
 import de.jensklingenberg.ktorfit.http.Body
 import de.jensklingenberg.ktorfit.http.DELETE
 import de.jensklingenberg.ktorfit.http.GET
+import de.jensklingenberg.ktorfit.http.Multipart
+import de.jensklingenberg.ktorfit.http.Part
+import io.ktor.client.request.forms.MultiPartFormDataContent
 import de.jensklingenberg.ktorfit.http.POST
 import de.jensklingenberg.ktorfit.http.Path
 import de.jensklingenberg.ktorfit.http.Query
@@ -31,8 +34,9 @@ interface PostService {
         @Query("limit") limit: Int
     ): PagedResponse<CommentDto>
 
+    @Multipart
     @POST(ApiEndPoints.POSTS)
-    suspend fun createPost(@Body request: CreatePostRequestDto): PostWithProfileDto
+    suspend fun createPost(@Body body: MultiPartFormDataContent): PostWithProfileDto
 
     @DELETE(ApiEndPoints.POSTS + "/{postid}")
     suspend fun deletePost(@Path("postid") id: String)

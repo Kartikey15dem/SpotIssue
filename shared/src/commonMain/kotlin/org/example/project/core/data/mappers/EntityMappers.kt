@@ -10,6 +10,7 @@ import org.example.project.core.model.home.Coordinates
 import org.example.project.core.network.dto.PostWithProfileDto
 import org.example.project.core.network.dto.ProfileDto
 import org.example.project.core.network.dto.CoordinatesDto
+import org.example.project.core.utils.getRelativeTime
 
 fun PostWithProfileDto.toPost(): Post {
     return Post(
@@ -23,11 +24,11 @@ fun PostWithProfileDto.toPost(): Post {
             "PDF" -> MediaType.PDF
             else -> MediaType.IMAGE
         },
-        mediaUrl = mediaUrl ?: "",
+        mediaUrls = mediaUrls,
         postLevel = PostLevel.valueOf(postLevel),
         likes = likes,
         comments = comments,
-        timeAgo = "1 hour ago", // Default
+        timeAgo = createdAt?.let { getRelativeTime(it) } ?: "Just now",
         locality = locality,
         district = district,
         state = state,
@@ -59,7 +60,7 @@ fun Post.toUserPostEntity(
         userAvatar = userUrl,
         postText = postText,
         mediaType = mediaType.name,
-        mediaUrl = mediaUrl,
+        mediaUrlsStr = mediaUrls?.joinToString(",") ?: "",
         location = locality ?: "", // Use locality as location for now if needed by entity
         postLevel = postLevel.name,
         likes = likes,
@@ -82,7 +83,7 @@ fun Post.toLikedPostEntity(
         userAvatar = userUrl,
         postText = postText,
         mediaType = mediaType.name,
-        mediaUrl = mediaUrl,
+        mediaUrlsStr = mediaUrls?.joinToString(",") ?: "",
         location = locality ?: "",
         postLevel = postLevel.name,
         likes = likes,

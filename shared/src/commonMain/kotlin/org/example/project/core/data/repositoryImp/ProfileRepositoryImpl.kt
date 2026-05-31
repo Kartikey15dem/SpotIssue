@@ -27,11 +27,14 @@ import org.example.project.core.network.dto.UpsertProfileRequest
 import org.example.project.core.data.paging.ProfileLikedPostsRemoteMediator
 import org.example.project.core.data.paging.ProfileUserPostsRemoteMediator
 import org.example.project.core.network.dto.CoordinatesDto
+import org.example.project.core.datastore.UserPreferencesRepository
+import kotlinx.coroutines.flow.combine
 
 class ProfileRepositoryImpl(
     private val profileService: ProfileService,
     private val database: IssueSpotDatabase,
     private val localDataSource: ProfileLocalDataSource,
+    private val prefRepository: UserPreferencesRepository
 ) : ProfileRepository {
 
     private val logger = Logger.Companion.withTag("ProfileRepository")
@@ -70,17 +73,18 @@ class ProfileRepositoryImpl(
         }
     }
 
-    override fun observeProfile(): Flow<DataState<Profile>> = flow {
-        val dbFlow = localDataSource.getProfileFlow()
-            .map { entity ->
-                if (entity != null) {
-                    DataState.Success(entity.toProfile())
-                } else {
-                    DataState.Loading
-                }
-            }
-
-        emitAll(dbFlow)
+    override fun observeProfile(): Flow<DataState<Profile>> = combine(
+        localDataSource.getProfileFlow(),
+        prefRepository.userData
+    ) { entity, userData ->
+        if (entity != null) {
+            val domainProfile = entity.toProfile().copy(
+                location = userData.userLocation?.address ?: "No location set"
+            )
+            DataState.Success(domainProfile)
+        } else {
+            DataState.Loading
+        }
     }.onStart { emit(DataState.Loading) }
 
     override suspend fun refreshProfile(): DataState<Unit> = safeApiCall {

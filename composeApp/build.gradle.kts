@@ -36,6 +36,12 @@ kotlin {
 //            implementation(libs.ktor.client.android)
             implementation(libs.androidx.media3.exoplayer)
             implementation(libs.androidx.media3.ui)
+            implementation(libs.androidx.media3.transformer)
+
+            // Background & Media Compression
+            implementation(libs.androidx.work.runtime.ktx)
+            implementation(libs.compressor)
+            implementation(libs.storage.kt)
 
             // Compose <-> Android View bridge
             implementation(libs.androidx.ui.viewbinding)

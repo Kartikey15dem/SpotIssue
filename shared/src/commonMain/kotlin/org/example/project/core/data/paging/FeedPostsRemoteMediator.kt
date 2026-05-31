@@ -14,6 +14,7 @@ import org.example.project.core.utils.parseIsoEpochMillis
 import kotlin.time.Clock
 import org.example.project.core.data.local.FeedLocalDataSource
 import org.example.project.core.data.mappers.toPost
+import org.example.project.core.database.entities.toEntity
 import org.example.project.core.model.auth.UserLocation
 import org.example.project.core.model.home.PostLevel
 

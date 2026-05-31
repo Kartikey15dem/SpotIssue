@@ -21,7 +21,7 @@ fun UserPostEntity.toPost(): Post = Post(
         "VIDEO" -> MediaType.VIDEO
         else -> MediaType.IMAGE
     },
-    mediaUrl = mediaUrl ?: "",
+    mediaUrls = if (mediaUrlsStr.isBlank()) emptyList() else mediaUrlsStr.split(","),
     postLevel = when (postLevel) {
         "LOCALITY" -> PostLevel.LOCALITY
         "DISTRICT" -> PostLevel.DISTRICT
@@ -51,7 +51,7 @@ fun LikedPostEntity.toPost(): Post = Post(
         "VIDEO" -> MediaType.VIDEO
         else -> MediaType.IMAGE
     },
-    mediaUrl = mediaUrl ?: "",
+    mediaUrls = if (mediaUrlsStr.isBlank()) emptyList() else mediaUrlsStr.split(","),
     postLevel = when (postLevel) {
         "LOCALITY" -> PostLevel.LOCALITY
         "DISTRICT" -> PostLevel.DISTRICT
@@ -78,7 +78,7 @@ fun Post.toLikedPostEntity(
     userAvatar = userUrl,
     postText = postText,
     mediaType = mediaType.name,
-    mediaUrl = mediaUrl,
+    mediaUrlsStr = mediaUrls?.joinToString(",") ?: "",
     locality = null,
     district = null,
     state = null,

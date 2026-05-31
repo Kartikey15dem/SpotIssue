@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 4,
-    "identityHash": "7efee249315087f9650a2354850409f2",
+    "identityHash": "164cedefff83765757903eadd19e1da4",
     "entities": [
       {
         "tableName": "profile",
@@ -70,7 +70,7 @@
       },
       {
         "tableName": "posts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userUrl` TEXT NOT NULL, `userName` TEXT NOT NULL, `timeAgo` TEXT NOT NULL, `postLevel` TEXT NOT NULL, `location` TEXT NOT NULL, `postText` TEXT NOT NULL, `mediaType` TEXT NOT NULL, `mediaUrl` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userUrl` TEXT NOT NULL, `userName` TEXT NOT NULL, `timeAgo` TEXT NOT NULL, `postLevel` TEXT NOT NULL, `location` TEXT NOT NULL, `postText` TEXT NOT NULL, `mediaType` TEXT NOT NULL, `mediaUrlsStr` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -121,8 +121,8 @@
             "notNull": true
           },
           {
-            "fieldPath": "mediaUrl",
-            "columnName": "mediaUrl",
+            "fieldPath": "mediaUrlsStr",
+            "columnName": "mediaUrlsStr",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -214,7 +214,7 @@
       },
       {
         "tableName": "user_posts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `userName` TEXT NOT NULL, `userAvatar` TEXT, `postText` TEXT NOT NULL, `mediaType` TEXT, `mediaUrl` TEXT, `location` TEXT NOT NULL, `locality` TEXT, `district` TEXT, `state` TEXT, `postLevel` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `isLiked` INTEGER NOT NULL, `timeAgo` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `userName` TEXT NOT NULL, `userAvatar` TEXT, `postText` TEXT NOT NULL, `mediaType` TEXT, `mediaUrlsStr` TEXT NOT NULL, `location` TEXT NOT NULL, `locality` TEXT, `district` TEXT, `state` TEXT, `postLevel` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `isLiked` INTEGER NOT NULL, `timeAgo` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -251,9 +251,10 @@
             "affinity": "TEXT"
           },
           {
-            "fieldPath": "mediaUrl",
-            "columnName": "mediaUrl",
-            "affinity": "TEXT"
+            "fieldPath": "mediaUrlsStr",
+            "columnName": "mediaUrlsStr",
+            "affinity": "TEXT",
+            "notNull": true
           },
           {
             "fieldPath": "location",
@@ -328,7 +329,7 @@
       },
       {
         "tableName": "liked_posts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `userName` TEXT NOT NULL, `userAvatar` TEXT, `postText` TEXT NOT NULL, `mediaType` TEXT, `mediaUrl` TEXT, `location` TEXT NOT NULL, `locality` TEXT, `district` TEXT, `state` TEXT, `postLevel` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `isLiked` INTEGER NOT NULL, `timeAgo` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `likedAt` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `userName` TEXT NOT NULL, `userAvatar` TEXT, `postText` TEXT NOT NULL, `mediaType` TEXT, `mediaUrlsStr` TEXT NOT NULL, `location` TEXT NOT NULL, `locality` TEXT, `district` TEXT, `state` TEXT, `postLevel` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `isLiked` INTEGER NOT NULL, `timeAgo` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `likedAt` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -365,9 +366,10 @@
             "affinity": "TEXT"
           },
           {
-            "fieldPath": "mediaUrl",
-            "columnName": "mediaUrl",
-            "affinity": "TEXT"
+            "fieldPath": "mediaUrlsStr",
+            "columnName": "mediaUrlsStr",
+            "affinity": "TEXT",
+            "notNull": true
           },
           {
             "fieldPath": "location",
@@ -483,7 +485,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7efee249315087f9650a2354850409f2')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '164cedefff83765757903eadd19e1da4')"
     ]
   }
 }

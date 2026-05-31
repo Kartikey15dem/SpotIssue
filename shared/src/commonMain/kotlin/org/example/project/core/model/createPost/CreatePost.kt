@@ -11,6 +11,6 @@ data class CreatePost(
     val postLevel: PostLevel,
     val postText: String,
     val mediaType: MediaType,
-    val mediaUrls: List<String>?,
+    val mediaFilePaths: List<String> = emptyList(),
     val location: UserLocation? = null
 )

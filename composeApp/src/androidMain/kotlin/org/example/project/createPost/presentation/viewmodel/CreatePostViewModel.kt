@@ -15,6 +15,9 @@ import org.example.project.core.model.home.MediaType
 import org.example.project.core.utils.DataState
 import org.example.project.core.model.home.PostLevel
 import org.example.project.core.datastore.UserPreferencesRepository
+import org.example.project.core.datastore.model.UploadStatus
+import org.example.project.core.datastore.model.UploadDraftState
+
 
 data class SelectedMediaItem(
     val uri: String,
@@ -30,6 +33,32 @@ class CreatePostViewModel(
 
     private val _sideEffects = MutableSharedFlow<CreatePostSideEffect>()
     val sideEffects: SharedFlow<CreatePostSideEffect> = _sideEffects
+
+        init {
+        viewModelScope.launch {
+            prefRepository.userData.collect { userData ->
+                val draft = userData.uploadDraftState
+                if (draft.status == UploadStatus.ERROR) {
+                    _uiState.value = _uiState.value.copy(
+                        description = draft.postText,
+                        // Could also restore media here if needed
+                    )
+                    _sideEffects.emit(CreatePostSideEffect.ShowError(draft.errorMessage ?: "Upload failed. Draft restored."))
+                    // Reset status to IDLE so we don't keep showing the error
+                    prefRepository.updateUploadDraftState(draft.copy(status = UploadStatus.IDLE))
+                } else if (draft.status == UploadStatus.SUCCESS) {
+                    _sideEffects.emit(CreatePostSideEffect.PostCreated("new_post"))
+                    prefRepository.updateUploadDraftState(UploadDraftState.DEFAULT)
+                    // Wait, if they are still on this screen, close it
+                    onNavigateBack()
+                } else if (draft.status == UploadStatus.UPLOADING) {
+                    _uiState.value = _uiState.value.copy(isLoading = true)
+                } else {
+                    _uiState.value = _uiState.value.copy(isLoading = false)
+                }
+            }
+        }
+    }
 
     fun onIntent(intent: CreatePostIntent) {
         when (intent) {
@@ -48,7 +77,7 @@ class CreatePostViewModel(
         _uiState.value = _uiState.value.copy(description = description)
     }
 
-    private fun createPost() {
+        private fun createPost() {
         viewModelScope.launch {
             if (_uiState.value.description.isBlank()) {
                 _sideEffects.emit(CreatePostSideEffect.ShowError("Please describe the issue"))
@@ -56,31 +85,25 @@ class CreatePostViewModel(
             }
 
             _uiState.value = _uiState.value.copy(isLoading = true)
-            val userLocation = prefRepository.userData.value.userLocation
+            
+            val mediaUris = _uiState.value.selectedMedia?.map { it.uri } ?: emptyList()
+            val mediaType = _uiState.value.selectedMedia?.firstOrNull()?.type?.name ?: "IMAGE"
 
-            when (val result = postRepository.createPost(
-                CreatePost(
-                    userId = "",
-                    userUrl = "",
-                    userName = "",
-                    postLevel = PostLevel.LOCALITY,
-                    postText = _uiState.value.description,
-                    mediaType = _uiState.value.selectedMedia?.firstOrNull()?.type ?: MediaType.IMAGE,
-                    mediaUrls = _uiState.value.selectedMedia?.map { it.uri },
-                    location = userLocation
-                )
-            )) {
-                is DataState.Success -> {
-                    _uiState.value = _uiState.value.copy(isLoading = false)
-                    _sideEffects.emit(CreatePostSideEffect.PostCreated("new_post"))
-                    onNavigateBack()
-                }
-                is DataState.Error -> {
-                    _uiState.value = _uiState.value.copy(isLoading = false)
-                    _sideEffects.emit(CreatePostSideEffect.ShowError(result.exception.message ?: "Failed to create post"))
-                }
-                else -> Unit
-            }
+            // 1. Save state to DataStore
+            val draft = UploadDraftState(
+                status = UploadStatus.UPLOADING,
+                postText = _uiState.value.description,
+                postLevel = "LOCALITY",
+                mediaUris = mediaUris,
+                mediaType = mediaType
+            )
+            prefRepository.updateUploadDraftState(draft)
+
+            // 2. Tell UI to enqueue WorkManager
+            _sideEffects.emit(CreatePostSideEffect.StartBackgroundUpload)
+            
+            // Note: We don't navigate back immediately, we let the UI show the progress 
+            // overlay if the user stays, or they can background the app.
         }
     }
 
@@ -188,6 +211,7 @@ sealed interface CreatePostSideEffect {
     data object NavigateBack : CreatePostSideEffect
     data object ShowMediaPicker : CreatePostSideEffect
     data object ShowPdfPicker : CreatePostSideEffect
+    data object StartBackgroundUpload : CreatePostSideEffect
     data class ShowError(val message: String) : CreatePostSideEffect
     data class PostCreated(val postId: String) : CreatePostSideEffect
 }

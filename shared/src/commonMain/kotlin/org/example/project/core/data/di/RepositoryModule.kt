@@ -22,5 +22,5 @@ val RepositoryModule = module {
     single { PostRepositoryImpl(get()) } bind PostRepository::class
 
     // Profile
-    single { ProfileRepositoryImpl(get(), get(), get()) } bind ProfileRepository::class
+    single { ProfileRepositoryImpl(get(), get(), get(), get()) } bind ProfileRepository::class
 }

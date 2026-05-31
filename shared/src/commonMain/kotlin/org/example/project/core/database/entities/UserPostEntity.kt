@@ -15,7 +15,7 @@ data class UserPostEntity(
     val userAvatar: String? = null,
     val postText: String,
     val mediaType: String? = null, // "image", "video", or null
-    val mediaUrl: String? = null,
+    val mediaUrlsStr: String,
     val location: String,
     val locality: String? = null,
     val district: String? = null,

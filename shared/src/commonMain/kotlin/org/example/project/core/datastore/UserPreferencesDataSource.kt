@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.example.project.core.datastore.model.UserData
+import org.example.project.core.datastore.model.UploadDraftState
 import org.example.project.core.model.auth.UserLocation
 
 @OptIn(ExperimentalSerializationApi::class, ExperimentalSettingsApi::class)
@@ -59,6 +60,10 @@ class UserPreferencesDataSource(
 
     suspend fun updateUserLocation(userLocation: UserLocation) {
         val updatedData = userData.value.copy(userLocation = userLocation)
+        updateUserData(updatedData)
+    }
+    suspend fun updateUploadDraftState(state: UploadDraftState) {
+        val updatedData = userData.value.copy(uploadDraftState = state)
         updateUserData(updatedData)
     }
     suspend fun clearUserData() {

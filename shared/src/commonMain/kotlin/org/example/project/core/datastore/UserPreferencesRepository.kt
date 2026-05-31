@@ -3,6 +3,7 @@ package org.example.project.core.datastore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import org.example.project.core.datastore.model.UserData
+import org.example.project.core.datastore.model.UploadDraftState
 import org.example.project.core.model.auth.UserLocation
 
 interface UserPreferencesRepository {
@@ -12,6 +13,7 @@ interface UserPreferencesRepository {
     suspend fun setLoggedIn(isLoggedIn: Boolean)
 
     suspend fun updateUserLocation(userLocation: UserLocation)
+    suspend fun updateUploadDraftState(state: UploadDraftState)
 
     suspend fun logOut()
 

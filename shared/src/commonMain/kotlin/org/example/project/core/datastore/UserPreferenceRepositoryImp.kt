@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import org.example.project.core.datastore.model.UserData
+import org.example.project.core.datastore.model.UploadDraftState
 import org.example.project.core.model.auth.UserLocation
 
 class UserPreferencesRepositoryImpl(
@@ -24,6 +25,10 @@ class UserPreferencesRepositoryImpl(
     override suspend fun updateUserLocation(userLocation: UserLocation) {
         localDataSource.updateUserLocation(userLocation)
         Logger.d { "User location updated: $userLocation" }
+    }
+
+    override suspend fun updateUploadDraftState(state: UploadDraftState) {
+        localDataSource.updateUploadDraftState(state)
     }
 
     override suspend fun logOut() {
