@@ -8,17 +8,28 @@ import id.zelory.compressor.Compressor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import android.provider.OpenableColumns
+import androidx.core.net.toUri
 
 object MediaCompressorUtil {
 
     suspend fun compressImage(context: Context, uriString: String): File? = withContext(Dispatchers.IO) {
         try {
-            val uri = Uri.parse(uriString)
+            val uri = uriString.toUri()
             val file = copyUriToFile(context, uri) ?: return@withContext null
             
             // Limit file size roughly, though compressor handles dimensions
             val compressedImageFile = Compressor.compress(context, file)
             compressedImageFile
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    suspend fun prepareFile(context: Context, uriString: String): File? = withContext(Dispatchers.IO) {
+        try {
+            val uri = uriString.toUri()
+            copyUriToFile(context, uri)
         } catch (e: Exception) {
             e.printStackTrace()
             null

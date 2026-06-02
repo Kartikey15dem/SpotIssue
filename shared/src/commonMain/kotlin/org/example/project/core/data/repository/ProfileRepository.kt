@@ -25,7 +25,7 @@ interface ProfileRepository {
     /**
      * Observe user profile (Room-backed)
      */
-    fun observeProfile(): Flow<DataState<Profile>>
+    fun observeProfile(): Flow<DataState<Profile?>>
 
     /**
      * Refresh profile data from remote

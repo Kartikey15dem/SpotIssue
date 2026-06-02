@@ -11,14 +11,20 @@ import org.example.project.profile.presentation.screens.ProfileScreen
 
 @Composable
 fun ProfileNavigation(
-    modifier : Modifier = Modifier,
-    onCreatePost:() -> Unit
+    onCreatePost:() -> Unit,
+    onBack: () -> Unit
 ) {
     val profileBackStack = rememberNavBackStack(Route.Profile.ProfileDetail)
 
     NavDisplay(
         backStack = profileBackStack,
-        onBack = { profileBackStack.removeLastOrNull() },
+        onBack = { 
+            if (profileBackStack.size > 1) {
+                profileBackStack.removeLastOrNull()
+            } else {
+                onBack()
+            }
+        },
         entryProvider = entryProvider {
             entry<Route.Profile.ProfileDetail>{
                 ProfileScreen(
@@ -30,13 +36,15 @@ fun ProfileNavigation(
             }
             entry<Route.Profile.EditProfileRoute>{
                 EditProfileScreen(
-                    onNavigateBack = {}
+                    onNavigateBack = {
+                        if (profileBackStack.size > 1) {
+                            profileBackStack.removeLastOrNull()
+                        } else {
+                            onBack()
+                        }
+                    }
                 )
-
-
             }
-
-
         }
     )
 }

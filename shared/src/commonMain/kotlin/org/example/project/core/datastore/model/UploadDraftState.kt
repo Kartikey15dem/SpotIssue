@@ -1,6 +1,9 @@
 package org.example.project.core.datastore.model
 
 import kotlinx.serialization.Serializable
+import org.example.project.core.model.home.MediaType
+import org.example.project.core.model.home.PostLevel
+import org.example.project.core.model.home.SelectedMediaItem
 
 @Serializable
 enum class UploadStatus {
@@ -11,9 +14,7 @@ enum class UploadStatus {
 data class UploadDraftState(
     val status: UploadStatus = UploadStatus.IDLE,
     val postText: String = "",
-    val postLevel: String = "LOCALITY",
-    val mediaUris: List<String> = emptyList(),
-    val mediaType: String = "IMAGE",
+    val selectedMedia : List<SelectedMediaItem>? = null,
     val errorMessage: String? = null
 ) {
     companion object {

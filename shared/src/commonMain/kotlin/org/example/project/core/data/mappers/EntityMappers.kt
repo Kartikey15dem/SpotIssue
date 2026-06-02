@@ -37,14 +37,15 @@ fun PostWithProfileDto.toPost(): Post {
     )
 }
 
-fun ProfileDto.toEntity(): ProfileEntity {
+fun ProfileDto.toEntity(userId: String = "current_user"): ProfileEntity {
     return ProfileEntity(
-        userId = id,
+        userId = userId,
         name = name,
         email = email,
         imageUrl = imageUrl,
         totalPosts = totalPosts,
         acks = acks,
+        postByAreaStr = postByArea?.joinToString(","),
         lastSyncedAt = kotlin.time.Clock.System.now().toEpochMilliseconds(),
     )
 }

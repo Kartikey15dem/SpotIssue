@@ -8,21 +8,15 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.example.project.core.model.createPost.CreatePost
 import org.example.project.core.data.repository.PostRepository
-import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.model.home.MediaType
-import org.example.project.core.utils.DataState
-import org.example.project.core.model.home.PostLevel
 import org.example.project.core.datastore.UserPreferencesRepository
 import org.example.project.core.datastore.model.UploadStatus
 import org.example.project.core.datastore.model.UploadDraftState
+import org.example.project.core.model.createPost.CreatePost
+import org.example.project.core.model.home.SelectedMediaItem
+import org.example.project.core.utils.DataState
 
-
-data class SelectedMediaItem(
-    val uri: String,
-    val type: MediaType
-)
 
 class CreatePostViewModel(
     private val postRepository: PostRepository,
@@ -38,23 +32,32 @@ class CreatePostViewModel(
         viewModelScope.launch {
             prefRepository.userData.collect { userData ->
                 val draft = userData.uploadDraftState
-                if (draft.status == UploadStatus.ERROR) {
-                    _uiState.value = _uiState.value.copy(
-                        description = draft.postText,
-                        // Could also restore media here if needed
-                    )
-                    _sideEffects.emit(CreatePostSideEffect.ShowError(draft.errorMessage ?: "Upload failed. Draft restored."))
-                    // Reset status to IDLE so we don't keep showing the error
-                    prefRepository.updateUploadDraftState(draft.copy(status = UploadStatus.IDLE))
-                } else if (draft.status == UploadStatus.SUCCESS) {
-                    _sideEffects.emit(CreatePostSideEffect.PostCreated("new_post"))
-                    prefRepository.updateUploadDraftState(UploadDraftState.DEFAULT)
-                    // Wait, if they are still on this screen, close it
-                    onNavigateBack()
-                } else if (draft.status == UploadStatus.UPLOADING) {
-                    _uiState.value = _uiState.value.copy(isLoading = true)
-                } else {
-                    _uiState.value = _uiState.value.copy(isLoading = false)
+                when (draft.status) {
+                    UploadStatus.ERROR -> {
+                        _uiState.value = _uiState.value.copy(
+                            description = draft.postText,
+                            selectedMedia = draft.selectedMedia
+                        )
+                        _sideEffects.emit(
+                            CreatePostSideEffect.ShowError(
+                                draft.errorMessage ?: "Upload failed. Draft restored."
+                            )
+                        )
+                        // Reset status to IDLE so we don't keep showing the error
+                        prefRepository.updateUploadDraftState(draft.copy(status = UploadStatus.IDLE))
+                    }
+                    UploadStatus.SUCCESS -> {
+                        _sideEffects.emit(CreatePostSideEffect.PostCreated("new_post"))
+                        prefRepository.updateUploadDraftState(UploadDraftState.DEFAULT)
+                        // Wait, if they are still on this screen, close it
+                        onNavigateBack()
+                    }
+                    UploadStatus.UPLOADING -> {
+                        _uiState.value = _uiState.value.copy(isLoading = true)
+                    }
+                    else -> {
+                        _uiState.value = _uiState.value.copy(isLoading = false)
+                    }
                 }
             }
         }
@@ -77,7 +80,7 @@ class CreatePostViewModel(
         _uiState.value = _uiState.value.copy(description = description)
     }
 
-        private fun createPost() {
+    private fun createPost() {
         viewModelScope.launch {
             if (_uiState.value.description.isBlank()) {
                 _sideEffects.emit(CreatePostSideEffect.ShowError("Please describe the issue"))
@@ -85,25 +88,39 @@ class CreatePostViewModel(
             }
 
             _uiState.value = _uiState.value.copy(isLoading = true)
-            
-            val mediaUris = _uiState.value.selectedMedia?.map { it.uri } ?: emptyList()
-            val mediaType = _uiState.value.selectedMedia?.firstOrNull()?.type?.name ?: "IMAGE"
 
-            // 1. Save state to DataStore
-            val draft = UploadDraftState(
-                status = UploadStatus.UPLOADING,
-                postText = _uiState.value.description,
-                postLevel = "LOCALITY",
-                mediaUris = mediaUris,
-                mediaType = mediaType
-            )
-            prefRepository.updateUploadDraftState(draft)
+            if (_uiState.value.selectedMedia.isNullOrEmpty()) {
+                // Upload text-only post directly
+                val userLocation = prefRepository.userData.value.userLocation
+                val createPostModel = CreatePost(
+                    postText = _uiState.value.description,
+                    mediaType = null,
+                    mediaFilePaths = emptyList(),
+                    location = userLocation
+                )
 
-            // 2. Tell UI to enqueue WorkManager
-            _sideEffects.emit(CreatePostSideEffect.StartBackgroundUpload)
-            
-            // Note: We don't navigate back immediately, we let the UI show the progress 
-            // overlay if the user stays, or they can background the app.
+                when (val result = postRepository.createPost(createPostModel)) {
+                    is DataState.Success -> {
+                        _sideEffects.emit(CreatePostSideEffect.PostCreated("new_post"))
+                        onNavigateBack()
+                    }
+                    is DataState.Error -> {
+                        _uiState.value = _uiState.value.copy(isLoading = false)
+                        emitError(result.exception.message ?: "Failed to create post")
+                    }
+                    else -> Unit
+                }
+            } else {
+                // Use WorkManager for media uploads
+                val draft = UploadDraftState(
+                    status = UploadStatus.UPLOADING,
+                    postText = _uiState.value.description,
+                    selectedMedia = _uiState.value.selectedMedia,
+                )
+                prefRepository.updateUploadDraftState(draft)
+
+                _sideEffects.emit(CreatePostSideEffect.StartBackgroundUpload)
+            }
         }
     }
 

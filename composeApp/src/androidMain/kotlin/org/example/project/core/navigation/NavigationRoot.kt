@@ -41,7 +41,16 @@ fun NavigationRoot(
 //    }
 
     LaunchedEffect(start) {
-        if (rootBackStack.firstOrNull() != start) {
+        val currentFirst = rootBackStack.firstOrNull()
+        if (currentFirst == null) {
+            rootBackStack.add(start)
+            return@LaunchedEffect
+        }
+
+        val isCurrentAuth = currentFirst is Route.Auth || currentFirst == Route.Auth
+        val isStartAuth = start is Route.Auth || start == Route.Auth
+
+        if (isCurrentAuth != isStartAuth) {
             rootBackStack.clear()
             rootBackStack.add(start)
         }
@@ -51,7 +60,11 @@ fun NavigationRoot(
         onBack = { rootBackStack.removeLastOrNull()},
         entryProvider = entryProvider {
             entry<Route.Auth> {
-                AuthNavigation()
+                AuthNavigation(
+                    onBack = {
+                        rootBackStack.removeLastOrNull()
+                    }
+                )
             }
             entry<Route.LocationFetch> {
                 LocationFetchScreenWithPermissions(
@@ -68,20 +81,27 @@ fun NavigationRoot(
                     },
                     onProfileClick = {
                         rootBackStack.add(Route.Profile)
+                    },
+                    onBack = {
+                        rootBackStack.removeLastOrNull()
                     }
-
                 )
             }
             entry<Route.Profile>{
                 ProfileNavigation(
                     onCreatePost = {
                         rootBackStack.add(Route.CreatePost)
+                    },
+                    onBack = {
+                        rootBackStack.removeLastOrNull()
                     }
                 )
             }
             entry<Route.CreatePost>{
                 CreatePostNavigation(
-
+                    onBack = {
+                        rootBackStack.removeLastOrNull()
+                    }
                 )
             }
         },

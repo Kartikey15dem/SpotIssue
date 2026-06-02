@@ -22,6 +22,9 @@ data class ProfileDto(
     val totalPosts: Int,
     @SerialName("acks")
     val acks: Int,
+
+    @SerialName("postByArea")
+    val postByArea: List<Int>? = null,
 )
 
 @Serializable

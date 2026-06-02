@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -34,28 +35,46 @@ class ProfileViewModel(
 
     init {
         observeProfile()
-        observePosts()
+        initPostFlows()
+        fetchProfile()
     }
 
     private fun observeProfile() {
         viewModelScope.launch {
             profileRepository.observeProfile().collect { dataState ->
-                updateState { it.copy(profileState = dataState) }
+                when (dataState) {
+                    is DataState.Loading -> updateState { it.copy(isProfileLoading = true) }
+                    is DataState.Success -> updateState { it.copy(
+                        isProfileLoading = false,
+                        profile = dataState.data
+                    ) }
+                    is DataState.Error -> {
+                        updateState { it.copy(isProfileLoading = false) }
+                        handleError(dataState.exception)
+                    }
+                }
             }
         }
     }
 
-    private fun observePosts() {
+    private fun fetchProfile() {
         viewModelScope.launch {
-             _uiState.map { it.isMine }.collect { isMine ->
-                 val flow = if (isMine) {
-                     profileRepository.getPagedUserPosts()
-                 } else {
-                     profileRepository.getPagedLikedPosts()
-                 }.cachedIn(viewModelScope)
-                 updateState { it.copy(postsFlow = flow) }
-             }
+            updateState { it.copy(isProfileLoading = true, profileError = null) }
+            val result = profileRepository.refreshProfile()
+            if (result is DataState.Error) {
+                updateState { it.copy(isProfileLoading = false, profileError = result.exception.message ?: "Failed to load profile") }
+                handleError(result.exception)
+            }
         }
+    }
+
+    private fun initPostFlows() {
+        val userFlow = profileRepository.getPagedUserPosts().cachedIn(viewModelScope)
+        val likedFlow = profileRepository.getPagedLikedPosts().cachedIn(viewModelScope)
+        updateState { it.copy(
+            userPostsFlow = userFlow,
+            likedPostsFlow = likedFlow
+        ) }
     }
 
     fun onIntent(intent: ProfileIntent) {
@@ -70,6 +89,7 @@ class ProfileViewModel(
             is ProfileIntent.ShareClicked -> sharePost(intent.postId)
             is ProfileIntent.ReportClicked -> reportPost(intent.postId)
             ProfileIntent.ErrorShown -> clearError()
+            ProfileIntent.RetryProfileClicked -> fetchProfile()
         }
     }
 
@@ -168,16 +188,23 @@ sealed interface ProfileIntent {
     data class ShareClicked(val postId: String) : ProfileIntent
     data class ReportClicked(val postId: String) : ProfileIntent
     data object ErrorShown : ProfileIntent
+    data object RetryProfileClicked : ProfileIntent
 }
 
 data class ProfileState(
-    val profileState: DataState<Profile> = DataState.Loading,
-    val postsFlow: Flow<PagingData<Post>>? = null,
+    val profile: Profile? = null,
+    val isProfileLoading: Boolean = true,
+    val userPostsFlow: Flow<PagingData<Post>>? = null,
+    val likedPostsFlow: Flow<PagingData<Post>>? = null,
     val isMine: Boolean = true,
     val sort: Sort = Sort.LATEST,
     val isLoading: Boolean = false,
-    val error: String? = null
-)
+    val error: String? = null,
+    val profileError: String? = null
+) {
+    val activePostsFlow: Flow<PagingData<Post>>? 
+        get() = if (isMine) userPostsFlow else likedPostsFlow
+}
 
 sealed interface ProfileSideEffect {
     data object NavigateToCreatePost : ProfileSideEffect

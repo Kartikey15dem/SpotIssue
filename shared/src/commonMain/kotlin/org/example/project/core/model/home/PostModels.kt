@@ -1,5 +1,7 @@
 package org.example.project.core.model.home
 
+import kotlinx.serialization.Serializable
+
 data class Coordinates(
     val latitude: Double,
     val longitude: Double
@@ -22,13 +24,13 @@ data class Post(
     val country: String? = null,
     val coordinates: Coordinates? = null
 )
-
+@Serializable
 enum class MediaType {
     IMAGE,
     VIDEO,
     PDF
 }
-
+@Serializable
 enum class PostLevel(val displayName: String) {
     LOCALITY("Locality"),
     DISTRICT("District"),
@@ -44,3 +46,9 @@ fun PostLevel.getText(): String {
         PostLevel.NATIONAL -> "Nationwide issues and concerns"
     }
 }
+
+@Serializable
+data class SelectedMediaItem(
+    val uri: String,
+    val type: MediaType
+)

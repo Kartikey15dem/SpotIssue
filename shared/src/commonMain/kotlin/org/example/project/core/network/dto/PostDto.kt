@@ -56,7 +56,6 @@ data class PostDto(
  */
 @Serializable
 data class PostWithProfileDto(
-    @SerialName("id")
     val id: String,
 
     @SerialName("user_id")

@@ -78,10 +78,14 @@ class EditProfileViewModel(
                     }
                     is DataState.Success -> {
                         val profile = state.data
+                        if (profile == null) {
+                            _uiState.update { it.copy(isLoading = false) }
+                            return@collect
+                        }
                         _uiState.update {
                             it.copy(
                                 originalProfile = profile,
-                                imageUrl = profile.imageUrl,
+                                imageUrl = profile.imageUrl?: "",
                                 name = profile.name,
                                 isLoading = false,
                                 error = null,
@@ -209,7 +213,7 @@ class EditProfileViewModel(
         if (original != null) {
             _uiState.update {
                 it.copy(
-                    imageUrl = original.imageUrl,
+                    imageUrl = original.imageUrl?: "",
                     name = original.name,
                 )
             }

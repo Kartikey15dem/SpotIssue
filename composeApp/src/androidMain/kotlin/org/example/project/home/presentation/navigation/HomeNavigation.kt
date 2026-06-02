@@ -16,9 +16,9 @@ import org.koin.compose.koinInject
 
 @Composable
 fun HomeNavigation(
-    modifier : Modifier = Modifier,
     onCreatePost : () -> Unit,
-    onProfileClick : () -> Unit
+    onProfileClick : () -> Unit,
+    onBack: () -> Unit
 ) {
     val homeBackStack = rememberNavBackStack(Route.Home)
     val currentLevelManager: CurrentLevelManager = koinInject()
@@ -26,7 +26,13 @@ fun HomeNavigation(
 
     NavDisplay(
         backStack = homeBackStack,
-        onBack = { homeBackStack.removeLastOrNull()},
+        onBack = { 
+            if (homeBackStack.size > 1) {
+                homeBackStack.removeLastOrNull()
+            } else {
+                onBack()
+            }
+        },
         entryProvider = entryProvider {
             entry<Route.Home> {
 

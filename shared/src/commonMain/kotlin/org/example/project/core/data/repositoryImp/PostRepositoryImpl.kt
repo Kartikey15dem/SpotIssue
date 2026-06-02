@@ -13,6 +13,8 @@ import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.append
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import io.ktor.utils.io.core.BytePacketBuilder
+import io.ktor.utils.io.core.writeFully
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 import okio.FileSystem
@@ -22,7 +24,9 @@ import org.example.project.core.network.dto.PagedResponse
 import androidx.paging.PagingData
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
+import io.ktor.utils.io.core.build
 import kotlinx.coroutines.flow.Flow
+import okio.SYSTEM
 import org.example.project.core.data.paging.CommentPagingSource
 import org.example.project.core.network.dto.CommentDto
 import org.example.project.core.model.home.Comment
@@ -66,9 +70,8 @@ class PostRepositoryImpl(
 
     override suspend fun createPost(post: CreatePost): DataState<Unit> = safeApiCall {
         val request = CreatePostRequestDto(
-            postLevel = post.postLevel.name,
             postText = post.postText,
-            mediaType = post.mediaType.name,
+            mediaType = post.mediaType?.name,
             locality = post.location?.locality,
             district = post.location?.district,
             state = post.location?.state,
@@ -80,23 +83,37 @@ class PostRepositoryImpl(
             }
         )
         
-        val multipartData = formData {
-            append("request", Json.encodeToString(request), Headers.build {
-                append(HttpHeaders.ContentType, "application/json")
-            })
+        val multipartParts = mutableListOf<io.ktor.http.content.PartData>()
+        
+        multipartParts.add(
+            io.ktor.http.content.PartData.FormItem(
+                value = Json.encodeToString(request),
+                dispose = {},
+                partHeaders = Headers.build {
+                    append(HttpHeaders.ContentDisposition, "form-data; name=\"request\"")
+                    append(HttpHeaders.ContentType, "application/json")
+                }
+            )
+        )
+        
+        post.mediaFilePaths.forEach { filePath ->
+            val path = filePath.toPath()
+            val fileName = path.name
+            val bytes = FileSystem.SYSTEM.source(path).buffer().readByteArray()
             
-            post.mediaFilePaths.forEach { filePath ->
-                val path = filePath.toPath()
-                val fileName = path.name
-                val bytes = FileSystem.SYSTEM.source(path).buffer().readByteArray()
-                
-                append("files", bytes, Headers.build {
-                    append(HttpHeaders.ContentDisposition, "filename=")
-                })
-            }
+            multipartParts.add(
+                io.ktor.http.content.PartData.FileItem(
+                    provider = { io.ktor.utils.io.ByteReadChannel(bytes) },
+                    dispose = {},
+                    partHeaders = Headers.build {
+                        append(HttpHeaders.ContentDisposition, "form-data; name=\"files\"; filename=\"$fileName\"")
+                        append(HttpHeaders.ContentType, "application/octet-stream")
+                    }
+                )
+            )
         }
         
-        postService.createPost(MultiPartFormDataContent(multipartData))
+        postService.createPost(MultiPartFormDataContent(multipartParts))
         Unit
     }
 

@@ -85,7 +85,7 @@ import org.example.project.core.components.LocalOverlayController
 import org.example.project.core.components.PdfPreviewContent
 import org.example.project.core.components.VideoPreviewPlayer
 import org.example.project.core.model.home.MediaType
-import org.example.project.createPost.presentation.viewmodel.SelectedMediaItem
+import org.example.project.core.model.home.SelectedMediaItem
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -102,7 +102,6 @@ fun CreatePostScreen(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5)
     ) { uris: List<Uri> ->
         if (uris.isNotEmpty()) {
-            // Map the URIs to include their MIME types
             val mediaData = uris.map { uri ->
                 val mimeType = context.contentResolver.getType(uri)
                 Pair(uri.toString(), mimeType)
@@ -110,7 +109,6 @@ fun CreatePostScreen(
             viewModel.setVisualMedia(mediaData)
         }
     }
-    // PDF/Document picker launcher
     val pdfPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->

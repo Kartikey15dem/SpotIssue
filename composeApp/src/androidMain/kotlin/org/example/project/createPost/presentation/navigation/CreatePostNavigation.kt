@@ -11,19 +11,29 @@ import org.example.project.createPost.presentation.screens.CreatePostScreen
 @Composable
 fun CreatePostNavigation(
     modifier : Modifier = Modifier,
-
+    onBack: () -> Unit
 ) {
-    val authBackStack = rememberNavBackStack(Route.CreatePost)
+    val createPostBackStack = rememberNavBackStack(Route.CreatePost)
 
     NavDisplay(
-        backStack = authBackStack,
+        backStack = createPostBackStack,
         modifier = modifier,
-        onBack = { authBackStack.removeLastOrNull() },
+        onBack = { 
+            if (createPostBackStack.size > 1) {
+                createPostBackStack.removeLastOrNull()
+            } else {
+                onBack()
+            }
+        },
         entryProvider = entryProvider {
             entry<Route.CreatePost>{
                 CreatePostScreen(
                     onNavigateBack = {
-                        authBackStack.removeLastOrNull()
+                        if (createPostBackStack.size > 1) {
+                            createPostBackStack.removeLastOrNull()
+                        } else {
+                            onBack()
+                        }
                     }
                 )
             }

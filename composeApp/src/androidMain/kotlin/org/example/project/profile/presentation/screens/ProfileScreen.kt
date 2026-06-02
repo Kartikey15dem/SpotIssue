@@ -23,6 +23,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -45,6 +46,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.LoadState
 import androidx.paging.compose.itemKey
 import kotlinx.coroutines.flow.collectLatest
 import org.example.project.R
@@ -125,83 +127,135 @@ fun ProfileScreenContent(
     state: ProfileState,
     onIntent: (ProfileIntent) -> Unit = {}
 ) {
-    val pagingItems = state.postsFlow?.collectAsLazyPagingItems()
+    val pagingItems = state.activePostsFlow?.collectAsLazyPagingItems()
 
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            when (val res = state.profileState) {
-                is DataState.Success -> ProfileHeader(res.data, onIntent)
-                is DataState.Error -> Text("Error loading profile", color = Color.Red)
-                DataState.Loading -> LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = IssueSpotColors.Primary)
+    if (state.profile == null) {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            if (state.isProfileLoading) {
+                CircularProgressIndicator(color = IssueSpotColors.Primary)
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(state.profileError ?: "Error loading profile", color = IssueSpotColors.OnBackground)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = { onIntent(ProfileIntent.RetryProfileClicked) },
+                        colors = ButtonDefaults.buttonColors(containerColor = IssueSpotColors.Primary)
+                    ) {
+                        Text("Retry", color = Color.White)
+                    }
+                }
             }
         }
+    } else {
+        LazyColumn(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (state.isProfileLoading) {
+                item {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = IssueSpotColors.Primary)
+                }
+            }
 
-        item {
-            Column {
-                Text(
-                    text = "Posts by Area",
-                    style = IssueSpotTypography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                if (state.profileState is DataState.Success) {
-                    val profile = state.profileState.data
+            item {
+                ProfileHeader(state.profile, onIntent)
+            }
+
+            item {
+                Column {
+                    Text(
+                        text = "Posts by Area",
+                        style = IssueSpotTypography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
                     PostLevel.entries.forEachIndexed { i, entry ->
                         PostByAreaBar(
-                            postByArea = profile.postByArea.getOrElse(i) { 0 },
+                            postByArea = state.profile.postByArea.getOrElse(i) { 0 },
                             postLevel = entry
                         )
                     }
                 }
             }
-        }
 
-        item {
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { onIntent(ProfileIntent.CreatePostClicked) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = IssueSpotColors.Primary,
-                    contentColor = Color.White
-                )
-            ) {
-                Text(
-                    text = "+  Post New Issue",
-                    style = IssueSpotTypography.bodyLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        item {
-            ProfilePostTabsHeader(state, onIntent)
-        }
-
-        if (pagingItems != null) {
-            items(
-                count = pagingItems.itemCount,
-                key = pagingItems.itemKey { it.id }
-            ) { index ->
-                val post = pagingItems[index]
-                if (post != null) {
-                    PostCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        post = post,
-                        isLiked = false,
-                        likesCount = post.likes,
-                        commentsCount = post.comments,
-                        isReported = false,
-                        onLikeClick = { onIntent(ProfileIntent.LikeClicked(post.id)) },
-                        onCommentIconClick = { onIntent(ProfileIntent.CommentClicked(post.id)) },
-                        onCommentSubmit = { _: String -> },
-                        onShareClick = { onIntent(ProfileIntent.ShareClicked(post.id)) },
-                        onReportClick = { onIntent(ProfileIntent.ReportClicked(post.id)) },
+            item {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onIntent(ProfileIntent.CreatePostClicked) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = IssueSpotColors.Primary,
+                        contentColor = Color.White
                     )
+                ) {
+                    Text(
+                        text = "+  Post New Issue",
+                        style = IssueSpotTypography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            item {
+                ProfilePostTabsHeader(state, onIntent)
+            }
+
+            if (pagingItems != null) {
+                if (pagingItems.loadState.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = IssueSpotColors.Primary)
+                        }
+                    }
+                } else {
+                    items(
+                        count = pagingItems.itemCount,
+                        key = pagingItems.itemKey { it.id }
+                    ) { index ->
+                        val post = pagingItems[index]
+                        if (post != null) {
+                            PostCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                post = post,
+                                isLiked = false,
+                                likesCount = post.likes,
+                                commentsCount = post.comments,
+                                isReported = false,
+                                onLikeClick = { onIntent(ProfileIntent.LikeClicked(post.id)) },
+                                onCommentIconClick = { onIntent(ProfileIntent.CommentClicked(post.id)) },
+                                onShareClick = { onIntent(ProfileIntent.ShareClicked(post.id)) },
+                                onReportClick = { onIntent(ProfileIntent.ReportClicked(post.id)) },
+                            )
+                        }
+                    }
+                    
+                    if (pagingItems.loadState.append is LoadState.Loading || pagingItems.loadState.refresh is LoadState.Loading) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = IssueSpotColors.Primary)
+                            }
+                        }
+                    } else if (pagingItems.loadState.append is LoadState.Error || pagingItems.loadState.refresh is LoadState.Error) {
+                        item {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("Failed to load posts", color = IssueSpotColors.OnBackground)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = { pagingItems.retry() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = IssueSpotColors.Primary)
+                                ) {
+                                    Text("Retry Posts", color = Color.White)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -237,7 +291,7 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = profile.location ?: "No location set",
+                    text = profile.location.ifBlank { "No location set" },
                     style = IssueSpotTypography.bodyMedium,
                     color = IssueSpotColors.OnSurfaceVariant
                 )

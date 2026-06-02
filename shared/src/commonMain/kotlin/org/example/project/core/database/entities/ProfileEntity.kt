@@ -20,15 +20,18 @@ data class ProfileEntity(
     val totalPosts: Int = 0,
     val acks: Int = 0,
     val updatedAt: Long = 0L,
+    val postByAreaStr: String? = null,
     val lastSyncedAt: Long = 0L
 )
 
 fun ProfileEntity.toProfile(): Profile {
+    val postByArea = postByAreaStr?.split(",")?.mapNotNull { it.toIntOrNull() } ?: listOf(0, 0, 0, 0)
     return Profile(
         imageUrl = imageUrl ?: "",
         name = name,
         email = email ?: "",
         totalPosts = totalPosts,
-        acks = acks
+        acks = acks,
+        postByArea = if (postByArea.size == 4) postByArea else listOf(0, 0, 0, 0)
     )
 }

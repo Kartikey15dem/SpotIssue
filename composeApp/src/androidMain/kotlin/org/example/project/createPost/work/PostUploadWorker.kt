@@ -4,12 +4,11 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import org.example.project.core.datastore.UserPreferencesRepository
-import org.example.project.core.datastore.model.UploadDraftState
 import org.example.project.core.datastore.model.UploadStatus
+import androidx.core.net.toUri
 import org.example.project.core.data.repository.PostRepository
 import org.example.project.core.model.createPost.CreatePost
 import org.example.project.core.model.home.MediaType
-import org.example.project.core.model.home.PostLevel
 import org.example.project.utils.media.MediaCompressorUtil
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -35,10 +34,10 @@ class PostUploadWorker(
                 return@withContext Result.success()
             }
 
-                        // 0. Check total size (Max 50MB)
             var totalSizeBytes: Long = 0
-            for (uriString in draft.mediaUris) {
-                appContext.contentResolver.openAssetFileDescriptor(android.net.Uri.parse(uriString), "r")?.use {
+
+            for (mediaItem in draft.selectedMedia.orEmpty()) {
+                appContext.contentResolver.openAssetFileDescriptor(mediaItem.uri.toUri(), "r")?.use {
                     totalSizeBytes += it.length
                 }
             }
@@ -51,13 +50,13 @@ class PostUploadWorker(
             }
 
             // 1. Compress and Prepare Files
-            if (draft.mediaUris.isNotEmpty()) {
-                for (uriString in draft.mediaUris) {
-                    val compressedFile: File? = if (draft.mediaType == "IMAGE") {
-                        MediaCompressorUtil.compressImage(appContext, uriString)
+            if (!draft.selectedMedia.isNullOrEmpty()) {
+                for (mediaItem in draft.selectedMedia) {
+                    val compressedFile: File? = if (mediaItem.type.name == "IMAGE") {
+                        MediaCompressorUtil.compressImage(appContext, mediaItem.uri)
                     } else {
-                        // Video/PDF copy for now
-                        MediaCompressorUtil.compressImage(appContext, uriString)
+                        // Video/PDF copy
+                        MediaCompressorUtil.prepareFile(appContext, mediaItem.uri)
                     }
                     compressedFile?.let { compressedPaths.add(it.absolutePath) }
                 }
@@ -67,12 +66,8 @@ class PostUploadWorker(
             val userLocation = prefRepository.userData.value.userLocation
             
             val createPostModel = CreatePost(
-                userId = "", 
-                userName = "",
-                userUrl = "",
-                postLevel = PostLevel.valueOf(draft.postLevel),
                 postText = draft.postText,
-                mediaType = MediaType.valueOf(draft.mediaType),
+                mediaType = draft.selectedMedia?.firstOrNull()?.type ?: MediaType.IMAGE,
                 mediaFilePaths = compressedPaths, 
                 location = userLocation
             )

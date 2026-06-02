@@ -7,8 +7,6 @@ import androidx.paging.PagingData
 import androidx.paging.map
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import androidx.paging.ExperimentalPagingApi
@@ -26,7 +24,6 @@ import org.example.project.core.data.mappers.toEntity
 import org.example.project.core.network.dto.UpsertProfileRequest
 import org.example.project.core.data.paging.ProfileLikedPostsRemoteMediator
 import org.example.project.core.data.paging.ProfileUserPostsRemoteMediator
-import org.example.project.core.network.dto.CoordinatesDto
 import org.example.project.core.datastore.UserPreferencesRepository
 import kotlinx.coroutines.flow.combine
 
@@ -73,7 +70,7 @@ class ProfileRepositoryImpl(
         }
     }
 
-    override fun observeProfile(): Flow<DataState<Profile>> = combine(
+    override fun observeProfile(): Flow<DataState<Profile?>> = combine(
         localDataSource.getProfileFlow(),
         prefRepository.userData
     ) { entity, userData ->
@@ -83,7 +80,7 @@ class ProfileRepositoryImpl(
             )
             DataState.Success(domainProfile)
         } else {
-            DataState.Loading
+            DataState.Error(Exception("Profile not found"))
         }
     }.onStart { emit(DataState.Loading) }
 

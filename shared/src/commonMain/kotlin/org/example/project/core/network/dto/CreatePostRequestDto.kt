@@ -4,13 +4,10 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class CreatePostRequestDto(
-    @SerialName("post_level")
-    val postLevel: String,
-    @SerialName("post_text")
+data class CreatePostRequestDto(    @SerialName("post_text")
     val postText: String,
     @SerialName("media_type")
-    val mediaType: String,
+    val mediaType: String?,
     @SerialName("locality")
     val locality: String? = null,
     @SerialName("district")

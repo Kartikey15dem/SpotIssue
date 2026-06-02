@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 4,
-    "identityHash": "164cedefff83765757903eadd19e1da4",
+    "identityHash": "dca32d1cadeefae04b5794b0e30e81c6",
     "entities": [
       {
         "tableName": "profile",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `userId` TEXT NOT NULL, `email` TEXT, `name` TEXT NOT NULL, `imageUrl` TEXT, `totalPosts` INTEGER NOT NULL, `acks` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `lastSyncedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `userId` TEXT NOT NULL, `email` TEXT, `name` TEXT NOT NULL, `imageUrl` TEXT, `totalPosts` INTEGER NOT NULL, `acks` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `postByAreaStr` TEXT, `lastSyncedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -53,6 +53,11 @@
             "columnName": "updatedAt",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "postByAreaStr",
+            "columnName": "postByAreaStr",
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "lastSyncedAt",
@@ -485,7 +490,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '164cedefff83765757903eadd19e1da4')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'dca32d1cadeefae04b5794b0e30e81c6')"
     ]
   }
 }

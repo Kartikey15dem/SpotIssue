@@ -18,6 +18,7 @@ import org.koin.core.parameter.parametersOf
 @Composable
 fun AuthNavigation(
     modifier : Modifier = Modifier,
+    onBack: () -> Unit = {}
 ) {
     val authBackStack = rememberNavBackStack(Route.Auth.Login)
     val authViewModel : AuthViewModel = koinViewModel()
@@ -25,7 +26,13 @@ fun AuthNavigation(
     NavDisplay(
         backStack = authBackStack,
         modifier = modifier,
-        onBack = { authBackStack.removeLastOrNull()},
+        onBack = { 
+            if (authBackStack.size > 1) {
+                authBackStack.removeLastOrNull()
+            } else {
+                onBack()
+            }
+        },
         entryProvider = entryProvider {
             entry<Route.Auth.Login> {
                 LoginScreen(
