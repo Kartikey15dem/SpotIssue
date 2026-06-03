@@ -64,21 +64,17 @@ import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
 
-/**
- * ProfileScreen with ViewModel integration
- */
 @Composable
 fun ProfileScreen(
     modifier: Modifier = Modifier,
-    onNavigateToCreatePost: () -> Unit = {},
-    onNavigateToEditProfile: () -> Unit = {},
-    onNavigateToPost: (postId: String) -> Unit = {},
+    onNavigateToCreatePost: () -> Unit,
+    onNavigateToEditProfile: () -> Unit,
+    onNavigateToPost: (postId: String) -> Unit ={},
     viewModel: ProfileViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Handle side effects
     LaunchedEffect(viewModel) {
         viewModel.sideEffects.collectLatest { effect ->
             when (effect) {
@@ -125,7 +121,7 @@ fun ProfileScreen(
 fun ProfileScreenContent(
     modifier: Modifier = Modifier,
     state: ProfileState,
-    onIntent: (ProfileIntent) -> Unit = {}
+    onIntent: (ProfileIntent) -> Unit
 ) {
     val pagingItems = state.activePostsFlow?.collectAsLazyPagingItems()
 
@@ -229,6 +225,7 @@ fun ProfileScreenContent(
                                 onCommentIconClick = { onIntent(ProfileIntent.CommentClicked(post.id)) },
                                 onShareClick = { onIntent(ProfileIntent.ShareClicked(post.id)) },
                                 onReportClick = { onIntent(ProfileIntent.ReportClicked(post.id)) },
+                                onPostClick = { onIntent(ProfileIntent.PostClicked(post.id)) }
                             )
                         }
                     }
@@ -282,8 +279,10 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                     contentScale = ContentScale.Crop
                 )
             }
-            Spacer(modifier = Modifier.padding(start = 8.dp))
-            Column {
+            Spacer(modifier = Modifier.width(4.dp))
+            Column (
+                modifier = Modifier.weight(1f)
+            ){
                 Text(
                     text = profile.name,
                     style = IssueSpotTypography.bodyLarge,
@@ -296,7 +295,6 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                     color = IssueSpotColors.OnSurfaceVariant
                 )
             }
-            Spacer(modifier = Modifier.weight(1f))
             Icon(
                 painter = painterResource(R.drawable.ic_edit),
                 contentDescription = "Edit",

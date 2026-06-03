@@ -55,4 +55,11 @@ class FeedRepositoryImpl(
 
         emitAll(dbFlow)
     }.onStart { emit(DataState.Loading) }
+
+    override fun getPagedSearchPosts(query: String, postLevel: PostLevel): Flow<PagingData<Post>> {
+        return Pager(
+            config = PagingConfig(pageSize = 20),
+            pagingSourceFactory = { org.example.project.core.data.paging.SearchPostsPagingSource(homeService, query, postLevel) }
+        ).flow
+    }
 }

@@ -24,16 +24,11 @@ sealed class NameCaptureEffect {
 
 data class NameCaptureUiState(
     val name: String = "",
-    val dialogState: DialogState? = null
-) {
-    sealed interface DialogState {
-        data object Loading : DialogState
-    }
-}
+    val isLoading: Boolean = true
+)
 sealed class NameCaptureIntent{
     data class NameChanged(val name: String) : NameCaptureIntent()
     data object SubmitClicked : NameCaptureIntent()
-    data object DismissDialog : NameCaptureIntent()
 }
 
 class NameCaptureViewModel(
@@ -46,17 +41,13 @@ class NameCaptureViewModel(
     private val _uiState = MutableStateFlow(NameCaptureUiState())
     val uiState: StateFlow<NameCaptureUiState> = _uiState.asStateFlow()
 
-    private val _effect = MutableSharedFlow<NameCaptureEffect>(
-        extraBufferCapacity = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
+    private val _effect = MutableSharedFlow<NameCaptureEffect>()
     val effect: SharedFlow<NameCaptureEffect> = _effect.asSharedFlow()
 
     fun handleIntent(intent: NameCaptureIntent) {
         when (intent) {
             is NameCaptureIntent.NameChanged -> updateName(intent.name)
             is NameCaptureIntent.SubmitClicked -> submitProfile()
-            is NameCaptureIntent.DismissDialog -> clearDialog()
         }
     }
 
@@ -79,7 +70,7 @@ class NameCaptureViewModel(
             val profile = Profile(
                 name = currentName,
                 email = email.trim(),
-                imageUrl = "",  // to be updated
+                imageUrl = "",
                 totalPosts = 0,
                 acks = 0,
                 postByArea = listOf(0, 0, 0, 0),
@@ -101,16 +92,12 @@ class NameCaptureViewModel(
         }
     }
 
-    private fun clearDialog() {
-        _uiState.update { it.copy(dialogState = null) }
-    }
-
     private fun showLoading() {
-        _uiState.update { it.copy(dialogState = NameCaptureUiState.DialogState.Loading) }
+        _uiState.update { it.copy(isLoading = true) }
     }
 
     private fun hideLoading() {
-        _uiState.update { it.copy(dialogState = null) }
+        _uiState.update { it.copy(isLoading = false) }
     }
 
     private fun showError(message: String) {

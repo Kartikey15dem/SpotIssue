@@ -35,5 +35,7 @@ sealed interface Route:NavKey{
         object EditProfileRoute: Route
     }
 
+    @Serializable
+    data class PostDetail(val postId: String) : Route
 }
 

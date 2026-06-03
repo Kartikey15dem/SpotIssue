@@ -41,30 +41,44 @@ class ProfileRepositoryImpl(
     }
 
     @OptIn(ExperimentalPagingApi::class, ExperimentalCoroutinesApi::class)
-    override fun getPagedUserPosts(): Flow<PagingData<Post>> {
+    override fun getPagedUserPosts(sort: String): Flow<PagingData<Post>> {
         return Pager(
             config = PagingConfig(pageSize = 20),
             remoteMediator = ProfileUserPostsRemoteMediator(
                 profileService = profileService,
                 database = database,
                 localDataSource = localDataSource,
+                sort = sort
             ),
-            pagingSourceFactory = { database.userPostDao().pagingSource(CURRENT_USER_ID) },
+            pagingSourceFactory = { 
+                when (sort.toUpperCase()) {
+                    "OLDEST" -> database.userPostDao().pagingSourceOldest(CURRENT_USER_ID)
+                    "POPULAR" -> database.userPostDao().pagingSourcePopular(CURRENT_USER_ID)
+                    else -> database.userPostDao().pagingSource(CURRENT_USER_ID)
+                }
+            },
         ).flow.map { pagingData ->
             pagingData.map { entity -> entity.toPost() }
         }
     }
 
     @OptIn(ExperimentalPagingApi::class, ExperimentalCoroutinesApi::class)
-    override fun getPagedLikedPosts(): Flow<PagingData<Post>> {
+    override fun getPagedLikedPosts(sort: String): Flow<PagingData<Post>> {
         return Pager(
             config = PagingConfig(pageSize = 20),
             remoteMediator = ProfileLikedPostsRemoteMediator(
                 profileService = profileService,
                 database = database,
                 localDataSource = localDataSource,
+                sort = sort
             ),
-            pagingSourceFactory = { database.likedPostDao().pagingSource(CURRENT_USER_ID) },
+            pagingSourceFactory = { 
+                when (sort.toUpperCase()) {
+                    "OLDEST" -> database.likedPostDao().pagingSourceOldest(CURRENT_USER_ID)
+                    "POPULAR" -> database.likedPostDao().pagingSourcePopular(CURRENT_USER_ID)
+                    else -> database.likedPostDao().pagingSource(CURRENT_USER_ID)
+                }
+            },
         ).flow.map { pagingData ->
             pagingData.map { entity -> entity.toPost() }
         }

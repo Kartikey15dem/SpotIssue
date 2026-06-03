@@ -18,6 +18,7 @@ import org.koin.compose.koinInject
 fun HomeNavigation(
     onCreatePost : () -> Unit,
     onProfileClick : () -> Unit,
+    onNavigateToPost: (String) -> Unit,
     onBack: () -> Unit
 ) {
     val homeBackStack = rememberNavBackStack(Route.Home)
@@ -49,6 +50,7 @@ fun HomeNavigation(
                     HomeScreen(
                         onNavigateToCreatePost = onCreatePost,
                         onNavigateToProfile = onProfileClick,
+                        onNavigateToPost = onNavigateToPost,
                         modifier = Modifier.padding(paddingValues)
                     )
                 }

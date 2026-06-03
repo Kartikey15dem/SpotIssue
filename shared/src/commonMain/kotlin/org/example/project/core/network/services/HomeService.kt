@@ -25,4 +25,11 @@ interface HomeService {
     suspend fun getActiveIssuesCount(
         @Query("level") level: String
     ): ActiveIssuesDto
+    @GET(ApiEndPoints.POSTS + "/search")
+    suspend fun searchPosts(
+        @Query("query") query: String,
+        @Query("level") level: String,
+        @Query("page") page: Int,
+        @Query("limit") limit: Int
+    ): PagedResponse<PostWithProfileDto>
 }

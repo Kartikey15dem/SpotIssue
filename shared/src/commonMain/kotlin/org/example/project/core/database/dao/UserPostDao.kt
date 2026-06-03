@@ -23,6 +23,12 @@ interface UserPostDao {
     @Query("SELECT * FROM user_posts WHERE userId = :userId ORDER BY createdAt DESC")
     fun pagingSource(userId: String = "current_user"): PagingSource<Int, UserPostEntity>
 
+    @Query("SELECT * FROM user_posts WHERE userId = :userId ORDER BY createdAt ASC")
+    fun pagingSourceOldest(userId: String = "current_user"): PagingSource<Int, UserPostEntity>
+
+    @Query("SELECT * FROM user_posts WHERE userId = :userId ORDER BY (likes + comments) DESC")
+    fun pagingSourcePopular(userId: String = "current_user"): PagingSource<Int, UserPostEntity>
+
     @Query("SELECT * FROM user_posts WHERE userId = :userId ORDER BY createdAt DESC")
     suspend fun getUserPosts(userId: String = "current_user"): List<UserPostEntity>
 

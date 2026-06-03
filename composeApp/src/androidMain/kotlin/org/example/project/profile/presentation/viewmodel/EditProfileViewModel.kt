@@ -16,12 +16,12 @@ import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
 import org.example.project.utils.AndroidVideoPicker
 
-/**
- * ViewModel for Edit Profile Screen with MVI pattern
- */
+import android.net.Uri
+import org.example.project.utils.AndroidImagePicker
+
 class EditProfileViewModel(
     private val profileRepository: ProfileRepository,
-    private val imagePicker: AndroidVideoPicker
+    private val imagePicker: AndroidImagePicker
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(EditProfileState())
@@ -40,10 +40,6 @@ class EditProfileViewModel(
             EditProfileIntent.LoadProfile -> loadProfile()
             is EditProfileIntent.ImageUrlChanged -> updateImageUrl(intent.url)
             is EditProfileIntent.NameChanged -> updateName(intent.name)
-            is EditProfileIntent.LocalityChanged -> updateLocality(intent.locality)
-            is EditProfileIntent.DistrictChanged -> updateDistrict(intent.district)
-            is EditProfileIntent.StateChanged -> updateState(intent.state)
-            is EditProfileIntent.CountryChanged -> updateCountry(intent.country)
             EditProfileIntent.PickFromGalleryClicked -> pickFromGallery()
             EditProfileIntent.CaptureFromCameraClicked -> captureFromCamera()
             EditProfileIntent.SaveChangesClicked -> saveChanges()
@@ -51,6 +47,14 @@ class EditProfileViewModel(
             EditProfileIntent.DismissImagePicker -> dismissImagePicker()
             EditProfileIntent.BackPressed -> viewModelScope.launch { _sideEffects.emit(EditProfileSideEffect.BackPreseed) }
             EditProfileIntent.ErrorShown -> clearError()
+            is EditProfileIntent.CameraImageCaptured -> {
+                if (intent.success) {
+                    _uiState.value.pendingCameraUri?.let { uri ->
+                        updateImageUrl(uri.toString())
+                    }
+                }
+                _uiState.update { it.copy(pendingCameraUri = null) }
+            }
         }
     }
 
@@ -62,7 +66,7 @@ class EditProfileViewModel(
                     handleError(res.exception)
                     _uiState.update { it.copy(isLoading = false) }
                 }
-                else -> Unit // observeProfile() will update state when data arrives
+                else -> Unit
             }
         }
     }
@@ -105,65 +109,17 @@ class EditProfileViewModel(
         _uiState.update { it.copy(name = name) }
     }
 
-    private fun updateLocality(locality: String) {
-        _uiState.update { it.copy(locality = locality) }
-    }
-
-    private fun updateDistrict(district: String) {
-        _uiState.update { it.copy(district = district) }
-    }
-
-    private fun updateState(state: String) {
-        _uiState.update { it.copy(state = state) }
-    }
-
-    private fun updateCountry(country: String) {
-        _uiState.update { it.copy(country = country) }
-    }
-
     private fun pickFromGallery() {
         viewModelScope.launch {
-            _uiState.update { it.copy(showImagePickerDialog = false, isLoadingImage = true) }
-
-            // Check and request permission
-//            if (!imagePicker.hasGalleryPermission()) {
-//                val granted = imagePicker.requestGalleryPermission()
-//                if (!granted) {
-//                    _sideEffects.emit(EditProfileSideEffect.ShowSnackbar("Gallery permission denied"))
-//                    _uiState.update { it.copy(isLoadingImage = false) }
-//                    return@launch
-//                }
-//            }
-//
-//            val imageUri = imagePicker.pickImageFromGallery()
-//            if (imageUri != null) {
-//                _uiState.update { it.copy(imageUrl = imageUri, isLoadingImage = false) }
-//            } else {
-//                _uiState.update { it.copy(isLoadingImage = false) }
-//            }
+            _sideEffects.emit(EditProfileSideEffect.ShowImagePicker)
         }
     }
 
     private fun captureFromCamera() {
         viewModelScope.launch {
-            _uiState.update { it.copy(showImagePickerDialog = false, isLoadingImage = true) }
-
-            // Check and request permission
-//            if (!imagePicker.hasCameraPermission()) {
-//                val granted = imagePicker.requestCameraPermission()
-//                if (!granted) {
-//                    _sideEffects.emit(EditProfileSideEffect.ShowSnackbar("Camera permission denied"))
-//                    _uiState.update { it.copy(isLoadingImage = false) }
-//                    return@launch
-//                }
-//            }
-//
-//            val imageUri = imagePicker.captureImageFromCamera()
-//            if (imageUri != null) {
-//                _uiState.update { it.copy(imageUrl = imageUri, isLoadingImage = false) }
-//            } else {
-//                _uiState.update { it.copy(isLoadingImage = false) }
-//            }
+            val uri = imagePicker.createImageUri()
+            _uiState.update { it.copy(pendingCameraUri = uri) }
+            _sideEffects.emit(EditProfileSideEffect.ShowCamera(uri))
         }
     }
 
@@ -183,12 +139,6 @@ class EditProfileViewModel(
                 imageUrl = currentState.imageUrl,
                 name = currentState.name,
 
-//                location = buildLocationString(
-//                    currentState.locality,
-//                    currentState.district,
-//                    currentState.state,
-//                    currentState.country
-//                )
             )
 
             if (updatedProfile != null) {
@@ -234,11 +184,6 @@ class EditProfileViewModel(
         _sideEffects.emit(EditProfileSideEffect.ShowError(message))
     }
 
-    private fun buildLocationString(locality: String, district: String, state: String, country: String): String {
-        return listOf(locality, district, state, country)
-            .filter { it.isNotBlank() }
-            .joinToString(", ")
-    }
 }
 
 // MVI Contract
@@ -247,10 +192,6 @@ sealed interface EditProfileIntent {
     data object LoadProfile : EditProfileIntent
     data class ImageUrlChanged(val url: String) : EditProfileIntent
     data class NameChanged(val name: String) : EditProfileIntent
-    data class LocalityChanged(val locality: String) : EditProfileIntent
-    data class DistrictChanged(val district: String) : EditProfileIntent
-    data class StateChanged(val state: String) : EditProfileIntent
-    data class CountryChanged(val country: String) : EditProfileIntent
     data object PickFromGalleryClicked : EditProfileIntent
     data object CaptureFromCameraClicked : EditProfileIntent
     data object SaveChangesClicked : EditProfileIntent
@@ -258,21 +199,19 @@ sealed interface EditProfileIntent {
     data object BackPressed : EditProfileIntent
     data object DismissImagePicker : EditProfileIntent
     data object ErrorShown : EditProfileIntent
+    data class CameraImageCaptured(val success: Boolean) : EditProfileIntent
 }
 
 data class EditProfileState(
     val originalProfile: Profile? = null,
     val imageUrl: String = "",
     val name: String = "",
-    val locality: String = "",
-    val district: String = "",
-    val state: String = "",
-    val country: String = "",
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isLoadingImage: Boolean = false,
     val showImagePickerDialog: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val pendingCameraUri: Uri? = null
 )
 
 sealed interface EditProfileSideEffect {
@@ -280,4 +219,6 @@ sealed interface EditProfileSideEffect {
     data class ShowSnackbar(val message: String) : EditProfileSideEffect
     data object ProfileSaved : EditProfileSideEffect
     data object BackPreseed : EditProfileSideEffect
+    data object ShowImagePicker : EditProfileSideEffect
+    data class ShowCamera(val uri: Uri) : EditProfileSideEffect
 }

@@ -22,12 +22,14 @@ interface ProfileService {
     @GET(ApiEndPoints.PROFILE + "/me/posts")
     suspend fun getMyPosts(
         @Query("page") page: Int,
-        @Query("limit") limit: Int
+        @Query("limit") limit: Int,
+        @Query("sort") sort: String
     ): PagedResponse<PostWithProfileDto>
 
     @GET(ApiEndPoints.PROFILE + "/me/liked-posts")
     suspend fun getMyLikedPosts(
         @Query("page") page: Int,
-        @Query("limit") limit: Int
+        @Query("limit") limit: Int,
+        @Query("sort") sort: String
     ): PagedResponse<PostWithProfileDto>
 }

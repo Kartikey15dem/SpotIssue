@@ -15,12 +15,12 @@ interface ProfileRepository {
     /**
      * Get paged user posts (network PagingSource via Pager).
      */
-    fun getPagedUserPosts(): Flow<PagingData<Post>>
+    fun getPagedUserPosts(sort: String = "LATEST"): Flow<PagingData<Post>>
 
     /**
      * Get paged liked posts (network PagingSource via Pager).
      */
-    fun getPagedLikedPosts(): Flow<PagingData<Post>>
+    fun getPagedLikedPosts(sort: String = "LATEST"): Flow<PagingData<Post>>
 
     /**
      * Observe user profile (Room-backed)

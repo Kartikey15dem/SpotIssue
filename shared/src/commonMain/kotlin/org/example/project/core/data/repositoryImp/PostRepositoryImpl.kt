@@ -8,6 +8,8 @@ import org.example.project.core.network.dto.CoordinatesDto
 import org.example.project.core.network.dto.CreatePostRequestDto
 import org.example.project.core.network.dto.AddCommentRequestDto
 import org.example.project.core.network.dto.ReportPostRequestDto
+import org.example.project.core.model.home.Post
+import org.example.project.core.data.mappers.toPost
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.append
@@ -119,5 +121,10 @@ class PostRepositoryImpl(
 
     override suspend fun deletePost(postId: String): DataState<Unit> = safeApiCall {
         postService.deletePost(postId)
+    }
+
+    override suspend fun getPost(postId: String): DataState<Post> = safeApiCall {
+        val dto = postService.getPost(postId)
+        dto.toPost()
     }
 }

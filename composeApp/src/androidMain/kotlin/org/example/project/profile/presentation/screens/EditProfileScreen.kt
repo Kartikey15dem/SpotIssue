@@ -48,6 +48,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
+import android.net.Uri
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.collectLatest
 import org.example.project.theme.IssueSpotColors
@@ -73,6 +77,21 @@ fun EditProfileScreen(
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        viewModel.onIntent(EditProfileIntent.CameraImageCaptured(success))
+    }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.onIntent(EditProfileIntent.ImageUrlChanged(uri.toString()))
+        }
+    }
+
     // Handle side effects
     LaunchedEffect(viewModel) {
         viewModel.sideEffects.collectLatest { effect ->
@@ -85,6 +104,14 @@ fun EditProfileScreen(
                 }
                 EditProfileSideEffect.ProfileSaved ,EditProfileSideEffect.BackPreseed -> {
                     onNavigateBack()
+                }
+                EditProfileSideEffect.ShowImagePicker -> {
+                    imagePickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                }
+                is EditProfileSideEffect.ShowCamera -> {
+                    cameraLauncher.launch(effect.uri)
                 }
             }
         }
@@ -248,14 +275,6 @@ fun EditProfileContent(
 
         Spacer(Modifier.height(8.dp))
 
-        Text(
-            text = "Enter a URL for your profile picture",
-            style = IssueSpotTypography.bodySmall,
-            color = IssueSpotColors.OnSurfaceVariant
-        )
-
-        Spacer(Modifier.height(24.dp))
-
         // Full Name
         Text(
             text = "Full Name",
@@ -283,124 +302,6 @@ fun EditProfileContent(
 
         Spacer(Modifier.height(24.dp))
 
-        // Location Section
-        Text(
-            text = "Location",
-            style = IssueSpotTypography.titleSmall,
-            color = IssueSpotColors.OnBackground,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.Start)
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        // Locality/Area
-        Text(
-            text = "Locality/Area",
-            style = IssueSpotTypography.bodyMedium,
-            color = IssueSpotColors.OnSurfaceVariant,
-            modifier = Modifier.align(Alignment.Start)
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = state.locality,
-            onValueChange = { onIntent(EditProfileIntent.LocalityChanged(it)) },
-            placeholder = { Text("e.g., Downtown") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = IssueSpotColors.SurfaceVariant,
-                focusedContainerColor = IssueSpotColors.SurfaceVariant,
-                unfocusedBorderColor = IssueSpotColors.Outline,
-                focusedBorderColor = IssueSpotColors.Primary
-            )
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        // District/City
-        Text(
-            text = "District/City",
-            style = IssueSpotTypography.bodyMedium,
-            color = IssueSpotColors.OnSurfaceVariant,
-            modifier = Modifier.align(Alignment.Start)
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = state.district,
-            onValueChange = { onIntent(EditProfileIntent.DistrictChanged(it)) },
-            placeholder = { Text("e.g., Mumbai Central") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = IssueSpotColors.SurfaceVariant,
-                focusedContainerColor = IssueSpotColors.SurfaceVariant,
-                unfocusedBorderColor = IssueSpotColors.Outline,
-                focusedBorderColor = IssueSpotColors.Primary
-            )
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        // State/Province
-        Text(
-            text = "State/Province",
-            style = IssueSpotTypography.bodyMedium,
-            color = IssueSpotColors.OnSurfaceVariant,
-            modifier = Modifier.align(Alignment.Start)
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = state.state,
-            onValueChange = { onIntent(EditProfileIntent.StateChanged(it)) },
-            placeholder = { Text("e.g., Maharashtra") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = IssueSpotColors.SurfaceVariant,
-                focusedContainerColor = IssueSpotColors.SurfaceVariant,
-                unfocusedBorderColor = IssueSpotColors.Outline,
-                focusedBorderColor = IssueSpotColors.Primary
-            )
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        // Country
-        Text(
-            text = "Country",
-            style = IssueSpotTypography.bodyMedium,
-            color = IssueSpotColors.OnSurfaceVariant,
-            modifier = Modifier.align(Alignment.Start)
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = state.country,
-            onValueChange = { onIntent(EditProfileIntent.CountryChanged(it)) },
-            placeholder = { Text("e.g., India") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = IssueSpotColors.SurfaceVariant,
-                focusedContainerColor = IssueSpotColors.SurfaceVariant,
-                unfocusedBorderColor = IssueSpotColors.Outline,
-                focusedBorderColor = IssueSpotColors.Primary
-            )
-        )
-
-        Spacer(Modifier.height(32.dp))
 
         // Action Buttons
         Row(
@@ -464,10 +365,10 @@ fun EditProfileContentPreview() {
             state = EditProfileState(
                 name = "John Doe",
                 imageUrl = "",
-                locality = "Downtown",
-                district = "Mumbai Central",
-                state = "Maharashtra",
-                country = "India",
+                
+                
+                
+                
                 isLoadingImage = false,
                 isSaving = false
             ),

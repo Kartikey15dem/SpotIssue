@@ -17,6 +17,7 @@ class ProfileLikedPostsRemoteMediator(
     private val profileService: ProfileService,
     private val database: IssueSpotDatabase,
     private val localDataSource: ProfileLocalDataSource,
+    private val sort: String
 ) : RemoteMediator<Int, LikedPostEntity>() {
 
     private val remoteKeysDao = database.remoteKeysDao()
@@ -50,6 +51,7 @@ class ProfileLikedPostsRemoteMediator(
             val response = profileService.getMyLikedPosts(
                 page = page,
                 limit = state.config.pageSize,
+                sort = sort
             )
 
             val entities = response.items.map { dto ->

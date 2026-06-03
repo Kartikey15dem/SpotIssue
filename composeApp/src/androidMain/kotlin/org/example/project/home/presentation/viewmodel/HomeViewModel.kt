@@ -75,6 +75,7 @@ class HomeViewModel(
             is HomeIntent.LikeClicked -> like(intent.postId, intent.currentIsLiked, intent.currentLikesCount)
             is HomeIntent.CommentSubmitted -> comment(intent.postId, intent.commentText, intent.currentCommentCount)
             is HomeIntent.ShareClicked -> share(intent.post)
+            is HomeIntent.PostClicked -> viewModelScope.launch { _sideEffects.emit(HomeSideEffect.NavigateToPost(intent.postId)) }
             HomeIntent.ErrorShown -> clearError()
         }
     }
@@ -97,8 +98,21 @@ class HomeViewModel(
         }
     }
 
+    private var searchJob: kotlinx.coroutines.Job? = null
+
     private fun updateSearchQuery(query: String) {
         updateState { it.copy(query = query) }
+        searchJob?.cancel()
+        if (query.isBlank()) {
+            updateState { it.copy(searchPostsFlow = null) }
+            return
+        }
+        val currentLevel = _uiState.value.postLevel
+        searchJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(300) // Debounce
+            val flow = feedRepository.getPagedSearchPosts(query, currentLevel).cachedIn(viewModelScope)
+            updateState { it.copy(searchPostsFlow = flow) }
+        }
     }
 
     private fun navigateToCreatePost() {
@@ -126,10 +140,15 @@ class HomeViewModel(
     }
 
     private fun report(postId: String, reason: String?) {
+        val currentIsReported = _uiState.value.postOverrides[postId]?.isReported ?: false
+        updateOverride(postId, isReported = true)
         viewModelScope.launch {
             when (val result = postRepository.reportPost(postId, reason)) {
                 is DataState.Success -> _sideEffects.emit(HomeSideEffect.ShowSnackbar("Post reported successfully"))
-                is DataState.Error -> handleError(Throwable("Failed to submit report. Please check your connection."))
+                is DataState.Error -> {
+                    updateOverride(postId, isReported = currentIsReported)
+                    handleError(Throwable("Failed to submit report. Please check your connection."))
+                }
                 else -> Unit
             }
         }
@@ -233,6 +252,7 @@ sealed interface HomeIntent {
     data class LikeClicked(val postId: String, val currentIsLiked: Boolean, val currentLikesCount: Int) : HomeIntent
     data class CommentSubmitted(val postId: String, val commentText: String, val currentCommentCount: Int) : HomeIntent
     data class ShareClicked(val post: Post) : HomeIntent
+    data class PostClicked(val postId: String) : HomeIntent
     data object ErrorShown : HomeIntent
 }
 
@@ -241,6 +261,7 @@ data class HomeState(
     val activeIssues: DataState<Int> = DataState.Loading,
     val isRefreshing: Boolean = false,
     val postsFlow: Flow<PagingData<Post>>? = null,
+    val searchPostsFlow: Flow<PagingData<Post>>? = null,
     val query: String = "",
     val error: String? = null,
     val postOverrides: Map<String, PostOverride> = emptyMap(),
@@ -250,6 +271,7 @@ data class HomeState(
 sealed interface HomeSideEffect {
     data object NavigateToCreatePost : HomeSideEffect
     data object NavigateToProfile : HomeSideEffect
+    data class NavigateToPost(val postId: String) : HomeSideEffect
     data class ShowError(val message: String) : HomeSideEffect
     data class ShowSnackbar(val message: String) : HomeSideEffect
     data class SharePost(val text: String) : HomeSideEffect

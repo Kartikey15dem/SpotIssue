@@ -40,4 +40,7 @@ interface PostService {
 
     @DELETE(ApiEndPoints.POSTS + "/{postid}")
     suspend fun deletePost(@Path("postid") id: String)
+
+    @GET(ApiEndPoints.POSTS + "/{id}")
+    suspend fun getPost(@Path("id") id: String): PostWithProfileDto
 }

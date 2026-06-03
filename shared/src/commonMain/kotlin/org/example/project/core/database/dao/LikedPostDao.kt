@@ -23,6 +23,12 @@ interface LikedPostDao {
     @Query("SELECT * FROM liked_posts WHERE userId = :userId ORDER BY likedAt DESC")
     fun pagingSource(userId: String = "current_user"): PagingSource<Int, LikedPostEntity>
 
+    @Query("SELECT * FROM liked_posts WHERE userId = :userId ORDER BY likedAt ASC")
+    fun pagingSourceOldest(userId: String = "current_user"): PagingSource<Int, LikedPostEntity>
+
+    @Query("SELECT * FROM liked_posts WHERE userId = :userId ORDER BY (likes + comments) DESC")
+    fun pagingSourcePopular(userId: String = "current_user"): PagingSource<Int, LikedPostEntity>
+
     @Query("SELECT * FROM liked_posts WHERE userId = :userId ORDER BY likedAt DESC")
     suspend fun getLikedPosts(userId: String = "current_user"): List<LikedPostEntity>
 

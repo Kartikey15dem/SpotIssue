@@ -47,7 +47,7 @@ fun NameCaptureScreen(
     Scaffold(
         snackbarHost = {
             SnackbarHost(snackbarHostState) { data ->
-                androidx.compose.material3.Snackbar(
+                Snackbar(
                     snackbarData = data,
                     containerColor = Color(0xFF323232),
                     contentColor = Color.White,
@@ -70,29 +70,6 @@ fun NameCaptureScreen(
     }
 }
 
-//@Composable
-//fun NameCaptureDialogs(
-//    dialogState: NameCaptureUiState.DialogState?,
-//    onDismiss: () -> Unit
-//) {
-//    when (dialogState) {
-//        is NameCaptureUiState.DialogState.Error -> {
-//            AlertDialog(
-//                onDismissRequest = onDismiss,
-//                title = { Text(text = "Profile Error") },
-//                text = { Text(text = dialogState.message) },
-//                confirmButton = {
-//                    TextButton(onClick = onDismiss) {
-//                        Text("OK", color = Color(0xFF4A6CF7))
-//                    }
-//                },
-//                containerColor = Color.White
-//            )
-//        }
-//        else -> Unit
-//    }
-//}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NameCaptureContent(
@@ -100,7 +77,7 @@ fun NameCaptureContent(
     onAction: (NameCaptureIntent) -> Unit
 ) {
     val focusManager = LocalFocusManager.current
-    val isLoading = uiState.dialogState == NameCaptureUiState.DialogState.Loading
+    val isLoading = uiState.isLoading
 
     Column(
         modifier = Modifier

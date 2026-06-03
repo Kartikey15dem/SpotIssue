@@ -16,6 +16,7 @@ import org.example.project.auth.presentation.screens.LocationFetchScreenWithPerm
 import org.example.project.createPost.presentation.navigation.CreatePostNavigation
 import org.example.project.home.presentation.navigation.HomeNavigation
 import org.example.project.profile.presentation.navigation.ProfileNavigation
+import org.example.project.home.presentation.screens.PostDetailScreen
 
 @Composable
 fun NavigationRoot(
@@ -82,6 +83,9 @@ fun NavigationRoot(
                     onProfileClick = {
                         rootBackStack.add(Route.Profile)
                     },
+                    onNavigateToPost = { postId ->
+                        rootBackStack.add(Route.PostDetail(postId))
+                    },
                     onBack = {
                         rootBackStack.removeLastOrNull()
                     }
@@ -92,6 +96,9 @@ fun NavigationRoot(
                     onCreatePost = {
                         rootBackStack.add(Route.CreatePost)
                     },
+                    onNavigateToPost = { postId ->
+                        rootBackStack.add(Route.PostDetail(postId))
+                    },
                     onBack = {
                         rootBackStack.removeLastOrNull()
                     }
@@ -100,6 +107,14 @@ fun NavigationRoot(
             entry<Route.CreatePost>{
                 CreatePostNavigation(
                     onBack = {
+                        rootBackStack.removeLastOrNull()
+                    }
+                )
+            }
+            entry<Route.PostDetail> { key ->
+                PostDetailScreen(
+                    postId = key.postId,
+                    onNavigateBack = {
                         rootBackStack.removeLastOrNull()
                     }
                 )

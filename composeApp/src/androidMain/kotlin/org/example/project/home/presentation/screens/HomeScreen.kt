@@ -67,6 +67,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onNavigateToCreatePost: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
+    onNavigateToPost: (String) -> Unit = {},
     viewModel: HomeViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -94,6 +95,7 @@ fun HomeScreen(
                     val shareIntent = Intent.createChooser(sendIntent, "Share Issue via...")
                     context.startActivity(shareIntent)
                 }
+                is HomeSideEffect.NavigateToPost -> onNavigateToPost(effect.postId)
             }
         }
     }
@@ -115,6 +117,7 @@ fun HomeScreen(
             modifier = modifier.padding(padding),
             state = state,
             onIntent = viewModel::onIntent,
+            onNavigateToPost = onNavigateToPost
         )
     }
 }
@@ -128,8 +131,10 @@ fun HomeContent(
     modifier: Modifier = Modifier,
     state: HomeState,
     onIntent: (HomeIntent) -> Unit,
+    onNavigateToPost: (String) -> Unit = {}
 ) {
-    val pagingItems = state.postsFlow?.collectAsLazyPagingItems()
+    val activeFlow = if (state.query.isNotBlank() && state.searchPostsFlow != null) state.searchPostsFlow else state.postsFlow
+    val pagingItems = activeFlow?.collectAsLazyPagingItems()
     val isRefreshing = pagingItems?.loadState?.refresh is LoadState.Loading || state.isRefreshing
 
     LaunchedEffect(pagingItems?.loadState?.refresh) {
@@ -196,6 +201,7 @@ fun HomeContent(
                                 onReportClick = { reason ->
                                     onIntent(HomeIntent.ReportClicked(post.id, reason))
                                 },
+                                onPostClick = { onIntent(HomeIntent.PostClicked(post.id)) }
                             )
                         }
                     }
@@ -315,42 +321,44 @@ private fun HomeHeader(
             }
         }
 
-        Spacer(Modifier.height(14.dp))
+        if (state.query.isBlank()) {
+            Spacer(Modifier.height(14.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
 
-            PostLevelChip(postLevel = state.postLevel)
+                PostLevelChip(postLevel = state.postLevel)
 
-            Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(10.dp))
 
-            val activeIssuesText = when (val res = state.activeIssues) {
-                is DataState.Success -> "${res.data} active issues"
-                is DataState.Error -> "Error loading issues"
-                DataState.Loading -> "Loading issues..."
+                val activeIssuesText = when (val res = state.activeIssues) {
+                    is DataState.Success -> "${res.data} active issues"
+                    is DataState.Error -> "Error loading issues"
+                    DataState.Loading -> "Loading issues..."
+                }
+
+                Text(
+                    text = "  $activeIssuesText".replace("\u0005", "↗"),
+                    style = IssueSpotTypography.bodyLarge,
+                    color = IssueSpotColors.OnSurfaceVariant
+                )
             }
 
+            Spacer(Modifier.height(12.dp))
+
             Text(
-                text = "  $activeIssuesText".replace("\u0005", "↗"),
+                text = "${state.postLevel.displayName} Issues",
+                style = IssueSpotTypography.bodyLarge,
+                color = IssueSpotColors.OnSurface,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(Modifier.height(6.dp))
+
+            Text(
+                text = state.postLevel.getText(),
                 style = IssueSpotTypography.bodyLarge,
                 color = IssueSpotColors.OnSurfaceVariant
             )
         }
-
-        Spacer(Modifier.height(12.dp))
-
-        Text(
-            text = "${state.postLevel.displayName} Issues",
-            style = IssueSpotTypography.bodyLarge,
-            color = IssueSpotColors.OnSurface,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(Modifier.height(6.dp))
-
-        Text(
-            text = state.postLevel.getText(),
-            style = IssueSpotTypography.bodyLarge,
-            color = IssueSpotColors.OnSurfaceVariant
-        )
     }
 }

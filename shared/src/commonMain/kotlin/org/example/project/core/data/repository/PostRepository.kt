@@ -1,6 +1,7 @@
 package org.example.project.core.data.repository
 
 import org.example.project.core.model.createPost.CreatePost
+import org.example.project.core.model.home.Post
 import org.example.project.core.network.dto.CommentDto
 import org.example.project.core.network.dto.PagedResponse
 import androidx.paging.PagingData
@@ -17,4 +18,5 @@ interface PostRepository {
     suspend fun addComment(postId: String, comment: String): DataState<Unit>
     suspend fun createPost(post : CreatePost): DataState<Unit>
     suspend fun deletePost(postId: String):DataState<Unit>
+    suspend fun getPost(postId: String): DataState<Post>
 }

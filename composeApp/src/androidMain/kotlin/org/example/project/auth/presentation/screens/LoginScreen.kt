@@ -25,7 +25,6 @@ import org.example.project.auth.presentation.viewmodel.AuthEffect
 import org.example.project.auth.presentation.viewmodel.AuthIntent
 import org.example.project.auth.presentation.viewmodel.AuthUiState
 import org.example.project.auth.presentation.viewmodel.AuthViewModel
-import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun LoginScreen(
@@ -50,7 +49,7 @@ fun LoginScreen(
     Scaffold(
         snackbarHost = {
             SnackbarHost(snackbarHostState) { data ->
-                androidx.compose.material3.Snackbar(
+               Snackbar(
                     snackbarData = data,
                     containerColor = Color(0xFF323232),
                     contentColor = Color.White,
@@ -73,36 +72,13 @@ fun LoginScreen(
     }
 }
 
-//@Composable
-//fun AuthDialogs(
-//    dialogState: AuthUiState.DialogState?,
-//    onDismiss: () -> Unit
-//) {
-//    when (dialogState) {
-//        is AuthUiState.DialogState.Error -> {
-//            AlertDialog(
-//                onDismissRequest = onDismiss,
-//                title = { Text(text = "Authentication Error") },
-//                text = { Text(text = dialogState.message) },
-//                confirmButton = {
-//                    TextButton(onClick = onDismiss) {
-//                        Text("OK", color = Color(0xFF4A6CF7))
-//                    }
-//                },
-//                containerColor = Color.White
-//            )
-//        }
-//        else -> Unit // Loading is handled directly on the button for better UX
-//    }
-//}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginContent(
     uiState: AuthUiState,
     onAction: (AuthIntent) -> Unit
 ) {
-    val isLoading = uiState.dialogState == AuthUiState.DialogState.Loading
+    val isLoading = uiState.isLoading
 
     Column(
         modifier = Modifier

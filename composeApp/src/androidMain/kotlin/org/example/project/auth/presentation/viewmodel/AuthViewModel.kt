@@ -26,19 +26,14 @@ sealed class AuthEffect {
 data class AuthUiState(
     val email: String = "",
     val otp: String = "",
-    val dialogState: DialogState? = null
-) {
-    sealed interface DialogState {
-        data object Loading : DialogState
-    }
-}
+    val isLoading : Boolean = false,
+)
 
 sealed class AuthIntent{
     data class EmailChanged(val email: String) : AuthIntent()
     data class OtpChanged(val otp: String) : AuthIntent()
     data object SendOtpClicked : AuthIntent()
     data object VerifyOtpClicked : AuthIntent()
-    data object DismissDialog : AuthIntent()
 }
 
 class AuthViewModel(
@@ -50,13 +45,8 @@ class AuthViewModel(
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    private val _effect = MutableSharedFlow<AuthEffect>(
-        extraBufferCapacity = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
+    private val _effect = MutableSharedFlow<AuthEffect>()
     val effect: SharedFlow<AuthEffect> = _effect.asSharedFlow()
-
-    var isNewUser = true
 
     fun handleIntent(intent: AuthIntent) {
         when (intent) {
@@ -64,7 +54,6 @@ class AuthViewModel(
             is AuthIntent.OtpChanged -> updateOtp(intent.otp)
             is AuthIntent.SendOtpClicked -> sendOtp()
             is AuthIntent.VerifyOtpClicked -> verifyOtp()
-            is AuthIntent.DismissDialog -> clearDialog()
         }
     }
 
@@ -118,12 +107,11 @@ class AuthViewModel(
 
             when (val result = authRepository.verifyOtp(email, otp)) {
                 is DataState.Success -> {
-                    isNewUser = result.data.isNewUser
+                    val isNewUser = result.data.isNewUser
                     if(isNewUser) _effect.emit(AuthEffect.NavigateToNameCaptureScreen(email))
                     else {
                         when(val res = profileRepository.refreshProfile()){
                             is DataState.Error -> {
-                                // to be handled properly
                                 showError(res.exception.message ?: "An unexpected error occurred")
                             }
                             DataState.Loading -> {
@@ -149,16 +137,13 @@ class AuthViewModel(
         }
     }
 
-    private fun clearDialog() {
-        _uiState.update { it.copy(dialogState = null) }
-    }
 
     private fun showLoading() {
-        _uiState.update { it.copy(dialogState = AuthUiState.DialogState.Loading) }
+        _uiState.update { it.copy(isLoading = true)  }
     }
 
     private fun hideLoading() {
-        _uiState.update { it.copy(dialogState = null) }
+        _uiState.update { it.copy(isLoading = false) }
     }
 
     private fun showError(message: String) {

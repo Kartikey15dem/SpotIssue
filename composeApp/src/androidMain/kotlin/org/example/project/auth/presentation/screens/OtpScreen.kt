@@ -70,7 +70,7 @@ fun OTPContent(
     uiState: AuthUiState,
     onAction: (AuthIntent) -> Unit
 ) {
-    val isLoading = uiState.dialogState == AuthUiState.DialogState.Loading
+    val isLoading = uiState.isLoading
     val otpString = uiState.otp
     val otpDigits = remember(otpString) {
         List(6) { index -> otpString.getOrNull(index)?.toString() ?: "" }

@@ -12,6 +12,7 @@ import org.example.project.profile.presentation.screens.ProfileScreen
 @Composable
 fun ProfileNavigation(
     onCreatePost:() -> Unit,
+    onNavigateToPost: (String) -> Unit,
     onBack: () -> Unit
 ) {
     val profileBackStack = rememberNavBackStack(Route.Profile.ProfileDetail)
@@ -31,7 +32,8 @@ fun ProfileNavigation(
                     onNavigateToCreatePost = onCreatePost,
                     onNavigateToEditProfile = {
                         profileBackStack.add(Route.Profile.EditProfileRoute)
-                    }
+                    },
+                    onNavigateToPost = onNavigateToPost
                 )
             }
             entry<Route.Profile.EditProfileRoute>{

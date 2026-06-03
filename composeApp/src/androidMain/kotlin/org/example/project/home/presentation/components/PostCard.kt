@@ -20,13 +20,21 @@ import org.example.project.R
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.graphics.Color
+import androidx.core.net.toUri
+import coil3.compose.AsyncImage
 import org.example.project.core.components.CommentsBottomSheet
 import org.example.project.core.components.ReportPostDialog
+import org.example.project.core.components.LocalOverlayController
+import org.example.project.core.components.PdfPreviewContent
+import org.example.project.core.components.VideoPreviewPlayer
 import org.example.project.core.model.home.Comment
 import org.example.project.core.model.home.MediaType
 import org.example.project.core.model.home.Post
@@ -48,6 +56,7 @@ fun PostCard(
     onShareClick: () -> Unit,
     onReportClick: (String) -> Unit,
     onDeleteClick: () -> Unit = {},
+    onPostClick: () -> Unit = {},
 ) {
     var commentText by rememberSaveable { mutableStateOf("") }
     var showReportDialog by rememberSaveable { mutableStateOf(false) }
@@ -66,7 +75,7 @@ fun PostCard(
 
     Box {
         Card(
-            modifier = modifier.fillMaxWidth(),
+            modifier = modifier.fillMaxWidth().clickable { onPostClick() },
             colors = CardDefaults.cardColors(containerColor = IssueSpotColors.CardBackground),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
@@ -84,20 +93,8 @@ fun PostCard(
                     Text(text = post.postText, style = IssueSpotTypography.bodyLarge)
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    when (post.mediaType) {
-                        MediaType.IMAGE -> {
-                            Image(
-                                painter = painterResource(R.drawable.img_post_placeholder),
-                                contentDescription = "Post media",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(220.dp)
-                                    .clip(RoundedCornerShape(8.dp)),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
-                        MediaType.VIDEO -> { /* Implementation */ }
-                        MediaType.PDF -> { /* Implementation */ }
+                    if (!post.mediaUrls.isNullOrEmpty()) {
+                        PostMediaPreview(post)
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -384,3 +381,167 @@ val samplePost = Post(
     postText = "sfdksdkfhsdhafkhdsfkjh",
     mediaType = MediaType.VIDEO // Replace with the actual media type
 )
+
+@Composable
+fun PostMediaPreview(
+    post: Post,
+    modifier: Modifier = Modifier
+) {
+    val overlayController = LocalOverlayController.current
+    var aspectRatio by remember { mutableFloatStateOf(1f) }
+    
+    val mediaUrls = post.mediaUrls ?: return
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(aspectRatio)
+                .clip(RoundedCornerShape(8.dp))
+        ) {
+            when (post.mediaType) {
+                MediaType.IMAGE -> {
+                    PostImageGrid(
+                        images = mediaUrls,
+                        onImageClick = { clickedIndex ->
+                            overlayController.show(
+                                type = MediaType.IMAGE,
+                                urls = mediaUrls,
+                                initialIndex = clickedIndex
+                            )
+                        }
+                    )
+                }
+                MediaType.VIDEO -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        VideoPreviewPlayer(
+                            videoUri = mediaUrls.first(),
+                            modifier = Modifier.fillMaxSize(),
+                            onFullscreenClick = {
+                                overlayController.show(
+                                    type = MediaType.VIDEO,
+                                    urls = mediaUrls,
+                                )
+                            },
+                            onAspectRatioAvailable = { newRatio ->
+                                aspectRatio = newRatio
+                            }
+                        )
+                    }
+                }
+                MediaType.PDF -> {
+                    PdfPreviewContent(
+                        pdfUri = mediaUrls.first().toUri(),
+                        onFullscreenClick = {
+                            overlayController.show(MediaType.PDF, mediaUrls)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PostImageGrid(
+    images: List<String>,
+    onImageClick: (Int) -> Unit
+) {
+    val count = images.size
+    val gridHeight = 300.dp
+    val spacing = 4.dp
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        when (count) {
+            1 -> {
+                var singleAspectRatio by remember { mutableFloatStateOf(1f) }
+                PostGridImageItem(
+                    uri = images[0],
+                    onClick = { onImageClick(0) },
+                    modifier = Modifier.fillMaxWidth().aspectRatio(singleAspectRatio),
+                    contentScale = ContentScale.Fit,
+                    onSuccess = { state ->
+                        val width = state.painter.intrinsicSize.width
+                        val height = state.painter.intrinsicSize.height
+                        if (height != 0f) {
+                            singleAspectRatio = width / height
+                            if (singleAspectRatio < 1f) singleAspectRatio = 1f
+                        }
+                    }
+                )
+            }
+            2 -> {
+                Row(modifier = Modifier.fillMaxWidth().height(gridHeight), horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                    PostGridImageItem(uri = images[0], onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                    PostGridImageItem(uri = images[1], onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                }
+            }
+            3 -> {
+                Row(modifier = Modifier.fillMaxWidth().height(gridHeight), horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                    PostGridImageItem(uri = images[0], onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                    Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(spacing)) {
+                        PostGridImageItem(uri = images[1], onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxWidth())
+                        PostGridImageItem(uri = images[2], onClick = { onImageClick(2) }, modifier = Modifier.weight(1f).fillMaxWidth())
+                    }
+                }
+            }
+            else -> {
+                Column(modifier = Modifier.fillMaxWidth().height(gridHeight), verticalArrangement = Arrangement.spacedBy(spacing)) {
+                    Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                        PostGridImageItem(uri = images[0], onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                        PostGridImageItem(uri = images[1], onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                    }
+                    Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                        PostGridImageItem(uri = images[2], onClick = { onImageClick(2) }, modifier = Modifier.weight(1f).fillMaxHeight())
+
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            PostGridImageItem(uri = images[3], onClick = { onImageClick(3) }, modifier = Modifier.fillMaxSize())
+
+                            if (count > 4) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.5f))
+                                        .clickable { onImageClick(3) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "+${count - 4}",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PostGridImageItem(
+    uri: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    onSuccess: ((coil3.compose.AsyncImagePainter.State.Success) -> Unit)? = null
+) {
+    Box(modifier = modifier.clip(RoundedCornerShape(8.dp))) {
+        AsyncImage(
+            model = uri.toUri(),
+            contentDescription = "Post Image",
+            onSuccess = onSuccess,
+            modifier = Modifier.fillMaxSize().clickable(onClick = onClick),
+            contentScale = contentScale
+        )
+    }
+}

@@ -11,8 +11,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.example.project.core.data.repository.PostRepository
@@ -32,6 +30,9 @@ class ProfileViewModel(
 
     private val _sideEffects = MutableSharedFlow<ProfileSideEffect>()
     val sideEffects: SharedFlow<ProfileSideEffect> = _sideEffects.asSharedFlow()
+
+    private val userPostsCache = mutableMapOf<Sort, Flow<PagingData<Post>>>()
+    private val likedPostsCache = mutableMapOf<Sort, Flow<PagingData<Post>>>()
 
     init {
         observeProfile()
@@ -68,41 +69,29 @@ class ProfileViewModel(
         }
     }
 
-    private fun initPostFlows() {
-        val userFlow = profileRepository.getPagedUserPosts().cachedIn(viewModelScope)
-        val likedFlow = profileRepository.getPagedLikedPosts().cachedIn(viewModelScope)
-        updateState { it.copy(
-            userPostsFlow = userFlow,
-            likedPostsFlow = likedFlow
-        ) }
-    }
-
-    fun onIntent(intent: ProfileIntent) {
-        when (intent) {
-            ProfileIntent.CreatePostClicked -> navigateToCreatePost()
-            ProfileIntent.EditProfileClicked -> navigateToEditProfile()
-            is ProfileIntent.TabChanged -> changeTab(intent.isMine)
-            is ProfileIntent.SortChanged -> changeSort(intent.sort)
-            is ProfileIntent.DeletePostClicked -> deletePost(intent.postId)
-            is ProfileIntent.LikeClicked -> likePost(intent.postId)
-            is ProfileIntent.CommentClicked -> navigateToPost(intent.postId)
-            is ProfileIntent.ShareClicked -> sharePost(intent.postId)
-            is ProfileIntent.ReportClicked -> reportPost(intent.postId)
-            ProfileIntent.ErrorShown -> clearError()
-            ProfileIntent.RetryProfileClicked -> fetchProfile()
+    private fun getPostFlow(sort: Sort): Flow<PagingData<Post>> {
+        return userPostsCache.getOrPut(sort) {
+            profileRepository.getPagedUserPosts(sort.name).cachedIn(viewModelScope)
         }
     }
 
-    private fun updateState(update: (ProfileState) -> ProfileState) {
-        _uiState.update(update)
+    private fun getLikedFlow(sort: Sort): Flow<PagingData<Post>> {
+        return likedPostsCache.getOrPut(sort) {
+            profileRepository.getPagedLikedPosts(sort.name).cachedIn(viewModelScope)
+        }
     }
 
-    private fun changeTab(isMine: Boolean) {
-        updateState { it.copy(isMine = isMine) }
+    private fun initPostFlows() {
+        val sort = _uiState.value.sort
+        updateState { it.copy(
+            userPostsFlow = getPostFlow(sort),
+            likedPostsFlow = getLikedFlow(sort)
+        )
+        }
     }
 
     private fun changeSort(sort: Sort) {
-        updateState { it.copy(sort = sort) }
+        updateState { it.copy(sort = sort, userPostsFlow = getPostFlow(sort), likedPostsFlow = getLikedFlow(sort)) }
     }
 
     private fun deletePost(postId: String) {
@@ -166,8 +155,33 @@ class ProfileViewModel(
         }
     }
 
+    fun onIntent(intent: ProfileIntent) {
+        when (intent) {
+            ProfileIntent.CreatePostClicked -> navigateToCreatePost()
+            ProfileIntent.EditProfileClicked -> navigateToEditProfile()
+            is ProfileIntent.TabChanged -> changeTab(intent.isMine)
+            is ProfileIntent.SortChanged -> changeSort(intent.sort)
+            is ProfileIntent.DeletePostClicked -> deletePost(intent.postId)
+            is ProfileIntent.LikeClicked -> likePost(intent.postId)
+            is ProfileIntent.CommentClicked -> navigateToPost(intent.postId)
+            is ProfileIntent.PostClicked -> navigateToPost(intent.postId)
+            is ProfileIntent.ShareClicked -> sharePost(intent.postId)
+            is ProfileIntent.ReportClicked -> reportPost(intent.postId)
+            ProfileIntent.ErrorShown -> clearError()
+            ProfileIntent.RetryProfileClicked -> fetchProfile()
+        }
+    }
+
+    private fun changeTab(isMine: Boolean) {
+        updateState { it.copy(isMine = isMine) }
+    }
+
     private fun clearError() {
         updateState { it.copy(error = null) }
+    }
+
+    private fun updateState(update: (ProfileState) -> ProfileState) {
+        _uiState.update(update)
     }
 
     private suspend fun handleError(error: Throwable) {
@@ -187,6 +201,7 @@ sealed interface ProfileIntent {
     data class CommentClicked(val postId: String) : ProfileIntent
     data class ShareClicked(val postId: String) : ProfileIntent
     data class ReportClicked(val postId: String) : ProfileIntent
+    data class PostClicked(val postId: String) : ProfileIntent
     data object ErrorShown : ProfileIntent
     data object RetryProfileClicked : ProfileIntent
 }
