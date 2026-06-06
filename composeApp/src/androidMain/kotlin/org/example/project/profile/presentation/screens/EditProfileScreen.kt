@@ -64,6 +64,16 @@ import org.example.project.R
 import org.koin.compose.viewmodel.koinViewModel
 import org.example.project.theme.IssueSpotTheme
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import org.example.project.profile.presentation.viewmodel.EmailChangeStep
+
 /**
  * Edit Profile Screen with ViewModel integration
  */
@@ -77,6 +87,19 @@ fun EditProfileScreen(
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    val context = LocalContext.current
+
+    // ... (rest of launchers)
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.onIntent(EditProfileIntent.CaptureFromCameraClicked)
+        } else {
+            // Permission denied logic
+        }
+    }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
@@ -113,8 +136,17 @@ fun EditProfileScreen(
                 is EditProfileSideEffect.ShowCamera -> {
                     cameraLauncher.launch(effect.uri)
                 }
+
+                else -> {}
             }
         }
+    }
+
+    if (state.showEmailChangeDialog) {
+        EmailChangeDialog(
+            state = state,
+            onIntent = viewModel::onIntent
+        )
     }
 
     Scaffold(
@@ -151,7 +183,15 @@ fun EditProfileScreen(
         EditProfileContent(
             modifier = modifier.padding(paddingValues),
             state = state,
-            onIntent = viewModel::onIntent
+            onIntent = viewModel::onIntent,
+            onCameraClick = {
+                val permission = Manifest.permission.CAMERA
+                if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
+                    viewModel.onIntent(EditProfileIntent.CaptureFromCameraClicked)
+                } else {
+                    cameraPermissionLauncher.launch(permission)
+                }
+            }
         )
     }
 }
@@ -163,7 +203,8 @@ fun EditProfileScreen(
 fun EditProfileContent(
     modifier: Modifier = Modifier,
     state: EditProfileState,
-    onIntent: (EditProfileIntent) -> Unit
+    onIntent: (EditProfileIntent) -> Unit,
+    onCameraClick: () -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -225,8 +266,7 @@ fun EditProfileContent(
                     .clip(CircleShape)
                     .background(IssueSpotColors.Primary)
                     .clickable {
-                        // Show dialog to choose between gallery and camera
-                        onIntent(EditProfileIntent.PickFromGalleryClicked)
+                        onCameraClick()
                     }
                     .padding(8.dp),
                 contentAlignment = Alignment.Center
@@ -260,7 +300,7 @@ fun EditProfileContent(
             }
 
             OutlinedButton(
-                onClick = { onIntent(EditProfileIntent.CaptureFromCameraClicked) },
+                onClick = onCameraClick,
                 enabled = !state.isLoadingImage
             ) {
                 Icon(
@@ -299,6 +339,51 @@ fun EditProfileContent(
                 focusedBorderColor = IssueSpotColors.Primary
             )
         )
+
+        Spacer(Modifier.height(16.dp))
+
+        // Email Section
+        Text(
+            text = "Email Address",
+            style = IssueSpotTypography.titleSmall,
+            color = IssueSpotColors.OnBackground,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.align(Alignment.Start)
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = state.email,
+                onValueChange = { },
+                readOnly = true,
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = IssueSpotColors.SurfaceVariant,
+                    focusedContainerColor = IssueSpotColors.SurfaceVariant,
+                    unfocusedBorderColor = IssueSpotColors.Outline,
+                    focusedBorderColor = IssueSpotColors.Primary
+                )
+            )
+
+            Button(
+                onClick = { onIntent(EditProfileIntent.ShowEmailChangeDialogClicked) },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = IssueSpotColors.Primary.copy(alpha = 0.1f),
+                    contentColor = IssueSpotColors.Primary
+                )
+            ) {
+                Text("Update", style = IssueSpotTypography.labelLarge)
+            }
+        }
 
         Spacer(Modifier.height(24.dp))
 
@@ -355,6 +440,91 @@ fun EditProfileContent(
 
         Spacer(Modifier.height(24.dp))
     }
+}
+
+@Composable
+fun EmailChangeDialog(
+    state: EditProfileState,
+    onIntent: (EditProfileIntent) -> Unit
+) {
+    var otpCode by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = { if (!state.isEmailUpdating) onIntent(EditProfileIntent.DismissEmailChangeDialog) },
+        title = {
+            Text(
+                text = if (state.emailChangeStep == EmailChangeStep.Request) "Change Email" else "Verify Email",
+                style = IssueSpotTypography.titleMedium
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (state.emailChangeStep == EmailChangeStep.Request) {
+                    Text(
+                        "Enter your new email address. We will send a verification code to it.",
+                        style = IssueSpotTypography.bodySmall
+                    )
+                    OutlinedTextField(
+                        value = state.newEmail,
+                        onValueChange = { onIntent(EditProfileIntent.NewEmailChanged(it)) },
+                        placeholder = { Text("New Email") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !state.isEmailUpdating
+                    )
+                } else {
+                    Text(
+                        "Enter the 6-digit code sent to ${state.newEmail}",
+                        style = IssueSpotTypography.bodySmall
+                    )
+                    OutlinedTextField(
+                        value = otpCode,
+                        onValueChange = { if (it.length <= 6) otpCode = it },
+                        placeholder = { Text("6-digit code") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !state.isEmailUpdating
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (state.emailChangeStep == EmailChangeStep.Request) {
+                        onIntent(EditProfileIntent.RequestEmailChangeClicked)
+                    } else {
+                        onIntent(EditProfileIntent.VerifyEmailChangeClicked(otpCode))
+                    }
+                },
+                enabled = !state.isEmailUpdating && (if (state.emailChangeStep == EmailChangeStep.Request) state.newEmail.isNotBlank() else otpCode.length == 6),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                if (state.isEmailUpdating) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(if (state.emailChangeStep == EmailChangeStep.Request) "Send OTP" else "Verify")
+                }
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = { onIntent(EditProfileIntent.DismissEmailChangeDialog) },
+                enabled = !state.isEmailUpdating,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Cancel")
+            }
+        },
+        containerColor = IssueSpotColors.Surface,
+        titleContentColor = IssueSpotColors.OnSurface,
+        textContentColor = IssueSpotColors.OnSurface
+    )
 }
 
 @Preview

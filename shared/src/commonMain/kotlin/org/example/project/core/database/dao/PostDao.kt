@@ -64,6 +64,30 @@ interface PostDao {
     suspend fun trimPostsByLevel(postLevel: String, maxPosts: Int)
 
     /**
+     * Update like status and count for a post
+     */
+    @Query("UPDATE posts SET likes = :likesCount, isLiked = :isLiked WHERE id = :postId")
+    suspend fun updateLikeStatus(postId: String, likesCount: Int, isLiked: Boolean)
+
+    /**
+     * Update report status for a post
+     */
+    @Query("UPDATE posts SET isReported = :isReported WHERE id = :postId")
+    suspend fun updateReportStatus(postId: String, isReported: Boolean)
+
+    /**
+     * Delete a post by ID
+     */
+    @Query("DELETE FROM posts WHERE id = :postId")
+    suspend fun deletePostById(postId: String)
+
+    /**
+     * Update comments count for a post
+     */
+    @Query("UPDATE posts SET comments = :commentsCount WHERE id = :postId")
+    suspend fun updateCommentsCount(postId: String, commentsCount: Int)
+
+    /**
      * Clear all posts
      */
     @Query("DELETE FROM posts")

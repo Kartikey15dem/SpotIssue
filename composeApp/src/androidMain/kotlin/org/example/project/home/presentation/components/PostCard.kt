@@ -111,12 +111,12 @@ fun PostCard(
                                 .clickable { onLikeClick() }
                                 .size(20.dp)
                                 .padding(end = 2.dp),
-                            tint = if (isLiked) IssueSpotColors.Primary else IssueSpotColors.OnSurfaceVariant
+                            tint = if (isLiked) IssueSpotColors.LikeActiveColor else IssueSpotColors.OnSurfaceVariant
                         )
                         Text(
                             text = likesCount.toString(),
                             style = IssueSpotTypography.bodyLarge,
-                            color = if (isLiked) IssueSpotColors.Primary else IssueSpotColors.OnSurfaceVariant
+                            color = if (isLiked) IssueSpotColors.LikeActiveColor else IssueSpotColors.OnSurfaceVariant
                         )
 
                         Spacer(modifier = Modifier.width(10.dp))
@@ -140,7 +140,9 @@ fun PostCard(
 
                         // Trigger report dialog
                         Icon(
-                            painter = painterResource(R.drawable.ic_report),
+                            painter = painterResource(
+                                id = if (isReported) R.drawable.ic_report_filled else R.drawable.ic_report
+                            ),
                             contentDescription = "Report",
                             modifier = Modifier
                                 .clickable(enabled = !isReported) {
@@ -149,11 +151,7 @@ fun PostCard(
                                 }
                                 .size(20.dp)
                                 .padding(end = 2.dp),
-                            tint = if (isReported) {
-                                IssueSpotColors.Error // Changes to red/orange on success
-                            } else {
-                                IssueSpotColors.OnSurfaceVariant // Gray by default
-                            }
+                            tint = if (isReported) IssueSpotColors.Error else IssueSpotColors.OnSurfaceVariant
                         )
 
                         Spacer(modifier = Modifier.width(10.dp))

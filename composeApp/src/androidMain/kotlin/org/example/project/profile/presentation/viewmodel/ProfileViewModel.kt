@@ -82,12 +82,10 @@ class ProfileViewModel(
     }
 
     private fun initPostFlows() {
-        val sort = _uiState.value.sort
         updateState { it.copy(
-            userPostsFlow = getPostFlow(sort),
-            likedPostsFlow = getLikedFlow(sort)
-        )
-        }
+            userPostsFlow = getPostFlow(Sort.LATEST),
+            likedPostsFlow = getLikedFlow(Sort.LATEST)
+        ) }
     }
 
     private fun changeSort(sort: Sort) {

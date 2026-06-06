@@ -59,9 +59,6 @@ import org.example.project.theme.IssueSpotTypography
 import org.example.project.core.components.CommentsBottomSheet
 import org.koin.compose.viewmodel.koinViewModel
 
-/**
- * HomeScreen with ViewModel integration
- */
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
@@ -74,7 +71,6 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
-    // Handle side effects
     LaunchedEffect(viewModel) {
         viewModel.sideEffects.collectLatest { effect ->
             when (effect) {
@@ -122,9 +118,6 @@ fun HomeScreen(
     }
 }
 
-/**
- * State-hoisted composable (pure UI).
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeContent(
@@ -175,10 +168,10 @@ fun HomeContent(
                         if (post != null) {
                             val override = state.postOverrides[post.id]
 
-                            val isLiked = override?.isLiked ?: false
+                            val isLiked = override?.isLiked ?: post.isLiked
                             val resolvedLikes = override?.likesCount ?: post.likes
                             val resolvedComments = override?.commentsCount ?: post.comments
-                            val isReported = override?.isReported ?: false
+                            val isReported = override?.isReported ?: post.isReported
 
                             PostCard(
                                 modifier = Modifier
@@ -195,7 +188,7 @@ fun HomeContent(
                                 },
                                 // 👇 Only pass the Intent, remove local states from PostCard!
                                 onCommentIconClick = {
-                                    onIntent(HomeIntent.CommentsIconClicked(post.id))
+                                    onIntent(HomeIntent.CommentsIconClicked(post.id, resolvedComments))
                                 },
                                 onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
                                 onReportClick = { reason ->
@@ -230,11 +223,12 @@ fun HomeContent(
             comments = commentsPagingItems,
             onDismiss = { onIntent(HomeIntent.DismissCommentsSheet) },
             onSubmit = { text ->
+                val fallbackCount = pagingItems?.itemSnapshotList?.items?.find { it.id == activePostId }?.comments ?: 0
                 onIntent(
                     HomeIntent.CommentSubmitted(
                         postId = activePostId,
                         commentText = text,
-                        currentCommentCount = activeOverride?.commentsCount ?: 0 // Fetch actual count to bump it
+                        currentCommentCount = activeOverride?.commentsCount ?: fallbackCount
                     )
                 )
             }

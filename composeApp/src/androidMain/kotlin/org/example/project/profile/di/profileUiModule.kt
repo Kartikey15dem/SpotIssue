@@ -3,6 +3,7 @@ package org.example.project.profile.di
 import org.example.project.profile.presentation.viewmodel.EditProfileViewModel
 import org.example.project.profile.presentation.viewmodel.ProfileViewModel
 import org.koin.core.module.dsl.viewModelOf
+import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
 /**
@@ -12,5 +13,11 @@ import org.koin.dsl.module
 val profileUiModule = module {
     // Presentation layer - ViewModels
     viewModelOf(::ProfileViewModel)
-    viewModelOf(::EditProfileViewModel)
+    viewModel {
+        EditProfileViewModel(
+            context = get(),
+            profileRepository = get(),
+            imagePicker = get()
+        )
+    }
 }

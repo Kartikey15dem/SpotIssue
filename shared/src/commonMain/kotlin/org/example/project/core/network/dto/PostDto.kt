@@ -99,7 +99,13 @@ data class PostWithProfileDto(
     val country: String? = null,
 
     @SerialName("coordinates")
-    val coordinates: CoordinatesDto? = null
+    val coordinates: CoordinatesDto? = null,
+
+    @SerialName("is_liked")
+    val isLiked: Boolean = false,
+
+    @SerialName("is_reported")
+    val isReported: Boolean = false
 )
 
 @Serializable

@@ -22,7 +22,9 @@ data class Post(
     val district: String? = null,
     val state: String? = null,
     val country: String? = null,
-    val coordinates: Coordinates? = null
+    val coordinates: Coordinates? = null,
+    val isLiked: Boolean = false,
+    val isReported: Boolean = false
 )
 @Serializable
 enum class MediaType {

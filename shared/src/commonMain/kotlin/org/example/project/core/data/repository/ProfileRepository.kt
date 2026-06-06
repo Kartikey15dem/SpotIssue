@@ -35,5 +35,15 @@ interface ProfileRepository {
     /**
      * Update user profile
      */
-    suspend fun updateProfile(profile: Profile): DataState<Unit>
+    suspend fun updateProfile(profile: Profile, imagePath: String? = null): DataState<Unit>
+
+    /**
+     * Request email change (send OTP to new email)
+     */
+    suspend fun requestEmailChange(newEmail: String): DataState<Unit>
+
+    /**
+     * Verify email change (verify OTP and update email)
+     */
+    suspend fun verifyEmailChange(newEmail: String, code: String): DataState<Unit>
 }

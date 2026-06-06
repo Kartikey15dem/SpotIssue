@@ -26,6 +26,18 @@ import org.example.project.core.data.paging.ProfileLikedPostsRemoteMediator
 import org.example.project.core.data.paging.ProfileUserPostsRemoteMediator
 import org.example.project.core.datastore.UserPreferencesRepository
 import kotlinx.coroutines.flow.combine
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.http.Headers
+import io.ktor.http.HttpHeaders
+import io.ktor.utils.io.core.build
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import okio.FileSystem
+import okio.Path.Companion.toPath
+import okio.buffer
+import okio.SYSTEM
+import org.example.project.core.network.dto.EmailChangeRequest
+import org.example.project.core.network.dto.EmailChangeVerifyRequest
 
 class ProfileRepositoryImpl(
     private val profileService: ProfileService,
@@ -51,7 +63,7 @@ class ProfileRepositoryImpl(
                 sort = sort
             ),
             pagingSourceFactory = { 
-                when (sort.toUpperCase()) {
+                when (sort.uppercase()) {
                     "OLDEST" -> database.userPostDao().pagingSourceOldest(CURRENT_USER_ID)
                     "POPULAR" -> database.userPostDao().pagingSourcePopular(CURRENT_USER_ID)
                     else -> database.userPostDao().pagingSource(CURRENT_USER_ID)
@@ -73,7 +85,7 @@ class ProfileRepositoryImpl(
                 sort = sort
             ),
             pagingSourceFactory = { 
-                when (sort.toUpperCase()) {
+                when (sort.uppercase()) {
                     "OLDEST" -> database.likedPostDao().pagingSourceOldest(CURRENT_USER_ID)
                     "POPULAR" -> database.likedPostDao().pagingSourcePopular(CURRENT_USER_ID)
                     else -> database.likedPostDao().pagingSource(CURRENT_USER_ID)
@@ -103,13 +115,57 @@ class ProfileRepositoryImpl(
         localDataSource.saveProfile(profileDto.toEntity())
     }
 
-    override suspend fun updateProfile(profile: Profile): DataState<Unit> = safeApiCall {
+    override suspend fun updateProfile(profile: Profile, imagePath: String?): DataState<Unit> = safeApiCall {
         val request = UpsertProfileRequest(
             name = profile.name,
             email = profile.email,
             imageUrl = profile.imageUrl,
         )
-        val profileDto = profileService.updateMyProfile(request)
+        
+        val multipartParts = mutableListOf<io.ktor.http.content.PartData>()
+
+        multipartParts.add(
+            io.ktor.http.content.PartData.FormItem(
+                value = Json.encodeToString(request),
+                dispose = {},
+                partHeaders = Headers.build {
+                    append(HttpHeaders.ContentDisposition, "form-data; name=\"profile\"")
+                    append(HttpHeaders.ContentType, "application/json")
+                }
+            )
+        )
+
+        imagePath?.let { pathString ->
+            val path = pathString.toPath()
+            val fileName = path.name
+            val bytes = FileSystem.SYSTEM.source(path).buffer().readByteArray()
+
+            multipartParts.add(
+                io.ktor.http.content.PartData.FileItem(
+                    provider = { io.ktor.utils.io.ByteReadChannel(bytes) },
+                    dispose = {},
+                    partHeaders = Headers.build {
+                        append(HttpHeaders.ContentDisposition, "form-data; name=\"file\"; filename=\"$fileName\"")
+                        append(HttpHeaders.ContentType, "application/octet-stream")
+                    }
+                )
+            )
+        }
+
+        val profileDto = profileService.updateMyProfile(MultiPartFormDataContent(multipartParts))
+        localDataSource.saveProfile(profileDto.toEntity())
+    }
+
+    override suspend fun requestEmailChange(newEmail: String): DataState<Unit> = safeApiCall {
+        profileService.requestEmailChange(EmailChangeRequest(newEmail))
+    }
+
+    override suspend fun verifyEmailChange(
+        newEmail: String,
+        code: String
+    ): DataState<Unit> = safeApiCall {
+        profileService.verifyEmailChange(EmailChangeVerifyRequest(newEmail, code))
+        val profileDto = profileService.getMyProfile()
         localDataSource.saveProfile(profileDto.toEntity())
     }
 }

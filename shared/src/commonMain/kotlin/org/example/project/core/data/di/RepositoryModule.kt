@@ -19,7 +19,7 @@ val RepositoryModule = module {
     single { FeedRepositoryImpl(get(), get(), get()) } bind FeedRepository::class
 
     // Post
-    single { PostRepositoryImpl(get()) } bind PostRepository::class
+    single { PostRepositoryImpl(get(), get()) } bind PostRepository::class
 
     // Profile
     single { ProfileRepositoryImpl(get(), get(), get(), get()) } bind ProfileRepository::class

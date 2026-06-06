@@ -24,7 +24,9 @@ data class PostEntity(
     val mediaUrlsStr: String, // Comma separated list
     val likes: Int,
     val comments: Int,
-    val cachedAt: Long // Timestamp when cached
+    val cachedAt: Long, // Timestamp when cached
+    val isLiked: Boolean = false,
+    val isReported: Boolean = false
 )
 
 /**
@@ -41,7 +43,10 @@ fun PostEntity.toPost(): Post {
         mediaType = MediaType.valueOf(mediaType),
         mediaUrls = if (mediaUrlsStr.isBlank()) emptyList() else mediaUrlsStr.split(","),
         likes = likes,
-        comments = comments
+        comments = comments,
+        isLiked = isLiked,
+        isReported = isReported,
+        locality = location // Map back location to locality for now
     )
 }
 
@@ -61,7 +66,9 @@ fun Post.toEntity(cachedAt: Long = Clock.System.now().toEpochMilliseconds()): Po
         likes = likes,
         comments = comments,
         cachedAt = cachedAt,
-        location =  ""
+        location = locality ?: "",
+        isLiked = isLiked,
+        isReported = isReported
     )
 }
 

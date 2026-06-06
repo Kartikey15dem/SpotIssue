@@ -70,7 +70,7 @@ class HomeViewModel(
             HomeIntent.CreatePostClicked -> navigateToCreatePost()
             HomeIntent.ProfileClicked -> navigateToProfile()
             is HomeIntent.ReportClicked -> report(intent.postId, intent.reason)
-            is HomeIntent.CommentsIconClicked -> openComments(intent.postId)
+            is HomeIntent.CommentsIconClicked -> openComments(intent.postId, intent.currentCommentsCount)
             HomeIntent.DismissCommentsSheet -> dismissComments()
             is HomeIntent.LikeClicked -> like(intent.postId, intent.currentIsLiked, intent.currentLikesCount)
             is HomeIntent.CommentSubmitted -> comment(intent.postId, intent.commentText, intent.currentCommentCount)
@@ -154,11 +154,11 @@ class HomeViewModel(
         }
     }
 
-    private fun openComments(postId: String) {
-        val existingFlow = _uiState.value.postOverrides[postId]?.commentsFlow
-        if (existingFlow == null) {
+    private fun openComments(postId: String, currentCommentsCount: Int) {
+        val existingOverride = _uiState.value.postOverrides[postId]
+        if (existingOverride?.commentsFlow == null) {
             val flow = postRepository.getPagedComments(postId).cachedIn(viewModelScope)
-            updateOverride(postId, commentsFlow = flow)
+            updateOverride(postId, commentsFlow = flow, commentsCount = existingOverride?.commentsCount ?: currentCommentsCount)
         }
         updateState { it.copy(showCommentsSheetForPostId = postId) }
     }
@@ -229,10 +229,10 @@ class HomeViewModel(
         updateState { currentState ->
             val existingOverride = currentState.postOverrides[postId]
             val newOverride = PostOverride(
-                isLiked = isLiked ?: existingOverride?.isLiked ?: false,
-                likesCount = likesCount ?: existingOverride?.likesCount ?: 0,
-                commentsCount = commentsCount ?: existingOverride?.commentsCount ?: 0,
-                isReported = isReported ?: existingOverride?.isReported ?: false,
+                isLiked = isLiked ?: existingOverride?.isLiked,
+                likesCount = likesCount ?: existingOverride?.likesCount,
+                commentsCount = commentsCount ?: existingOverride?.commentsCount,
+                isReported = isReported ?: existingOverride?.isReported,
                 commentsFlow = commentsFlow ?: existingOverride?.commentsFlow
             )
             currentState.copy(postOverrides = currentState.postOverrides + (postId to newOverride))
@@ -246,7 +246,7 @@ sealed interface HomeIntent {
     data object CreatePostClicked : HomeIntent
     data object ProfileClicked : HomeIntent
     data class ReportClicked(val postId: String, val reason: String) : HomeIntent
-    data class CommentsIconClicked(val postId: String) : HomeIntent
+    data class CommentsIconClicked(val postId: String, val currentCommentsCount: Int) : HomeIntent
     data object DismissCommentsSheet : HomeIntent
 
     data class LikeClicked(val postId: String, val currentIsLiked: Boolean, val currentLikesCount: Int) : HomeIntent
@@ -278,9 +278,9 @@ sealed interface HomeSideEffect {
 }
 
 data class PostOverride(
-    val isLiked: Boolean,
-    val likesCount: Int,
-    val commentsCount: Int,
-    val isReported: Boolean,
+    val isLiked: Boolean? = null,
+    val likesCount: Int? = null,
+    val commentsCount: Int? = null,
+    val isReported: Boolean? = null,
     val commentsFlow: Flow<PagingData<Comment>>? = null
 )

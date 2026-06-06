@@ -33,7 +33,9 @@ fun PostWithProfileDto.toPost(): Post {
         district = district,
         state = state,
         country = country,
-        coordinates = coordinates?.let { Coordinates(it.latitude, it.longitude) }
+        coordinates = coordinates?.let { Coordinates(it.latitude, it.longitude) },
+        isLiked = isLiked,
+        isReported = isReported
     )
 }
 
