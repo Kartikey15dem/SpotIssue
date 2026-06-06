@@ -1,6 +1,7 @@
 package org.example.project.home.presentation.screens
 
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -64,7 +66,6 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onNavigateToCreatePost: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
-    onNavigateToPost: (String) -> Unit = {},
     viewModel: HomeViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -91,7 +92,6 @@ fun HomeScreen(
                     val shareIntent = Intent.createChooser(sendIntent, "Share Issue via...")
                     context.startActivity(shareIntent)
                 }
-                is HomeSideEffect.NavigateToPost -> onNavigateToPost(effect.postId)
             }
         }
     }
@@ -113,7 +113,6 @@ fun HomeScreen(
             modifier = modifier.padding(padding),
             state = state,
             onIntent = viewModel::onIntent,
-            onNavigateToPost = onNavigateToPost
         )
     }
 }
@@ -124,11 +123,10 @@ fun HomeContent(
     modifier: Modifier = Modifier,
     state: HomeState,
     onIntent: (HomeIntent) -> Unit,
-    onNavigateToPost: (String) -> Unit = {}
 ) {
     val activeFlow = if (state.query.isNotBlank() && state.searchPostsFlow != null) state.searchPostsFlow else state.postsFlow
     val pagingItems = activeFlow?.collectAsLazyPagingItems()
-    val isRefreshing = pagingItems?.loadState?.refresh is LoadState.Loading || state.isRefreshing
+    val isRefreshing = state.isRefreshing
 
     LaunchedEffect(pagingItems?.loadState?.refresh) {
         if (pagingItems?.loadState?.refresh is LoadState.Error) {
@@ -147,73 +145,140 @@ fun HomeContent(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            HomeHeader(
-                modifier = Modifier.fillMaxWidth(),
-                state = state,
-                onIntent = onIntent
-            )
+            if(state.expandedPost != null) {
+                val post = state.expandedPost
+                val override = state.postOverrides[post.id]
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item { Spacer(Modifier.height(8.dp)) }
+                val isLiked = override?.isLiked ?: post.isLiked
+                val resolvedLikes = override?.likesCount ?: post.likes
+                val resolvedComments = override?.commentsCount ?: post.comments
+                val isReported = override?.isReported ?: post.isReported
 
-                if (pagingItems != null) {
-                    items(
-                        count = pagingItems.itemCount,
-                        key = pagingItems.itemKey { it.id }
-                    ) { index ->
-                        val post = pagingItems[index]
-                        if (post != null) {
-                            val override = state.postOverrides[post.id]
+                BackHandler {
+                    onIntent(HomeIntent.DismissPost)
+                }
 
-                            val isLiked = override?.isLiked ?: post.isLiked
-                            val resolvedLikes = override?.likesCount ?: post.likes
-                            val resolvedComments = override?.commentsCount ?: post.comments
-                            val isReported = override?.isReported ?: post.isReported
 
-                            PostCard(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp),
-                                post = post,
-                                isLiked = isLiked,
-                                likesCount = resolvedLikes,
-                                commentsCount = resolvedComments,
-                                isReported = isReported,
+                    PostCard(
+                        modifier = Modifier
+                            .fillMaxSize(),
+                        post = post,
+                        isLiked = isLiked,
+                        likesCount = resolvedLikes,
+                        commentsCount = resolvedComments,
+                        isReported = isReported,
 
-                                onLikeClick = {
-                                    onIntent(HomeIntent.LikeClicked(post.id, isLiked, resolvedLikes))
-                                },
-                                // 👇 Only pass the Intent, remove local states from PostCard!
-                                onCommentIconClick = {
-                                    onIntent(HomeIntent.CommentsIconClicked(post.id, resolvedComments))
-                                },
-                                onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
-                                onReportClick = { reason ->
-                                    onIntent(HomeIntent.ReportClicked(post.id, reason))
-                                },
-                                onPostClick = { onIntent(HomeIntent.PostClicked(post.id)) }
+                        onLikeClick = {
+                            onIntent(
+                                HomeIntent.LikeClicked(
+                                    post.id,
+                                    isLiked,
+                                    resolvedLikes
+                                )
                             )
+                        },
+                        onCommentIconClick = {
+                            onIntent(
+                                HomeIntent.CommentsIconClicked(
+                                    post.id,
+                                    resolvedComments
+                                )
+                            )
+                        },
+                        onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
+                        onReportClick = { reason ->
+                            onIntent(HomeIntent.ReportClicked(post.id, reason))
+                        },
+                        onCollapseClick = { onIntent(HomeIntent.DismissPost) },
+                        isExpanded = true
+
+                    )
+                    
+
+
+            } else {
+                    HomeHeader(
+                        modifier = Modifier.fillMaxWidth(),
+                        state = state,
+                        onIntent = onIntent
+                    )
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        item { Spacer(Modifier.height(8.dp)) }
+
+                        if (pagingItems != null) {
+                            items(
+                                count = pagingItems.itemCount,
+                                key = pagingItems.itemKey { it.id }
+                            ) { index ->
+                                val post = pagingItems[index]
+                                if (post != null) {
+                                    val override = state.postOverrides[post.id]
+
+                                    val isLiked = override?.isLiked ?: post.isLiked
+                                    val resolvedLikes = override?.likesCount ?: post.likes
+                                    val resolvedComments = override?.commentsCount ?: post.comments
+                                    val isReported = override?.isReported ?: post.isReported
+
+                                    PostCard(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp),
+                                        post = post,
+                                        isLiked = isLiked,
+                                        likesCount = resolvedLikes,
+                                        commentsCount = resolvedComments,
+                                        isReported = isReported,
+
+                                        onLikeClick = {
+                                            onIntent(
+                                                HomeIntent.LikeClicked(
+                                                    post.id,
+                                                    isLiked,
+                                                    resolvedLikes
+                                                )
+                                            )
+                                        },
+                                        onCommentIconClick = {
+                                            onIntent(
+                                                HomeIntent.CommentsIconClicked(
+                                                    post.id,
+                                                    resolvedComments
+                                                )
+                                            )
+                                        },
+                                        onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
+                                        onReportClick = { reason ->
+                                            onIntent(HomeIntent.ReportClicked(post.id, reason))
+                                        },
+                                        onPostClick = { onIntent(HomeIntent.PostClicked(post)) }
+                                    )
+                                }
+                            }
+                        }
+
+                        item { Spacer(Modifier.height(16.dp)) }
+
+                        if (pagingItems?.loadState?.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
+                            item {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(color = IssueSpotColors.Primary)
+                                }
+                            }
                         }
                     }
                 }
 
-                item { Spacer(Modifier.height(16.dp)) }
 
-                if (pagingItems?.loadState?.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                            androidx.compose.material3.CircularProgressIndicator(color = IssueSpotColors.Primary)
-                        }
-                    }
-                }
-            }
         }
     }
 
-    // 👇 Render Bottom Sheet at the screen level based on ViewModel state
     if (state.showCommentsSheetForPostId != null) {
         val activePostId = state.showCommentsSheetForPostId
         val activeOverride = state.postOverrides[activePostId]

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import androidx.paging.insertHeaderItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,12 +12,14 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.example.project.core.data.repository.PostRepository
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.data.mappers.Sort
 import org.example.project.core.model.home.Post
+import org.example.project.core.model.home.Comment
 import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
 
@@ -106,32 +109,109 @@ class ProfileViewModel(
         }
     }
 
-    private fun likePost(postId: String) {
+    private fun like(postId: String, currentIsLiked: Boolean, currentLikesCount: Int) {
+        val targetIsLiked = !currentIsLiked
+        val targetLikesCount = if (targetIsLiked) currentLikesCount + 1 else (currentLikesCount - 1).coerceAtLeast(0)
+        updateOverride(postId, isLiked = targetIsLiked, likesCount = targetLikesCount)
+
         viewModelScope.launch {
             when (val result = postRepository.likePost(postId)) {
-                is DataState.Error -> handleError(result.exception)
+                is DataState.Error -> {
+                    updateOverride(postId, isLiked = currentIsLiked, likesCount = currentLikesCount)
+                    handleError(Throwable("Failed to update like status. Please try again."))
+                }
                 else -> Unit
             }
         }
     }
 
-    private fun sharePost(postId: String) {
+    private fun report(postId: String, reason: String?) {
+        val currentIsReported = _uiState.value.postOverrides[postId]?.isReported ?: false
+        updateOverride(postId, isReported = true)
         viewModelScope.launch {
-            _sideEffects.emit(ProfileSideEffect.SharePost("Shared post $postId from IssueSpot"))
+            when (val result = postRepository.reportPost(postId, reason)) {
+                is DataState.Success -> _sideEffects.emit(ProfileSideEffect.ShowSnackbar("Post reported successfully"))
+                is DataState.Error -> {
+                    updateOverride(postId, isReported = currentIsReported)
+                    handleError(Throwable("Failed to submit report. Please check your connection."))
+                }
+                else -> Unit
+            }
         }
     }
 
-    private fun reportPost(postId: String) {
+    private fun openComments(postId: String, currentCommentsCount: Int) {
+        val existingOverride = _uiState.value.postOverrides[postId]
+        if (existingOverride?.commentsFlow == null) {
+            val flow = postRepository.getPagedComments(postId).cachedIn(viewModelScope)
+            updateOverride(postId, commentsFlow = flow, commentsCount = existingOverride?.commentsCount ?: currentCommentsCount)
+        }
+        updateState { it.copy(showCommentsSheetForPostId = postId) }
+    }
+
+    private fun dismissComments() {
+        updateState { it.copy(showCommentsSheetForPostId = null) }
+    }
+
+    private fun comment(postId: String, comment: String, currentCommentCount: Int) {
+        updateOverride(postId, commentsCount = currentCommentCount + 1)
+        
+        val currentFlow = _uiState.value.postOverrides[postId]?.commentsFlow
+        if (currentFlow != null) {
+            val optimisticComment = Comment(
+                id = "temp_${System.currentTimeMillis()}",
+                postId = postId,
+                text = comment,
+                timeAgo = "Just now",
+                userName = "You",
+                userImageUrl = null
+            )
+            val updatedFlow = currentFlow.map { pagingData ->
+                pagingData.insertHeaderItem(item = optimisticComment)
+            }
+            updateOverride(postId, commentsFlow = updatedFlow)
+        }
+
         viewModelScope.launch {
-            when (val result = postRepository.reportPost(postId, null)) {
+            when (val result = postRepository.addComment(postId, comment)) {
                 is DataState.Success -> {
-                    _sideEffects.emit(ProfileSideEffect.ShowSnackbar("Post reported successfully"))
+                    _sideEffects.emit(ProfileSideEffect.ShowSnackbar("Comment posted successfully!"))
                 }
                 is DataState.Error -> {
-                    handleError(result.exception)
+                    updateOverride(postId, commentsCount = currentCommentCount)
+                    handleError(Throwable("Could not post comment. Connection lost."))
                 }
                 else -> Unit
             }
+        }
+    }
+
+    private fun share(post: Post) {
+        viewModelScope.launch {
+            val postUrl = "https://www.issuespot.com/post/${post.id}"
+            val shareText = "${post.userName} posted an issue: ${post.postText}\\n\\nView it here: $postUrl"
+            _sideEffects.emit(ProfileSideEffect.SharePost(shareText))
+        }
+    }
+
+    private fun updateOverride(
+        postId: String,
+        isLiked: Boolean? = null,
+        likesCount: Int? = null,
+        commentsCount: Int? = null,
+        isReported: Boolean? = null,
+        commentsFlow: Flow<PagingData<Comment>>? = null
+    ) {
+        updateState { currentState ->
+            val existingOverride = currentState.postOverrides[postId]
+            val newOverride = PostOverride(
+                isLiked = isLiked ?: existingOverride?.isLiked,
+                likesCount = likesCount ?: existingOverride?.likesCount,
+                commentsCount = commentsCount ?: existingOverride?.commentsCount,
+                isReported = isReported ?: existingOverride?.isReported,
+                commentsFlow = commentsFlow ?: existingOverride?.commentsFlow
+            )
+            currentState.copy(postOverrides = currentState.postOverrides + (postId to newOverride))
         }
     }
 
@@ -153,6 +233,15 @@ class ProfileViewModel(
         }
     }
 
+
+    private fun showPostDetail(post: Post) {
+        updateState { it.copy(expandedPost = post) }
+    }
+
+    private fun closePostDetail() {
+        updateState { it.copy(expandedPost = null) }
+    }
+
     fun onIntent(intent: ProfileIntent) {
         when (intent) {
             ProfileIntent.CreatePostClicked -> navigateToCreatePost()
@@ -160,11 +249,14 @@ class ProfileViewModel(
             is ProfileIntent.TabChanged -> changeTab(intent.isMine)
             is ProfileIntent.SortChanged -> changeSort(intent.sort)
             is ProfileIntent.DeletePostClicked -> deletePost(intent.postId)
-            is ProfileIntent.LikeClicked -> likePost(intent.postId)
-            is ProfileIntent.CommentClicked -> navigateToPost(intent.postId)
-            is ProfileIntent.PostClicked -> navigateToPost(intent.postId)
-            is ProfileIntent.ShareClicked -> sharePost(intent.postId)
-            is ProfileIntent.ReportClicked -> reportPost(intent.postId)
+            is ProfileIntent.LikeClicked -> like(intent.postId, intent.currentIsLiked, intent.currentLikesCount)
+            is ProfileIntent.CommentsIconClicked -> openComments(intent.postId, intent.currentCommentsCount)
+            ProfileIntent.DismissCommentsSheet -> dismissComments()
+            is ProfileIntent.CommentSubmitted -> comment(intent.postId, intent.commentText, intent.currentCommentCount)
+            is ProfileIntent.PostClicked -> showPostDetail(intent.post)
+            ProfileIntent.DismissPost -> closePostDetail()
+            is ProfileIntent.ShareClicked -> share(intent.post)
+            is ProfileIntent.ReportClicked -> report(intent.postId, intent.reason)
             ProfileIntent.ErrorShown -> clearError()
             ProfileIntent.RetryProfileClicked -> fetchProfile()
         }
@@ -195,14 +287,25 @@ sealed interface ProfileIntent {
     data class TabChanged(val isMine: Boolean) : ProfileIntent
     data class SortChanged(val sort: Sort) : ProfileIntent
     data class DeletePostClicked(val postId: String) : ProfileIntent
-    data class LikeClicked(val postId: String) : ProfileIntent
-    data class CommentClicked(val postId: String) : ProfileIntent
-    data class ShareClicked(val postId: String) : ProfileIntent
-    data class ReportClicked(val postId: String) : ProfileIntent
-    data class PostClicked(val postId: String) : ProfileIntent
+    data class LikeClicked(val postId: String, val currentIsLiked: Boolean, val currentLikesCount: Int) : ProfileIntent
+    data class CommentsIconClicked(val postId: String, val currentCommentsCount: Int) : ProfileIntent
+    data object DismissCommentsSheet : ProfileIntent
+    data class CommentSubmitted(val postId: String, val commentText: String, val currentCommentCount: Int) : ProfileIntent
+    data class ShareClicked(val post: Post) : ProfileIntent
+    data class ReportClicked(val postId: String, val reason: String?) : ProfileIntent
+    data class PostClicked(val post: Post) : ProfileIntent
+    data object DismissPost : ProfileIntent
     data object ErrorShown : ProfileIntent
     data object RetryProfileClicked : ProfileIntent
 }
+
+data class PostOverride(
+    val isLiked: Boolean? = null,
+    val likesCount: Int? = null,
+    val commentsCount: Int? = null,
+    val isReported: Boolean? = null,
+    val commentsFlow: Flow<PagingData<Comment>>? = null
+)
 
 data class ProfileState(
     val profile: Profile? = null,
@@ -213,7 +316,10 @@ data class ProfileState(
     val sort: Sort = Sort.LATEST,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val profileError: String? = null
+    val profileError: String? = null,
+    val postOverrides: Map<String, PostOverride> = emptyMap(),
+    val showCommentsSheetForPostId: String? = null,
+    val expandedPost: Post? = null
 ) {
     val activePostsFlow: Flow<PagingData<Post>>? 
         get() = if (isMine) userPostsFlow else likedPostsFlow

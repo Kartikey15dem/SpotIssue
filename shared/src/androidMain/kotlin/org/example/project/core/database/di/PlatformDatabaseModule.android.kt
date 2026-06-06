@@ -17,7 +17,7 @@ actual val platformDatabaseModule: Module = module{
         // Now this will compile perfectly!
         AppDatabaseFactory(androidApplication())
             .createDatabase(IssueSpotDatabase::class.java, "issuespot.db")
-            .fallbackToDestructiveMigrationOnDowngrade(false)
+            .fallbackToDestructiveMigration(true)
             .setDriver(BundledSQLiteDriver())
             .setQueryCoroutineContext(ioContext)
             .build()

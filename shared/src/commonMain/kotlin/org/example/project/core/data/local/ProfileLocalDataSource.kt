@@ -175,7 +175,7 @@ class ProfileLocalDataSource(
      * Update likes count on a liked post
      */
     suspend fun updateLikedPostLikes(postId: String, likes: Int) {
-        likedPostDao.updatePostLikes(postId, likes)
+        likedPostDao.updatePostLikeStatus(postId, likes, true)
     }
 
     /**

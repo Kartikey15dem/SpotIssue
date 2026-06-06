@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.insertHeaderItem
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,7 +77,8 @@ class HomeViewModel(
             is HomeIntent.LikeClicked -> like(intent.postId, intent.currentIsLiked, intent.currentLikesCount)
             is HomeIntent.CommentSubmitted -> comment(intent.postId, intent.commentText, intent.currentCommentCount)
             is HomeIntent.ShareClicked -> share(intent.post)
-            is HomeIntent.PostClicked -> viewModelScope.launch { _sideEffects.emit(HomeSideEffect.NavigateToPost(intent.postId)) }
+            is HomeIntent.PostClicked -> showPostDetail(intent.post)
+            is HomeIntent.DismissPost -> closePostDetial()
             HomeIntent.ErrorShown -> clearError()
         }
     }
@@ -98,7 +101,7 @@ class HomeViewModel(
         }
     }
 
-    private var searchJob: kotlinx.coroutines.Job? = null
+    private var searchJob: Job? = null
 
     private fun updateSearchQuery(query: String) {
         updateState { it.copy(query = query) }
@@ -109,7 +112,7 @@ class HomeViewModel(
         }
         val currentLevel = _uiState.value.postLevel
         searchJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(300) // Debounce
+            delay(300)
             val flow = feedRepository.getPagedSearchPosts(query, currentLevel).cachedIn(viewModelScope)
             updateState { it.copy(searchPostsFlow = flow) }
         }
@@ -218,6 +221,14 @@ class HomeViewModel(
         _sideEffects.emit(HomeSideEffect.ShowError(message))
     }
 
+    private fun showPostDetail(post : Post) {
+        updateState { it.copy(expandedPost = post) }
+    }
+
+    private fun closePostDetial(){
+        updateState { it.copy(expandedPost = null) }
+    }
+
     private fun updateOverride(
         postId: String,
         isLiked: Boolean? = null,
@@ -252,7 +263,8 @@ sealed interface HomeIntent {
     data class LikeClicked(val postId: String, val currentIsLiked: Boolean, val currentLikesCount: Int) : HomeIntent
     data class CommentSubmitted(val postId: String, val commentText: String, val currentCommentCount: Int) : HomeIntent
     data class ShareClicked(val post: Post) : HomeIntent
-    data class PostClicked(val postId: String) : HomeIntent
+    data class PostClicked(val post: Post) : HomeIntent
+    data object DismissPost : HomeIntent
     data object ErrorShown : HomeIntent
 }
 
@@ -265,13 +277,13 @@ data class HomeState(
     val query: String = "",
     val error: String? = null,
     val postOverrides: Map<String, PostOverride> = emptyMap(),
-    val showCommentsSheetForPostId: String? = null
+    val showCommentsSheetForPostId: String? = null,
+    val expandedPost : Post? = null
 )
 
 sealed interface HomeSideEffect {
     data object NavigateToCreatePost : HomeSideEffect
     data object NavigateToProfile : HomeSideEffect
-    data class NavigateToPost(val postId: String) : HomeSideEffect
     data class ShowError(val message: String) : HomeSideEffect
     data class ShowSnackbar(val message: String) : HomeSideEffect
     data class SharePost(val text: String) : HomeSideEffect

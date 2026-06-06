@@ -64,8 +64,14 @@ interface LikedPostDao {
     )
     suspend fun trimLikedPosts(userId: String = "current_user", maxPosts: Int)
 
-    @Query("UPDATE liked_posts SET likes = :likes WHERE id = :postId")
-    suspend fun updatePostLikes(postId: String, likes: Int)
+    @Query("UPDATE liked_posts SET likes = :likes, isLiked = :isLiked WHERE id = :postId")
+    suspend fun updatePostLikeStatus(postId: String, likes: Int, isLiked: Boolean)
+
+    @Query("UPDATE liked_posts SET comments = :commentsCount WHERE id = :postId")
+    suspend fun updateCommentsCount(postId: String, commentsCount: Int)
+
+    @Query("UPDATE liked_posts SET isReported = :isReported WHERE id = :postId")
+    suspend fun updateReportStatus(postId: String, isReported: Boolean)
 
     @Query("SELECT COUNT(*) FROM liked_posts WHERE userId = :userId")
     suspend fun getLikedPostCount(userId: String = "current_user"): Int

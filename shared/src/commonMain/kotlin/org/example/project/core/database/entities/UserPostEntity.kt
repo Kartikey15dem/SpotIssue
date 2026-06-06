@@ -24,6 +24,7 @@ data class UserPostEntity(
     val likes: Int = 0,
     val comments: Int = 0,
     val isLiked: Boolean = false,
+    val isReported: Boolean = false,
     val timeAgo: String,
     val createdAt: Long, // Timestamp for sorting
     val cachedAt: Long = 0L // Set when inserting

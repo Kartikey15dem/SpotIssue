@@ -1,5 +1,6 @@
 package org.example.project.home.presentation.components
 
+import android.provider.CalendarContract
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
@@ -28,6 +29,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.core.net.toUri
 import coil3.compose.AsyncImage
 import org.example.project.core.components.CommentsBottomSheet
@@ -52,45 +54,80 @@ fun PostCard(
     modifier: Modifier = Modifier,
     canDelete: Boolean = false,
     onLikeClick: () -> Unit,
-    onCommentIconClick: () -> Unit, // 👇 Simply trigger the click
+    onCommentIconClick: () -> Unit,
     onShareClick: () -> Unit,
     onReportClick: (String) -> Unit,
     onDeleteClick: () -> Unit = {},
     onPostClick: () -> Unit = {},
+    onCollapseClick: () -> Unit = {},
+    isExpanded: Boolean = false
 ) {
-    var commentText by rememberSaveable { mutableStateOf("") }
     var showReportDialog by rememberSaveable { mutableStateOf(false) }
-
-
-    var fullscreenVisible by rememberSaveable { mutableStateOf(false) }
-
-
-
-    // Estimate video aspect ratio
-    val videoAspect = when {
-        post.mediaUrls?.firstOrNull()?.contains("landscape", ignoreCase = true) == true -> 16f / 9f
-        post.mediaUrls?.firstOrNull()?.contains("portrait", ignoreCase = true) == true -> 9f / 16f
-        else -> 9f / 16f
-    }
+    var hasOverflow by remember { mutableStateOf(false) }
 
     Box {
         Card(
-            modifier = modifier.fillMaxWidth().clickable { onPostClick() },
+            modifier = modifier
+                .then(
+                    if (isExpanded) {
+                        Modifier.fillMaxSize()
+                    } else {
+                        Modifier.fillMaxWidth()
+                    }
+                ),
             colors = CardDefaults.cardColors(containerColor = IssueSpotColors.CardBackground),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             Box(Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    PostHeader(
-                        userName = post.userName,
-                        timeAgo = post.timeAgo,
-                        postLevel = post.postLevel,
-                        location = post.locality +"," +post.district +"," +post.state +"," +post.country
-                    )
 
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = post.postText, style = IssueSpotTypography.bodyLarge)
+                    Column(
+                        modifier = Modifier.clickable {
+                            if (!isExpanded) {
+                                onPostClick()
+                            }
+                        }
+                    ) {
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        PostHeader(
+                            userName = post.userName,
+                            timeAgo = post.timeAgo,
+                            postLevel = post.postLevel,
+                            location = post.locality + "," +
+                                    post.district + "," +
+                                    post.state + "," +
+                                    post.country,
+                            isExpanded = isExpanded,
+                            onCollapseClick = onCollapseClick
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = post.postText,
+                            style = IssueSpotTypography.bodyLarge,
+                            maxLines = if (isExpanded) Int.MAX_VALUE else 4,
+                            overflow = TextOverflow.Ellipsis,
+                            onTextLayout = {
+                                hasOverflow = it.hasVisualOverflow
+                            }
+                        )
+
+                        if (!isExpanded && hasOverflow) {
+                            Text(
+                                text = "More",
+                                style = IssueSpotTypography.bodyMedium,
+                                color = IssueSpotColors.Primary,
+                                modifier = Modifier
+                                    .padding(top = 4.dp)
+                                    .clickable {
+                                        onPostClick()
+                                    }
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(12.dp))
 
                     if (!post.mediaUrls.isNullOrEmpty()) {
@@ -138,7 +175,6 @@ fun PostCard(
 
                         Spacer(modifier = Modifier.weight(1f))
 
-                        // Trigger report dialog
                         Icon(
                             painter = painterResource(
                                 id = if (isReported) R.drawable.ic_report_filled else R.drawable.ic_report
@@ -146,7 +182,6 @@ fun PostCard(
                             contentDescription = "Report",
                             modifier = Modifier
                                 .clickable(enabled = !isReported) {
-                                    // Open dialog only if not reported yet
                                     showReportDialog = true
                                 }
                                 .size(20.dp)
@@ -166,7 +201,7 @@ fun PostCard(
                         )
                     }
 
-                                    }
+                }
                 if (canDelete) {
                     IconButton(
                         onClick = onDeleteClick,
@@ -185,10 +220,9 @@ fun PostCard(
                         )
                     }
                 }
+
             }
 
-
-            
             if (showReportDialog) {
                 ReportPostDialog(
                     onDismiss = { showReportDialog = false },
@@ -200,57 +234,34 @@ fun PostCard(
             }
         }
 
-        // Overlay placed OUTSIDE Card so it covers entire screen
-        if (fullscreenVisible) {
-            FullscreenVideoOverlay(
-                url = post.mediaUrls?.firstOrNull() ?: "",
-                videoAspectRatio = videoAspect,
-                visible = fullscreenVisible,
-                onDismiss = { fullscreenVisible = false }
-            )
-        }
     }
 }
 
-@Composable
-private fun PostCardDeleteButton(
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    IconButton(
-        onClick = onClick,
-        modifier = modifier
-            .clip(RoundedCornerShape(4.dp))
-            .size(36.dp), // button visual size (and touch target)
-        colors = IconButtonDefaults.filledIconButtonColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-            contentColor = MaterialTheme.colorScheme.onErrorContainer
-         )
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_delete),
-            contentDescription = "Delete post",
-            modifier = Modifier.size(22.dp), // bigger icon, but still inside the button
-            tint = MaterialTheme.colorScheme.onErrorContainer
-         )
-    }
-}
-
-/**
- * Reusable post header component showing user avatar, name, time, post level, and location
- */
 @Composable
 fun PostHeader(
     userName: String,
     timeAgo: String? = null,
     postLevel: PostLevel,
     location: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isExpanded: Boolean = false,
+    onCollapseClick: () -> Unit = {}
 ) {
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (isExpanded) {
+            IconButton(
+                onClick = onCollapseClick
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_close),
+                    contentDescription = "Close",
+                    tint = IssueSpotColors.OnBackground
+                )
+            }
+        }
         Box(
             modifier = Modifier
                 .size(40.dp)

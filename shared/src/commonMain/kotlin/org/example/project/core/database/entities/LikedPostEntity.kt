@@ -24,6 +24,7 @@ data class LikedPostEntity(
     val likes: Int = 0,
     val comments: Int = 0,
     val isLiked: Boolean = true, // Always true for liked posts
+    val isReported: Boolean = false,
     val timeAgo: String,
     val createdAt: Long, // Timestamp for sorting
     val likedAt: Long = 0L, // When user liked it (set when inserting)

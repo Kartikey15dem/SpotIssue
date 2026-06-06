@@ -67,6 +67,12 @@ interface UserPostDao {
     @Query("UPDATE user_posts SET likes = :likes, isLiked = :isLiked WHERE id = :postId")
     suspend fun updatePostLikeStatus(postId: String, likes: Int, isLiked: Boolean)
 
+    @Query("UPDATE user_posts SET comments = :commentsCount WHERE id = :postId")
+    suspend fun updateCommentsCount(postId: String, commentsCount: Int)
+
+    @Query("UPDATE user_posts SET isReported = :isReported WHERE id = :postId")
+    suspend fun updateReportStatus(postId: String, isReported: Boolean)
+
     @Query("SELECT COUNT(*) FROM user_posts WHERE userId = :userId")
     suspend fun getUserPostCount(userId: String = "current_user"): Int
 }

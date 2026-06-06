@@ -29,7 +29,7 @@ import org.example.project.core.database.entities.RemoteKeysEntity
         LikedPostEntity::class,
         RemoteKeysEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 actual abstract class IssueSpotDatabase : RoomDatabase() {

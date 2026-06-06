@@ -29,6 +29,25 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import org.example.project.core.components.CommentsBottomSheet
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.Snackbar
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -75,6 +94,11 @@ fun ProfileScreen(
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    val listState = rememberLazyListState()
+    val showFab by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
     LaunchedEffect(viewModel) {
         viewModel.sideEffects.collectLatest { effect ->
             when (effect) {
@@ -88,7 +112,13 @@ fun ProfileScreen(
                     snackbarHostState.showSnackbar(effect.message)
                 }
                 is ProfileSideEffect.SharePost -> {
-                    snackbarHostState.showSnackbar("Share: ${effect.text}")
+                    val sendIntent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_TEXT, effect.text)
+                        type = "text/plain"
+                    }
+                    val shareIntent = Intent.createChooser(sendIntent, "Share Issue via...")
+                    context.startActivity(shareIntent)
                 }
                 is ProfileSideEffect.OpenMediaViewer -> {
                 }
@@ -99,7 +129,7 @@ fun ProfileScreen(
     Scaffold(
         snackbarHost = { 
             SnackbarHost(snackbarHostState) { data ->
-                androidx.compose.material3.Snackbar(
+                Snackbar(
                     snackbarData = data,
                     containerColor = Color(0xFF323232),
                     contentColor = Color.White,
@@ -107,23 +137,38 @@ fun ProfileScreen(
                 )
             }
         },
+        floatingActionButton = {
+            if (showFab) {
+                FloatingActionButton(
+                    onClick = { coroutineScope.launch { listState.animateScrollToItem(0) } },
+                    containerColor = IssueSpotColors.Primary,
+                    contentColor = Color.White
+                ) {
+                    Text("↑", fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                }
+            }
+        },
         containerColor = IssueSpotColors.Background
     ) { padding ->
         ProfileScreenContent(
             modifier = modifier.padding(padding),
             state = state,
-            onIntent = viewModel::onIntent
+            onIntent = viewModel::onIntent,
+            listState = listState
         )
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreenContent(
     modifier: Modifier = Modifier,
     state: ProfileState,
-    onIntent: (ProfileIntent) -> Unit
+    onIntent: (ProfileIntent) -> Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState
 ) {
     val pagingItems = state.activePostsFlow?.collectAsLazyPagingItems()
+    var postToDelete by remember { mutableStateOf<String?>(null) }
 
     if (state.profile == null) {
         Box(
@@ -146,91 +191,155 @@ fun ProfileScreenContent(
             }
         }
     } else {
-        LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        PullToRefreshBox(
+            isRefreshing = pagingItems?.loadState?.refresh is LoadState.Loading,
+            onRefresh = { pagingItems?.refresh() },
+            modifier = modifier.fillMaxSize().background(IssueSpotColors.Background)
         ) {
-            if (state.isProfileLoading) {
-                item {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = IssueSpotColors.Primary)
+            if (state.expandedPost != null) {
+                val post = state.expandedPost
+                val override = state.postOverrides[post.id]
+
+                val isLiked = override?.isLiked ?: post.isLiked
+                val resolvedLikes = override?.likesCount ?: post.likes
+                val resolvedComments = override?.commentsCount ?: post.comments
+                val isReported = override?.isReported ?: post.isReported
+
+                BackHandler {
+                    onIntent(ProfileIntent.DismissPost)
                 }
-            }
 
-            item {
-                ProfileHeader(state.profile, onIntent)
-            }
-
-            item {
-                Column {
-                    Text(
-                        text = "Posts by Area",
-                        style = IssueSpotTypography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold
+                Box(modifier = Modifier.fillMaxSize()) {
+                    PostCard(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp, vertical = 40.dp),
+                        post = post,
+                        isLiked = isLiked,
+                        likesCount = resolvedLikes,
+                        commentsCount = resolvedComments,
+                        isReported = isReported,
+                        canDelete = state.isMine,
+                        onDeleteClick = { postToDelete = post.id },
+                        onLikeClick = {
+                            onIntent(ProfileIntent.LikeClicked(post.id, isLiked, resolvedLikes))
+                        },
+                        onCommentIconClick = {
+                            onIntent(ProfileIntent.CommentsIconClicked(post.id, resolvedComments))
+                        },
+                        onShareClick = { onIntent(ProfileIntent.ShareClicked(post)) },
+                        onReportClick = { reason ->
+                            onIntent(ProfileIntent.ReportClicked(post.id, reason))
+                        },
+                        onCollapseClick = { onIntent(ProfileIntent.DismissPost) }
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    PostLevel.entries.forEachIndexed { i, entry ->
-                        PostByAreaBar(
-                            postByArea = state.profile.postByArea.getOrElse(i) { 0 },
-                            postLevel = entry
+                    
+                    IconButton(
+                        onClick = { onIntent(ProfileIntent.DismissPost) },
+                        modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_close),
+                            contentDescription = "Close",
+                            tint = Color.White
                         )
                     }
                 }
-            }
-
-            item {
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { onIntent(ProfileIntent.CreatePostClicked) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = IssueSpotColors.Primary,
-                        contentColor = Color.White
-                    )
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "+  Post New Issue",
-                        style = IssueSpotTypography.bodyLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            item {
-                ProfilePostTabsHeader(state, onIntent)
-            }
-
-            if (pagingItems != null) {
-                if (pagingItems.loadState.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
+                if (state.isProfileLoading) {
                     item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = IssueSpotColors.Primary)
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = IssueSpotColors.Primary)
+                    }
+                }
+
+                item {
+                    ProfileHeader(state.profile, onIntent)
+                }
+
+                item {
+                    Column {
+                        Text(
+                            text = "Posts by Area",
+                            style = IssueSpotTypography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        PostLevel.entries.forEachIndexed { i, entry ->
+                            PostByAreaBar(
+                                postByArea = state.profile.postByArea.getOrElse(i) { 0 },
+                                postLevel = entry
+                            )
                         }
                     }
-                } else {
+                }
+
+                item {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onIntent(ProfileIntent.CreatePostClicked) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = IssueSpotColors.Primary,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text(
+                            text = "+  Post New Issue",
+                            style = IssueSpotTypography.bodyLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                item {
+                    ProfilePostTabsHeader(state, onIntent)
+                }
+
+                if (pagingItems != null) {
                     items(
                         count = pagingItems.itemCount,
                         key = pagingItems.itemKey { it.id }
                     ) { index ->
                         val post = pagingItems[index]
                         if (post != null) {
+                            val override = state.postOverrides[post.id]
+
+                            val isLiked = override?.isLiked ?: post.isLiked
+                            val resolvedLikes = override?.likesCount ?: post.likes
+                            val resolvedComments = override?.commentsCount ?: post.comments
+                            val isReported = override?.isReported ?: post.isReported
+
                             PostCard(
                                 modifier = Modifier.fillMaxWidth(),
                                 post = post,
-                                isLiked = false,
-                                likesCount = post.likes,
-                                commentsCount = post.comments,
-                                isReported = false,
-                                onLikeClick = { onIntent(ProfileIntent.LikeClicked(post.id)) },
-                                onCommentIconClick = { onIntent(ProfileIntent.CommentClicked(post.id)) },
-                                onShareClick = { onIntent(ProfileIntent.ShareClicked(post.id)) },
-                                onReportClick = { onIntent(ProfileIntent.ReportClicked(post.id)) },
-                                onPostClick = { onIntent(ProfileIntent.PostClicked(post.id)) }
+                                isLiked = isLiked,
+                                likesCount = resolvedLikes,
+                                commentsCount = resolvedComments,
+                                isReported = isReported,
+                                canDelete = state.isMine,
+                                onDeleteClick = { postToDelete = post.id },
+                                onLikeClick = {
+                                    onIntent(ProfileIntent.LikeClicked(post.id, isLiked, resolvedLikes))
+                                },
+                                onCommentIconClick = {
+                                    onIntent(ProfileIntent.CommentsIconClicked(post.id, resolvedComments))
+                                },
+                                onShareClick = { onIntent(ProfileIntent.ShareClicked(post)) },
+                                onReportClick = { reason -> 
+                                    onIntent(ProfileIntent.ReportClicked(post.id, reason)) 
+                                },
+                                onPostClick = { onIntent(ProfileIntent.PostClicked(post)) }
                             )
                         }
                     }
                     
-                    if (pagingItems.loadState.append is LoadState.Loading || pagingItems.loadState.refresh is LoadState.Loading) {
+                    if (pagingItems.loadState.append is LoadState.Loading) {
                         item {
                             Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                                 CircularProgressIndicator(color = IssueSpotColors.Primary)
@@ -255,9 +364,52 @@ fun ProfileScreenContent(
                     }
                 }
             }
+            }
         }
     }
-}
+
+    if (postToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { postToDelete = null },
+            title = { Text("Delete Post", style = IssueSpotTypography.titleMedium, fontWeight = FontWeight.Bold, color = IssueSpotColors.OnBackground) },
+            text = { Text("Are you sure you want to delete this post? This action cannot be undone.", color = IssueSpotColors.OnSurfaceVariant) },
+            containerColor = IssueSpotColors.Surface,
+            confirmButton = {
+                TextButton(onClick = { 
+                    onIntent(ProfileIntent.DeletePostClicked(postToDelete!!)) 
+                    postToDelete = null 
+                }) { 
+                    Text("Delete", color = Color.Red, fontWeight = FontWeight.Bold) 
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { postToDelete = null }) { 
+                    Text("Cancel", color = IssueSpotColors.Primary) 
+                }
+            }
+        )
+    }
+
+    if (state.showCommentsSheetForPostId != null) {
+        val activePostId = state.showCommentsSheetForPostId
+        val activeOverride = state.postOverrides[activePostId]
+        val commentsPagingItems = activeOverride?.commentsFlow?.collectAsLazyPagingItems()
+
+        CommentsBottomSheet(
+            comments = commentsPagingItems,
+            onDismiss = { onIntent(ProfileIntent.DismissCommentsSheet) },
+            onSubmit = { text ->
+                val fallbackCount = pagingItems?.itemSnapshotList?.items?.find { it.id == activePostId }?.comments ?: 0
+                onIntent(
+                    ProfileIntent.CommentSubmitted(
+                        postId = activePostId,
+                        commentText = text,
+                        currentCommentCount = activeOverride?.commentsCount ?: fallbackCount
+                    )
+                )
+            }
+        )
+    }}
 
 @Composable
 private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {

@@ -10,6 +10,6 @@ import org.koin.dsl.module
 val platformModule: Module = module {
     single { AndroidImagePicker(get()) }
     single { AndroidVideoPicker(get()) }
-    single { LocationPermissionHandler(get()) }
+    factory { LocationPermissionHandler(get()) }
     single { LocationProvider(get()) }
 }

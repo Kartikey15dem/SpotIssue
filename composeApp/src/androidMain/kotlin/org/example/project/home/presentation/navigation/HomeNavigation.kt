@@ -50,7 +50,6 @@ fun HomeNavigation(
                     HomeScreen(
                         onNavigateToCreatePost = onCreatePost,
                         onNavigateToProfile = onProfileClick,
-                        onNavigateToPost = onNavigateToPost,
                         modifier = Modifier.padding(paddingValues)
                     )
                 }

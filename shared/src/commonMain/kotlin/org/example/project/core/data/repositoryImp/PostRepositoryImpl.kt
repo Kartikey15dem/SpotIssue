@@ -46,12 +46,22 @@ class PostRepositoryImpl(
         }
         if (result is DataState.Success) {
             // Update local DB instantly
-            val localPost = database.postDao().getPostById(postId)
-            if (localPost != null) {
-                val newIsLiked = !localPost.isLiked
-                val newLikesCount = if (newIsLiked) localPost.likes + 1 else (localPost.likes - 1).coerceAtLeast(0)
-                database.postDao().updateLikeStatus(postId, newLikesCount, newIsLiked)
-            }
+            val isLikedCurrent = database.postDao().getPostById(postId)?.isLiked
+                ?: database.userPostDao().getPostById(postId)?.isLiked
+                ?: database.likedPostDao().getLikedPostById(postId)?.isLiked
+                ?: false
+                
+            val likesCountCurrent = database.postDao().getPostById(postId)?.likes
+                ?: database.userPostDao().getPostById(postId)?.likes
+                ?: database.likedPostDao().getLikedPostById(postId)?.likes
+                ?: 0
+
+            val newIsLiked = !isLikedCurrent
+            val newLikesCount = if (newIsLiked) likesCountCurrent + 1 else (likesCountCurrent - 1).coerceAtLeast(0)
+            
+            database.postDao().updateLikeStatus(postId, newLikesCount, newIsLiked)
+            database.userPostDao().updatePostLikeStatus(postId, newLikesCount, newIsLiked)
+            database.likedPostDao().updatePostLikeStatus(postId, newLikesCount, newIsLiked)
             
             // Sync with fresh data from API
             safeApiCall { postService.getPost(postId) }.let { freshResult ->
@@ -73,6 +83,8 @@ class PostRepositoryImpl(
         }
         if (result is DataState.Success) {
             database.postDao().updateReportStatus(postId, true)
+            database.userPostDao().updateReportStatus(postId, true)
+            database.likedPostDao().updateReportStatus(postId, true)
         } else {
             logger.e { "Failed to report post: $postId" }
         }
@@ -103,10 +115,16 @@ class PostRepositoryImpl(
             postService.addComment(postId, AddCommentRequestDto(comment))
         }
         if (result is DataState.Success) {
-            val localPost = database.postDao().getPostById(postId)
-            if (localPost != null) {
-                database.postDao().updateCommentsCount(postId, localPost.comments + 1)
-            }
+            val commentsCountCurrent = database.postDao().getPostById(postId)?.comments
+                ?: database.userPostDao().getPostById(postId)?.comments
+                ?: database.likedPostDao().getLikedPostById(postId)?.comments
+                ?: 0
+
+            val newCommentsCount = commentsCountCurrent + 1
+            database.postDao().updateCommentsCount(postId, newCommentsCount)
+            database.userPostDao().updateCommentsCount(postId, newCommentsCount)
+            database.likedPostDao().updateCommentsCount(postId, newCommentsCount)
+            
             
             safeApiCall { postService.getPost(postId) }.let { freshResult ->
                 if (freshResult is DataState.Success) {
@@ -171,12 +189,15 @@ class PostRepositoryImpl(
 
     override suspend fun deletePost(postId: String): DataState<Unit> {
         logger.d { "Deleting post: $postId" }
+        // Delete locally first for instant UI feedback
+        database.postDao().deletePostById(postId)
+        database.userPostDao().deletePost(postId)
+        database.likedPostDao().deleteLikedPost(postId)
+        
         val result = safeApiCall {
             postService.deletePost(postId)
         }
-        if (result is DataState.Success) {
-            database.postDao().deletePostById(postId)
-        } else {
+        if (result !is DataState.Success) {
             logger.e { "Failed to delete post: $postId" }
         }
         return result

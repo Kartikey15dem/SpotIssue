@@ -31,6 +31,8 @@ fun UserPostEntity.toPost(): Post = Post(
     },
     likes = likes,
     comments = comments,
+    isLiked = isLiked,
+    isReported = isReported,
     timeAgo = timeAgo
 )
 
@@ -61,6 +63,8 @@ fun LikedPostEntity.toPost(): Post = Post(
     },
     likes = likes,
     comments = comments,
+    isLiked = isLiked,
+    isReported = isReported,
     timeAgo = timeAgo
 )
 
