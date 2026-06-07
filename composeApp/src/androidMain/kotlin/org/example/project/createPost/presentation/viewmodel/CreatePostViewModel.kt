@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.example.project.core.data.repository.PostRepository
+import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.model.home.MediaType
 import org.example.project.core.datastore.UserPreferencesRepository
 import org.example.project.core.datastore.model.UploadStatus
@@ -16,10 +17,12 @@ import org.example.project.core.datastore.model.UploadDraftState
 import org.example.project.core.model.createPost.CreatePost
 import org.example.project.core.model.home.SelectedMediaItem
 import org.example.project.core.utils.DataState
+import kotlinx.coroutines.flow.update
 
 
 class CreatePostViewModel(
     private val postRepository: PostRepository,
+    private val profileRepository: ProfileRepository,
     private val prefRepository: UserPreferencesRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CreatePostState())
@@ -28,16 +31,25 @@ class CreatePostViewModel(
     private val _sideEffects = MutableSharedFlow<CreatePostSideEffect>()
     val sideEffects: SharedFlow<CreatePostSideEffect> = _sideEffects
 
-        init {
+    init {
+        observeUserData()
+        observeProfile()
+    }
+
+    private fun observeUserData() {
         viewModelScope.launch {
             prefRepository.userData.collect { userData ->
+                _uiState.update { it.copy(
+                    location = userData.userLocation?.address ?: "Current Location"
+                ) }
+
                 val draft = userData.uploadDraftState
                 when (draft.status) {
                     UploadStatus.ERROR -> {
-                        _uiState.value = _uiState.value.copy(
+                        _uiState.update { it.copy(
                             description = draft.postText,
                             selectedMedia = draft.selectedMedia
-                        )
+                        ) }
                         _sideEffects.emit(
                             CreatePostSideEffect.ShowError(
                                 draft.errorMessage ?: "Upload failed. Draft restored."
@@ -53,10 +65,26 @@ class CreatePostViewModel(
                         onNavigateBack()
                     }
                     UploadStatus.UPLOADING -> {
-                        _uiState.value = _uiState.value.copy(isLoading = true)
+                        _uiState.update { it.copy(isLoading = true) }
                     }
                     else -> {
-                        _uiState.value = _uiState.value.copy(isLoading = false)
+                        _uiState.update { it.copy(isLoading = false) }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun observeProfile() {
+        viewModelScope.launch {
+            profileRepository.observeProfile().collect { res ->
+                if (res is DataState.Success) {
+                    val profile = res.data
+                    if (profile != null) {
+                        _uiState.update { it.copy(
+                            userName = profile.name,
+                            userImageUrl = profile.imageUrl
+                        ) }
                     }
                 }
             }
@@ -216,6 +244,7 @@ sealed interface CreatePostIntent {
 
 data class CreatePostState(
     val userName: String = "Current User",
+    val userImageUrl: String? = null,
     val location: String = "Current Location",
     val description: String = "",
     val isLoading: Boolean = false,
