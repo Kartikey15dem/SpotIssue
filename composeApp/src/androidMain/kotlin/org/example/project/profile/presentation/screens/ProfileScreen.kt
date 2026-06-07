@@ -422,7 +422,9 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                         modifier = Modifier
                             .size(60.dp)
                             .clip(CircleShape),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(R.drawable.ic_user_avatar),
+                        fallback = painterResource(R.drawable.ic_user_avatar)
                     )
                 } else {
                     Image(

@@ -169,14 +169,16 @@ fun NameCaptureContent(
                 )
             } else {
                 AsyncImage(
-                    model = uiState.imageUrl.ifBlank { R.drawable.ic_user_avatar },
+                    model = uiState.imageUrl.ifBlank { null },
                     contentDescription = "Profile Picture",
                     modifier = Modifier
                         .size(120.dp)
                         .clip(CircleShape)
                         .border(3.dp, Color(0xFF4A6CF7), CircleShape)
                         .clickable { onAction(NameCaptureIntent.PickFromGalleryClicked) },
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    error = painterResource(R.drawable.ic_user_avatar),
+                    fallback = painterResource(R.drawable.ic_user_avatar)
                 )
             }
 

@@ -92,7 +92,9 @@ fun FullScreenImageViewer(
                             translationX = offset.x
                             translationY = offset.y
                         },
-                    contentScale = ContentScale.Fit
+                    contentScale = ContentScale.Fit,
+                    error = painterResource(R.drawable.img_post_placeholder),
+                    fallback = painterResource(R.drawable.img_post_placeholder)
                 )
             }
         }

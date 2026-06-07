@@ -89,7 +89,7 @@ fun PostCard(
                                 onPostClick()
                             }
                     ) {
-                        Spacer(modifier = Modifier.height(24.dp)) // Space for buttons
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         PostHeader(
                             userName = post.userName,
@@ -99,7 +99,9 @@ fun PostCard(
                             location = post.locality + "," +
                                     post.district + "," +
                                     post.state + "," +
-                                    post.country
+                                    post.country,
+                            isDetailMode = isDetailMode,
+                            onCollapseClick = onCollapseClick
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -200,46 +202,24 @@ fun PostCard(
                                 .padding(end = 2.dp),
                             tint = IssueSpotColors.OnSurfaceVariant
                         )
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        if (canDelete) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_delete),
+                                contentDescription = "Delete",
+                                modifier = Modifier
+                                    .clickable { onDeleteClick() }
+                                    .size(20.dp)
+                                    .padding(end = 2.dp),
+                                tint = IssueSpotColors.Error
+                            )
+                        }
                     }
                 }
 
-                if (canDelete) {
-                    IconButton(
-                        onClick = onDeleteClick,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .offset(x = (-12).dp, y = 12.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .size(32.dp)
-                            .background(IssueSpotColors.Error),
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_delete),
-                            contentDescription = "Delete post",
-                            modifier = Modifier.size(18.dp),
-                            tint = IssueSpotColors.Surface
-                        )
-                    }
-                }
 
-                if (isDetailMode) {
-                    IconButton(
-                        onClick = onCollapseClick,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .offset(x = 12.dp, y = 12.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .size(32.dp)
-                            .background(IssueSpotColors.SurfaceVariant),
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_close),
-                            contentDescription = "Close",
-                            modifier = Modifier.size(18.dp),
-                            tint = IssueSpotColors.OnSurfaceVariant
-                        )
-                    }
-                }
+
             }
         }
 
@@ -262,15 +242,34 @@ fun PostHeader(
     timeAgo: String? = null,
     postLevel: PostLevel,
     location: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isDetailMode: Boolean = false,
+    onCollapseClick: () -> Unit = {}
 ) {
     Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
     ) {
+
+        if (isDetailMode) {
+            IconButton(
+                onClick = onCollapseClick,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_close),
+                    contentDescription = "Close",
+                    modifier = Modifier.size(20.dp),
+                    tint = IssueSpotColors.OnSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+        }
+
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(48.dp)
                 .clip(CircleShape)
                 .background(IssueSpotColors.SurfaceVariant),
             contentAlignment = Alignment.Center
@@ -278,71 +277,69 @@ fun PostHeader(
             if (!userImageUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = userImageUrl.toUri(),
-                    contentDescription = "$userName's avatar",
+                    contentDescription = "$userName avatar",
                     modifier = Modifier
-                        .size(40.dp)
+                        .fillMaxSize()
                         .clip(CircleShape),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    error = painterResource(R.drawable.ic_user_avatar),
+                    fallback = painterResource(R.drawable.ic_user_avatar)
                 )
             } else {
-                Image(
+                Icon(
                     painter = painterResource(R.drawable.ic_user_avatar),
-                    contentDescription = "$userName's avatar",
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
+                    contentDescription = null,
+                    tint = IssueSpotColors.OnSurfaceVariant
                 )
             }
         }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
         Column(
-            modifier = Modifier
-                .padding(start = 12.dp)
-                .weight(1f)
+            modifier = Modifier.weight(1f)
         ) {
+
             Row(
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
             ) {
+
                 Text(
                     text = userName,
-                    style = IssueSpotTypography.bodyLarge,
+                    style = IssueSpotTypography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
+                    modifier = Modifier.weight(1f)
                 )
-                if (timeAgo != null) {
-                    Text(
-                        modifier = Modifier.padding(start = 8.dp),
-                        text = timeAgo,
-                        style = IssueSpotTypography.bodySmall,
-                        color = IssueSpotColors.OnSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                PostLevelChip(postLevel)
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_location_on),
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = IssueSpotColors.OnSurfaceVariant
-                )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = location,
+                style = IssueSpotTypography.bodySmall,
+                color = IssueSpotColors.OnSurfaceVariant,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            if (!timeAgo.isNullOrBlank()) {
+
+                Spacer(modifier = Modifier.height(3.dp))
+
                 Text(
-                    modifier = Modifier.padding(start = 4.dp),
-                    text = location,
+                    text = timeAgo,
                     style = IssueSpotTypography.bodySmall,
-                    color = IssueSpotColors.OnSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    color = IssueSpotColors.OnSurfaceVariant
                 )
             }
         }
-        
-        Spacer(modifier = Modifier.width(8.dp))
-        PostLevelChip(postLevel)
     }
 }
 @Composable
@@ -571,7 +568,9 @@ fun PostGridImageItem(
             contentDescription = "Post Image",
             onSuccess = onSuccess,
             modifier = Modifier.fillMaxSize().clickable(onClick = onClick),
-            contentScale = contentScale
+            contentScale = contentScale,
+            error = painterResource(R.drawable.img_post_placeholder),
+            fallback = painterResource(R.drawable.img_post_placeholder)
         )
     }
 }

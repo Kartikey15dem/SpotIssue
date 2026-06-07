@@ -247,14 +247,16 @@ fun EditProfileContent(
                 )
             } else {
                 AsyncImage(
-                    model = state.imageUrl.ifBlank { "https://via.placeholder.com/150" },
+                    model = state.imageUrl.ifBlank { null },
                     contentDescription = "Profile Picture",
                     modifier = Modifier
                         .size(120.dp)
                         .clip(CircleShape)
                         .border(3.dp, IssueSpotColors.Primary, CircleShape)
                         .clickable { onIntent(EditProfileIntent.PickFromGalleryClicked) },
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    error = painterResource(R.drawable.ic_user_avatar),
+                    fallback = painterResource(R.drawable.ic_user_avatar)
                 )
             }
 

@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +36,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +65,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -182,83 +185,76 @@ fun CreatePostScreenContent(
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.Start,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = { onIntent(CreatePostIntent.CloseClicked) }
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_close),
-                                contentDescription = "Close",
-                                tint = IssueSpotColors.OnBackground
-                            )
-                        }
 
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(IssueSpotColors.SurfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (!state.userImageUrl.isNullOrBlank()) {
-                                AsyncImage(
-                                    model = state.userImageUrl.toUri(),
-                                    contentDescription = "avatar",
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Image(
-                                    painter = painterResource(R.drawable.ic_user_avatar),
-                                    contentDescription = "avatar",
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
-                        }
-                        Column(
-                            modifier = Modifier
-                                .padding(start = 12.dp)
-                                .weight(1f)
-                        ) {
-                            Text(
-                                text = state.userName,
-                                style = IssueSpotTypography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    IconButton(
+                        onClick = { onIntent(CreatePostIntent.CloseClicked) },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_close),
+                            contentDescription = "Close",
+                            tint = IssueSpotColors.OnBackground
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(IssueSpotColors.SurfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!state.userImageUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = state.userImageUrl.toUri(),
+                                contentDescription = "avatar",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop,
+                                error = painterResource(R.drawable.ic_user_avatar),
+                                fallback = painterResource(R.drawable.ic_user_avatar)
                             )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_location_on),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = IssueSpotColors.OnSurfaceVariant
-                                )
-                                Text(
-                                    modifier = Modifier.padding(start = 4.dp),
-                                    text = state.location,
-                                    style = IssueSpotTypography.bodySmall,
-                                    color = IssueSpotColors.OnSurfaceVariant,
-                                    maxLines = 2,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                )
-                            }
+                        } else {
+                            Image(
+                                painter = painterResource(R.drawable.ic_user_avatar),
+                                contentDescription = "avatar",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
                         }
                     }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+
+                        Text(
+                            text = state.userName,
+                            style = IssueSpotTypography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        Text(
+                            text = state.location,
+                            style = IssueSpotTypography.bodySmall,
+                            color = IssueSpotColors.OnSurfaceVariant,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
 
                     Button(
                         onClick = { onIntent(CreatePostIntent.PostIssueClicked) },
@@ -266,15 +262,29 @@ fun CreatePostScreenContent(
                             containerColor = IssueSpotColors.PostButtonBackground,
                             contentColor = IssueSpotColors.PostButtonText
                         ),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.defaultMinSize(minWidth = 0.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        contentPadding = PaddingValues(
+                            horizontal = 18.dp,
+                            vertical = 8.dp
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 0.dp
+                        )
                     ) {
-                        Text("Post", style = IssueSpotTypography.bodyLarge)
+                        Text(
+                            text = "Post",
+                            style = IssueSpotTypography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(top = 12.dp),
+                    color = IssueSpotColors.Outline.copy(alpha = 0.15f)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 var boxHeightPx by remember { mutableIntStateOf(0) }
                 var cursorYInText by remember { mutableFloatStateOf(0f) }
@@ -644,7 +654,9 @@ fun GridImageItem(
             contentDescription = "Selected Image",
             onSuccess = onSuccess,
             modifier = Modifier.fillMaxSize().clickable(onClick = onClick),
-            contentScale = contentScale
+            contentScale = contentScale,
+            error = painterResource(R.drawable.img_post_placeholder),
+            fallback = painterResource(R.drawable.img_post_placeholder)
         )
         IconButton(
             onClick = onRemove,
@@ -675,9 +687,6 @@ fun CreatePostScreenPreview() {
         )
     }
 }
-
-
-
 
 
 
