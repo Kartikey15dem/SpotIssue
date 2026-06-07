@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -138,13 +139,13 @@ fun ProfileScreen(
             }
         },
         floatingActionButton = {
-            if (showFab) {
-                FloatingActionButton(
+            if (showFab && state.expandedPost == null) {
+                SmallFloatingActionButton(
                     onClick = { coroutineScope.launch { listState.animateScrollToItem(0) } },
-                    containerColor = IssueSpotColors.Primary,
+                    containerColor = IssueSpotColors.Secondary,
                     contentColor = Color.White
                 ) {
-                    Text("↑", fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                    Text("↑", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 }
             }
         },
@@ -212,8 +213,7 @@ fun ProfileScreenContent(
                 Box(modifier = Modifier.fillMaxSize()) {
                     PostCard(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 12.dp, vertical = 40.dp),
+                            .fillMaxSize(),
                         post = post,
                         isLiked = isLiked,
                         likesCount = resolvedLikes,
@@ -231,19 +231,10 @@ fun ProfileScreenContent(
                         onReportClick = { reason ->
                             onIntent(ProfileIntent.ReportClicked(post.id, reason))
                         },
-                        onCollapseClick = { onIntent(ProfileIntent.DismissPost) }
+                        onCollapseClick = { onIntent(ProfileIntent.DismissPost) },
+                        isExpanded = true
                     )
-                    
-                    IconButton(
-                        onClick = { onIntent(ProfileIntent.DismissPost) },
-                        modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_close),
-                            contentDescription = "Close",
-                            tint = Color.White
-                        )
-                    }
+
                 }
             } else {
                 LazyColumn(

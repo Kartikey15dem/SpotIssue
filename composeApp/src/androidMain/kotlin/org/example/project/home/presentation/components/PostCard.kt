@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import org.example.project.theme.IssueSpotColors
@@ -25,6 +24,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -32,12 +32,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.core.net.toUri
 import coil3.compose.AsyncImage
-import org.example.project.core.components.CommentsBottomSheet
 import org.example.project.core.components.ReportPostDialog
 import org.example.project.core.components.LocalOverlayController
 import org.example.project.core.components.PdfPreviewContent
 import org.example.project.core.components.VideoPreviewPlayer
-import org.example.project.core.model.home.Comment
 import org.example.project.core.model.home.MediaType
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
@@ -78,8 +76,9 @@ fun PostCard(
             colors = CardDefaults.cardColors(containerColor = IssueSpotColors.CardBackground),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
-            Box(Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
+            Box(Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.padding(16.dp)
+                    .fillMaxSize()) {
 
                     Column(
                         modifier = Modifier.clickable {
@@ -133,6 +132,7 @@ fun PostCard(
                     if (!post.mediaUrls.isNullOrEmpty()) {
                         PostMediaPreview(post)
                     }
+                    Spacer(modifier = Modifier.weight(1f))
 
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
@@ -253,7 +253,10 @@ fun PostHeader(
     ) {
         if (isExpanded) {
             IconButton(
-                onClick = onCollapseClick
+                onClick = onCollapseClick,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .size(24.dp)
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_close),
@@ -322,9 +325,6 @@ fun PostHeader(
     }
 }
 
-/**
- * Reusable chip component for displaying post level with appropriate color
- */
 @Composable
 fun PostLevelChip(
     postLevel: PostLevel,
