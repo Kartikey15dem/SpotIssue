@@ -8,9 +8,6 @@ import androidx.room.Upsert
 import androidx.paging.PagingSource
 import org.example.project.core.database.entities.LikedPostEntity
 
-/**
- * DAO for liked posts operations
- */
 @Dao
 interface LikedPostDao {
 
@@ -20,23 +17,23 @@ interface LikedPostDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<LikedPostEntity>)
 
-    @Query("SELECT * FROM liked_posts WHERE userId = :userId ORDER BY likedAt DESC")
-    fun pagingSource(userId: String = "current_user"): PagingSource<Int, LikedPostEntity>
+    @Query("SELECT * FROM liked_posts ORDER BY createdAt DESC")
+    fun pagingSource(): PagingSource<Int, LikedPostEntity>
 
-    @Query("SELECT * FROM liked_posts WHERE userId = :userId ORDER BY likedAt ASC")
-    fun pagingSourceOldest(userId: String = "current_user"): PagingSource<Int, LikedPostEntity>
+    @Query("SELECT * FROM liked_posts ORDER BY createdAt ASC")
+    fun pagingSourceOldest(): PagingSource<Int, LikedPostEntity>
 
-    @Query("SELECT * FROM liked_posts WHERE userId = :userId ORDER BY (likes + comments) DESC")
-    fun pagingSourcePopular(userId: String = "current_user"): PagingSource<Int, LikedPostEntity>
+    @Query("SELECT * FROM liked_posts ORDER BY (likes + comments) DESC")
+    fun pagingSourcePopular(): PagingSource<Int, LikedPostEntity>
 
-    @Query("SELECT * FROM liked_posts WHERE userId = :userId ORDER BY likedAt DESC")
-    suspend fun getLikedPosts(userId: String = "current_user"): List<LikedPostEntity>
+    @Query("SELECT * FROM liked_posts ORDER BY createdAt DESC")
+    suspend fun getLikedPosts(): List<LikedPostEntity>
 
-    @Query("SELECT * FROM liked_posts WHERE userId = :userId ORDER BY likedAt ASC")
-    suspend fun getLikedPostsOldest(userId: String = "current_user"): List<LikedPostEntity>
+    @Query("SELECT * FROM liked_posts ORDER BY likedAt ASC")
+    suspend fun getLikedPostsOldest(): List<LikedPostEntity>
 
-    @Query("SELECT * FROM liked_posts WHERE userId = :userId ORDER BY (likes + comments) DESC")
-    suspend fun getLikedPostsPopular(userId: String = "current_user"): List<LikedPostEntity>
+    @Query("SELECT * FROM liked_posts ORDER BY (likes + comments) DESC")
+    suspend fun getLikedPostsPopular(): List<LikedPostEntity>
 
     @Query("SELECT * FROM liked_posts WHERE id = :postId")
     suspend fun getLikedPostById(postId: String): LikedPostEntity?
@@ -44,25 +41,11 @@ interface LikedPostDao {
     @Query("DELETE FROM liked_posts WHERE id = :postId")
     suspend fun deleteLikedPost(postId: String)
 
-    @Query("DELETE FROM liked_posts WHERE userId = :userId")
-    suspend fun deleteAllLikedPosts(userId: String = "current_user")
+    @Query("DELETE FROM liked_posts")
+    suspend fun deleteAllLikedPosts()
 
-    /**
-     * Keep only the newest [maxPosts] rows for this user, deleting the rest.
-     */
-    @Query(
-        """
-        DELETE FROM liked_posts
-        WHERE userId = :userId
-          AND id NOT IN (
-            SELECT id FROM liked_posts
-            WHERE userId = :userId
-            ORDER BY likedAt DESC
-            LIMIT :maxPosts
-          )
-        """,
-    )
-    suspend fun trimLikedPosts(userId: String = "current_user", maxPosts: Int)
+    @Query("DELETE FROM liked_posts WHERE id NOT IN (SELECT id FROM liked_posts ORDER BY createdAt DESC LIMIT :maxPosts)")
+    suspend fun trimLikedPosts(maxPosts: Int)
 
     @Query("UPDATE liked_posts SET likes = :likes, isLiked = :isLiked WHERE id = :postId")
     suspend fun updatePostLikeStatus(postId: String, likes: Int, isLiked: Boolean)
@@ -73,6 +56,9 @@ interface LikedPostDao {
     @Query("UPDATE liked_posts SET isReported = :isReported WHERE id = :postId")
     suspend fun updateReportStatus(postId: String, isReported: Boolean)
 
-    @Query("SELECT COUNT(*) FROM liked_posts WHERE userId = :userId")
-    suspend fun getLikedPostCount(userId: String = "current_user"): Int
+    @Query("UPDATE liked_posts SET userName = :name, userAvatar = :avatar WHERE userId = :ownerId")
+    suspend fun updateUserInfo(ownerId: String, name: String, avatar: String?)
+
+    @Query("SELECT COUNT(*) FROM liked_posts")
+    suspend fun getLikedPostCount(): Int
 }

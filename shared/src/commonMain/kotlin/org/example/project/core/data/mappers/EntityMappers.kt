@@ -11,10 +11,15 @@ import org.example.project.core.network.dto.PostWithProfileDto
 import org.example.project.core.network.dto.ProfileDto
 import org.example.project.core.network.dto.CoordinatesDto
 import org.example.project.core.utils.getRelativeTime
+import org.example.project.core.utils.parseIsoEpochMillis
+import kotlin.time.Clock
 
 fun PostWithProfileDto.toPost(): Post {
+    val parsedCreatedAt = parseIsoEpochMillis(createdAt)
+
     return Post(
         id = id,
+        userId = userId,
         userName = profile?.name ?: "Unknown",
         userUrl = profile?.imageUrl ?: "",
         postText = postText,
@@ -25,7 +30,7 @@ fun PostWithProfileDto.toPost(): Post {
             else -> MediaType.IMAGE
         },
         mediaUrls = mediaUrls,
-        postLevel = PostLevel.valueOf(postLevel),
+        postLevel = try { PostLevel.valueOf(postLevel) } catch(e: Exception) { PostLevel.LOCALITY },
         likes = likes,
         comments = comments,
         timeAgo = createdAt?.let { getRelativeTime(it) } ?: "Just now",
@@ -35,7 +40,8 @@ fun PostWithProfileDto.toPost(): Post {
         country = country,
         coordinates = coordinates?.let { Coordinates(it.latitude, it.longitude) },
         isLiked = isLiked,
-        isReported = isReported
+        isReported = isReported,
+        createdAt = parsedCreatedAt
     )
 }
 
@@ -48,14 +54,14 @@ fun ProfileDto.toEntity(userId: String = "current_user"): ProfileEntity {
         totalPosts = totalPosts,
         acks = acks,
         postByAreaStr = postByArea?.joinToString(","),
-        lastSyncedAt = kotlin.time.Clock.System.now().toEpochMilliseconds(),
+        lastSyncedAt = Clock.System.now().toEpochMilliseconds(),
     )
 }
 
 fun Post.toUserPostEntity(
-    userId: String = "current_user",
-    cachedAt: Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
+    cachedAt: Long = 0L
 ): UserPostEntity {
+    val now = Clock.System.now().toEpochMilliseconds()
     return UserPostEntity(
         id = id,
         userId = userId,
@@ -64,22 +70,22 @@ fun Post.toUserPostEntity(
         postText = postText,
         mediaType = mediaType.name,
         mediaUrlsStr = mediaUrls?.joinToString(",") ?: "",
-        location = locality ?: "", // Use locality as location for now if needed by entity
+        location = locality ?: "",
         postLevel = postLevel.name,
         likes = likes,
         comments = comments,
         isLiked = isLiked,
         isReported = isReported,
         timeAgo = timeAgo,
-        createdAt = kotlin.time.Clock.System.now().toEpochMilliseconds(),
-        cachedAt = cachedAt
+        createdAt = createdAt,
+        cachedAt = if (cachedAt == 0L) now else cachedAt
     )
 }
 
 fun Post.toLikedPostEntity(
-    userId: String = "current_user",
-    cachedAt: Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
+    cachedAt: Long = 0L
 ): LikedPostEntity {
+    val now = Clock.System.now().toEpochMilliseconds()
     return LikedPostEntity(
         id = id,
         userId = userId,
@@ -95,8 +101,8 @@ fun Post.toLikedPostEntity(
         isLiked = isLiked,
         isReported = isReported,
         timeAgo = timeAgo,
-        createdAt = kotlin.time.Clock.System.now().toEpochMilliseconds(),
-        likedAt = kotlin.time.Clock.System.now().toEpochMilliseconds(),
-        cachedAt = cachedAt
+        createdAt = createdAt,
+        likedAt = now,
+        cachedAt = if (cachedAt == 0L) now else cachedAt
     )
 }

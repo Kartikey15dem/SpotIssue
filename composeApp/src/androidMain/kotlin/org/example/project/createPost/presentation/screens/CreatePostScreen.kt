@@ -186,6 +186,7 @@ fun CreatePostScreenContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
+                        modifier = Modifier.weight(1f),
                         horizontalArrangement = Arrangement.Start,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -204,31 +205,41 @@ fun CreatePostScreenContent(
                                 .size(40.dp)
                                 .clip(CircleShape)
                                 .background(IssueSpotColors.SurfaceVariant),
-                            contentAlignment = Alignment.TopCenter
+                            contentAlignment = Alignment.Center
                         ) {
-                            Image(
-                                painter = painterResource(R.drawable.ic_user_avatar),
-                                contentDescription = "avatar",
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
-                        Column {
-                            Row(
-                                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp, start = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Current User",
-                                    style = IssueSpotTypography.bodyLarge,
-                                    fontWeight = FontWeight.SemiBold
+                            if (!state.userImageUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = state.userImageUrl.toUri(),
+                                    contentDescription = "avatar",
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop
                                 )
-
+                            } else {
+                                Image(
+                                    painter = painterResource(R.drawable.ic_user_avatar),
+                                    contentDescription = "avatar",
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
                             }
+                        }
+                        Column(
+                            modifier = Modifier
+                                .padding(start = 12.dp)
+                                .weight(1f)
+                        ) {
+                            Text(
+                                text = state.userName,
+                                style = IssueSpotTypography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
                             Row(
-                                modifier = Modifier.padding(start = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
@@ -239,9 +250,11 @@ fun CreatePostScreenContent(
                                 )
                                 Text(
                                     modifier = Modifier.padding(start = 4.dp),
-                                    text = "Tere Bhai ki Road",
+                                    text = state.location,
                                     style = IssueSpotTypography.bodySmall,
-                                    color = IssueSpotColors.OnSurfaceVariant
+                                    color = IssueSpotColors.OnSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                 )
                             }
                         }

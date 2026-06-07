@@ -38,6 +38,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -126,18 +129,21 @@ fun HomeContent(
 ) {
     val activeFlow = if (state.query.isNotBlank() && state.searchPostsFlow != null) state.searchPostsFlow else state.postsFlow
     val pagingItems = activeFlow?.collectAsLazyPagingItems()
-    val isRefreshing = state.isRefreshing
+    var isManualRefreshing by remember { mutableStateOf(false) }
 
     LaunchedEffect(pagingItems?.loadState?.refresh) {
-        if (pagingItems?.loadState?.refresh is LoadState.Error) {
-            val errorState = pagingItems.loadState.refresh as LoadState.Error
-            // Handle error if needed
+        if (pagingItems?.loadState?.refresh !is LoadState.Loading) {
+            isManualRefreshing = false
         }
     }
+    
+    val isRefreshing = isManualRefreshing
+
+
 
     PullToRefreshBox(
         isRefreshing = isRefreshing,
-        onRefresh = { onIntent(HomeIntent.Refresh) },
+        onRefresh = { isManualRefreshing = true; onIntent(HomeIntent.Refresh) },
         modifier = modifier
             .fillMaxSize()
             .background(IssueSpotColors.Background)
@@ -190,7 +196,7 @@ fun HomeContent(
                             onIntent(HomeIntent.ReportClicked(post.id, reason))
                         },
                         onCollapseClick = { onIntent(HomeIntent.DismissPost) },
-                        isExpanded = true
+                        isDetailMode = true
 
                     )
                     

@@ -9,6 +9,7 @@ data class Coordinates(
 
 data class Post(
     val id: String,
+    val userId: String,
     val userUrl: String,
     val userName: String,
     val timeAgo: String,
@@ -24,7 +25,8 @@ data class Post(
     val country: String? = null,
     val coordinates: Coordinates? = null,
     val isLiked: Boolean = false,
-    val isReported: Boolean = false
+    val isReported: Boolean = false,
+    val createdAt: Long = 0L
 )
 @Serializable
 enum class MediaType {

@@ -8,9 +8,6 @@ import androidx.room.Upsert
 import androidx.paging.PagingSource
 import org.example.project.core.database.entities.UserPostEntity
 
-/**
- * DAO for user posts operations
- */
 @Dao
 interface UserPostDao {
 
@@ -20,23 +17,23 @@ interface UserPostDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<UserPostEntity>)
 
-    @Query("SELECT * FROM user_posts WHERE userId = :userId ORDER BY createdAt DESC")
-    fun pagingSource(userId: String = "current_user"): PagingSource<Int, UserPostEntity>
+    @Query("SELECT * FROM user_posts ORDER BY createdAt DESC")
+    fun pagingSource(): PagingSource<Int, UserPostEntity>
 
-    @Query("SELECT * FROM user_posts WHERE userId = :userId ORDER BY createdAt ASC")
-    fun pagingSourceOldest(userId: String = "current_user"): PagingSource<Int, UserPostEntity>
+    @Query("SELECT * FROM user_posts ORDER BY createdAt ASC")
+    fun pagingSourceOldest(): PagingSource<Int, UserPostEntity>
 
-    @Query("SELECT * FROM user_posts WHERE userId = :userId ORDER BY (likes + comments) DESC")
-    fun pagingSourcePopular(userId: String = "current_user"): PagingSource<Int, UserPostEntity>
+    @Query("SELECT * FROM user_posts ORDER BY (likes + comments) DESC")
+    fun pagingSourcePopular(): PagingSource<Int, UserPostEntity>
 
-    @Query("SELECT * FROM user_posts WHERE userId = :userId ORDER BY createdAt DESC")
-    suspend fun getUserPosts(userId: String = "current_user"): List<UserPostEntity>
+    @Query("SELECT * FROM user_posts ORDER BY createdAt DESC")
+    suspend fun getUserPosts(): List<UserPostEntity>
 
-    @Query("SELECT * FROM user_posts WHERE userId = :userId ORDER BY createdAt ASC")
-    suspend fun getUserPostsOldest(userId: String = "current_user"): List<UserPostEntity>
+    @Query("SELECT * FROM user_posts ORDER BY createdAt ASC")
+    suspend fun getUserPostsOldest(): List<UserPostEntity>
 
-    @Query("SELECT * FROM user_posts WHERE userId = :userId ORDER BY (likes + comments) DESC")
-    suspend fun getUserPostsPopular(userId: String = "current_user"): List<UserPostEntity>
+    @Query("SELECT * FROM user_posts ORDER BY (likes + comments) DESC")
+    suspend fun getUserPostsPopular(): List<UserPostEntity>
 
     @Query("SELECT * FROM user_posts WHERE id = :postId")
     suspend fun getPostById(postId: String): UserPostEntity?
@@ -44,25 +41,11 @@ interface UserPostDao {
     @Query("DELETE FROM user_posts WHERE id = :postId")
     suspend fun deletePost(postId: String)
 
-    @Query("DELETE FROM user_posts WHERE userId = :userId")
-    suspend fun deleteAllUserPosts(userId: String = "current_user")
+    @Query("DELETE FROM user_posts")
+    suspend fun deleteAllUserPosts()
 
-    /**
-     * Keep only the newest [maxPosts] rows for this user, deleting the rest.
-     */
-    @Query(
-        """
-        DELETE FROM user_posts
-        WHERE userId = :userId
-          AND id NOT IN (
-            SELECT id FROM user_posts
-            WHERE userId = :userId
-            ORDER BY createdAt DESC
-            LIMIT :maxPosts
-          )
-        """,
-    )
-    suspend fun trimUserPosts(userId: String = "current_user", maxPosts: Int)
+    @Query("DELETE FROM user_posts WHERE id NOT IN (SELECT id FROM user_posts ORDER BY createdAt DESC LIMIT :maxPosts)")
+    suspend fun trimUserPosts(maxPosts: Int)
 
     @Query("UPDATE user_posts SET likes = :likes, isLiked = :isLiked WHERE id = :postId")
     suspend fun updatePostLikeStatus(postId: String, likes: Int, isLiked: Boolean)
@@ -73,6 +56,9 @@ interface UserPostDao {
     @Query("UPDATE user_posts SET isReported = :isReported WHERE id = :postId")
     suspend fun updateReportStatus(postId: String, isReported: Boolean)
 
-    @Query("SELECT COUNT(*) FROM user_posts WHERE userId = :userId")
-    suspend fun getUserPostCount(userId: String = "current_user"): Int
+    @Query("UPDATE user_posts SET userName = :name, userAvatar = :avatar WHERE userId = :ownerId")
+    suspend fun updateUserInfo(ownerId: String, name: String, avatar: String?)
+
+    @Query("SELECT COUNT(*) FROM user_posts")
+    suspend fun getUserPostCount(): Int
 }

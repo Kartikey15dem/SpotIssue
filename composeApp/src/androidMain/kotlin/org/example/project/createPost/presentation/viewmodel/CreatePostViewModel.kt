@@ -129,11 +129,11 @@ class CreatePostViewModel(
 
                 when (val result = postRepository.createPost(createPostModel)) {
                     is DataState.Success -> {
-                        _sideEffects.emit(CreatePostSideEffect.PostCreated("new_post"))
+                        _sideEffects.emit(CreatePostSideEffect.PostCreated(result.data.id))
                         onNavigateBack()
                     }
                     is DataState.Error -> {
-                        _uiState.value = _uiState.value.copy(isLoading = false)
+                        _uiState.update { it.copy(isLoading = false) }
                         emitError(result.exception.message ?: "Failed to create post")
                     }
                     else -> Unit

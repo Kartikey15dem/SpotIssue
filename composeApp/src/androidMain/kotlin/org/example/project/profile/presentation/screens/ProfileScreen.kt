@@ -36,7 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.SmallFloatingActionButton
@@ -61,6 +61,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import coil3.compose.AsyncImage
+import androidx.core.net.toUri
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -192,11 +194,7 @@ fun ProfileScreenContent(
             }
         }
     } else {
-        PullToRefreshBox(
-            isRefreshing = pagingItems?.loadState?.refresh is LoadState.Loading,
-            onRefresh = { pagingItems?.refresh() },
-            modifier = modifier.fillMaxSize().background(IssueSpotColors.Background)
-        ) {
+        Box(modifier = modifier.fillMaxSize().background(IssueSpotColors.Background)) {
             if (state.expandedPost != null) {
                 val post = state.expandedPost
                 val override = state.postOverrides[post.id]
@@ -210,151 +208,153 @@ fun ProfileScreenContent(
                     onIntent(ProfileIntent.DismissPost)
                 }
 
-                Box(modifier = Modifier.fillMaxSize()) {
-                    PostCard(
-                        modifier = Modifier
-                            .fillMaxSize(),
-                        post = post,
-                        isLiked = isLiked,
-                        likesCount = resolvedLikes,
-                        commentsCount = resolvedComments,
-                        isReported = isReported,
-                        canDelete = state.isMine,
-                        onDeleteClick = { postToDelete = post.id },
-                        onLikeClick = {
-                            onIntent(ProfileIntent.LikeClicked(post.id, isLiked, resolvedLikes))
-                        },
-                        onCommentIconClick = {
-                            onIntent(ProfileIntent.CommentsIconClicked(post.id, resolvedComments))
-                        },
-                        onShareClick = { onIntent(ProfileIntent.ShareClicked(post)) },
-                        onReportClick = { reason ->
-                            onIntent(ProfileIntent.ReportClicked(post.id, reason))
-                        },
-                        onCollapseClick = { onIntent(ProfileIntent.DismissPost) },
-                        isExpanded = true
-                    )
-
-                }
+                PostCard(
+                    modifier = Modifier.fillMaxSize(),
+                    post = post,
+                    isLiked = isLiked,
+                    likesCount = resolvedLikes,
+                    commentsCount = resolvedComments,
+                    isReported = isReported,
+                    canDelete = state.isMine,
+                    onDeleteClick = { postToDelete = post.id },
+                    onLikeClick = {
+                        onIntent(ProfileIntent.LikeClicked(post.id, isLiked, resolvedLikes))
+                    },
+                    onCommentIconClick = {
+                        onIntent(ProfileIntent.CommentsIconClicked(post.id, resolvedComments))
+                    },
+                    onShareClick = { onIntent(ProfileIntent.ShareClicked(post)) },
+                    onReportClick = { reason ->
+                        onIntent(ProfileIntent.ReportClicked(post.id, reason))
+                    },
+                    onCollapseClick = { onIntent(ProfileIntent.DismissPost) },
+                    isDetailMode = true
+                )
             } else {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp),
+                        .padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                if (state.isProfileLoading) {
+                    item { Spacer(Modifier.height(8.dp)) }
+
                     item {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = IssueSpotColors.Primary)
+                        ProfileHeader(state.profile, onIntent)
                     }
-                }
 
-                item {
-                    ProfileHeader(state.profile, onIntent)
-                }
-
-                item {
-                    Column {
-                        Text(
-                            text = "Posts by Area",
-                            style = IssueSpotTypography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        PostLevel.entries.forEachIndexed { i, entry ->
-                            PostByAreaBar(
-                                postByArea = state.profile.postByArea.getOrElse(i) { 0 },
-                                postLevel = entry
+                    item {
+                        Column {
+                            Text(
+                                text = "Posts by Area",
+                                style = IssueSpotTypography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold
                             )
-                        }
-                    }
-                }
-
-                item {
-                    Button(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { onIntent(ProfileIntent.CreatePostClicked) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = IssueSpotColors.Primary,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text(
-                            text = "+  Post New Issue",
-                            style = IssueSpotTypography.bodyLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                item {
-                    ProfilePostTabsHeader(state, onIntent)
-                }
-
-                if (pagingItems != null) {
-                    items(
-                        count = pagingItems.itemCount,
-                        key = pagingItems.itemKey { it.id }
-                    ) { index ->
-                        val post = pagingItems[index]
-                        if (post != null) {
-                            val override = state.postOverrides[post.id]
-
-                            val isLiked = override?.isLiked ?: post.isLiked
-                            val resolvedLikes = override?.likesCount ?: post.likes
-                            val resolvedComments = override?.commentsCount ?: post.comments
-                            val isReported = override?.isReported ?: post.isReported
-
-                            PostCard(
-                                modifier = Modifier.fillMaxWidth(),
-                                post = post,
-                                isLiked = isLiked,
-                                likesCount = resolvedLikes,
-                                commentsCount = resolvedComments,
-                                isReported = isReported,
-                                canDelete = state.isMine,
-                                onDeleteClick = { postToDelete = post.id },
-                                onLikeClick = {
-                                    onIntent(ProfileIntent.LikeClicked(post.id, isLiked, resolvedLikes))
-                                },
-                                onCommentIconClick = {
-                                    onIntent(ProfileIntent.CommentsIconClicked(post.id, resolvedComments))
-                                },
-                                onShareClick = { onIntent(ProfileIntent.ShareClicked(post)) },
-                                onReportClick = { reason -> 
-                                    onIntent(ProfileIntent.ReportClicked(post.id, reason)) 
-                                },
-                                onPostClick = { onIntent(ProfileIntent.PostClicked(post)) }
-                            )
-                        }
-                    }
-                    
-                    if (pagingItems.loadState.append is LoadState.Loading) {
-                        item {
-                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(color = IssueSpotColors.Primary)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            PostLevel.entries.forEachIndexed { i, entry ->
+                                PostByAreaBar(
+                                    postByArea = state.profile.postByArea.getOrElse(i) { 0 },
+                                    postLevel = entry
+                                )
                             }
                         }
-                    } else if (pagingItems.loadState.append is LoadState.Error || pagingItems.loadState.refresh is LoadState.Error) {
-                        item {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text("Failed to load posts", color = IssueSpotColors.OnBackground)
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Button(
-                                    onClick = { pagingItems.retry() },
-                                    colors = ButtonDefaults.buttonColors(containerColor = IssueSpotColors.Primary)
+                    }
+
+                    item {
+                        Button(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { onIntent(ProfileIntent.CreatePostClicked) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = IssueSpotColors.Primary,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Text(
+                                text = "+  Post New Issue",
+                                style = IssueSpotTypography.bodyLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    item {
+                        ProfilePostTabsHeader(state, onIntent)
+                    }
+
+                    if (pagingItems != null) {
+                        if (pagingItems.loadState.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(200.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Text("Retry Posts", color = Color.White)
+                                    CircularProgressIndicator(color = IssueSpotColors.Primary)
+                                }
+                            }
+                        } else if (pagingItems.loadState.refresh is LoadState.NotLoading && pagingItems.itemCount == 0) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(32.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("No posts found", color = IssueSpotColors.OnBackground)
+                                }
+                            }
+                        } else {
+                            items(
+                                count = pagingItems.itemCount,
+                                key = pagingItems.itemKey { it.id }
+                            ) { index ->
+                                val post = pagingItems[index]
+                                if (post != null) {
+                                    val override = state.postOverrides[post.id]
+
+                                    val isLiked = override?.isLiked ?: post.isLiked
+                                    val resolvedLikes = override?.likesCount ?: post.likes
+                                    val resolvedComments = override?.commentsCount ?: post.comments
+                                    val isReported = override?.isReported ?: post.isReported
+
+                                    PostCard(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        post = post,
+                                        isLiked = isLiked,
+                                        likesCount = resolvedLikes,
+                                        commentsCount = resolvedComments,
+                                        isReported = isReported,
+                                        canDelete = state.isMine,
+                                        onDeleteClick = { postToDelete = post.id },
+                                        onLikeClick = {
+                                            onIntent(ProfileIntent.LikeClicked(post.id, isLiked, resolvedLikes))
+                                        },
+                                        onCommentIconClick = {
+                                            onIntent(ProfileIntent.CommentsIconClicked(post.id, resolvedComments))
+                                        },
+                                        onShareClick = { onIntent(ProfileIntent.ShareClicked(post)) },
+                                        onReportClick = { reason -> 
+                                            onIntent(ProfileIntent.ReportClicked(post.id, reason)) 
+                                        },
+                                        onPostClick = { onIntent(ProfileIntent.PostClicked(post)) }
+                                    )
+                                }
+                            }
+                        }
+
+                        if (pagingItems.loadState.append is LoadState.Loading) {
+                            item {
+                                Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(color = IssueSpotColors.Primary)
                                 }
                             }
                         }
                     }
+                    
+                    item { Spacer(Modifier.height(16.dp)) }
                 }
-            }
             }
         }
     }
@@ -400,7 +400,8 @@ fun ProfileScreenContent(
                 )
             }
         )
-    }}
+    }
+}
 
 @Composable
 private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
@@ -413,14 +414,26 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                     .background(IssueSpotColors.Surface),
                 contentAlignment = Alignment.Center
             ) {
-                Image(
-                    painter = painterResource(R.drawable.ic_user_avatar),
-                    contentDescription = "${profile.name}'s avatar",
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
+                val imageUrl = profile.imageUrl
+                if (!imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = imageUrl.toUri(),
+                        contentDescription = "${profile.name}'s avatar",
+                        modifier = Modifier
+                            .size(60.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(R.drawable.ic_user_avatar),
+                        contentDescription = "${profile.name}'s avatar",
+                        modifier = Modifier
+                            .size(60.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
             Spacer(modifier = Modifier.width(4.dp))
             Column (
@@ -429,13 +442,17 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                 Text(
                     text = profile.name,
                     style = IssueSpotTypography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = profile.location.ifBlank { "No location set" },
                     style = IssueSpotTypography.bodyMedium,
-                    color = IssueSpotColors.OnSurfaceVariant
+                    color = IssueSpotColors.OnSurfaceVariant,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             }
             Icon(

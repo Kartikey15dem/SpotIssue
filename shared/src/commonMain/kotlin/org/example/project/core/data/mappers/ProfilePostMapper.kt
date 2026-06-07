@@ -5,20 +5,21 @@ import org.example.project.core.database.entities.LikedPostEntity
 import org.example.project.core.model.home.MediaType
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
-
-import kotlin.time.Clock
+import kotlinx.datetime.Clock
 
 /**
  * Map UserPostEntity to Post domain model
  */
 fun UserPostEntity.toPost(): Post = Post(
     id = id,
+    userId = userId,
     userName = userName,
     userUrl = userAvatar ?: "",
     postText = postText,
     mediaType = when (mediaType) {
         "IMAGE" -> MediaType.IMAGE
         "VIDEO" -> MediaType.VIDEO
+        "PDF" -> MediaType.PDF
         else -> MediaType.IMAGE
     },
     mediaUrls = if (mediaUrlsStr.isBlank()) emptyList() else mediaUrlsStr.split(","),
@@ -33,24 +34,23 @@ fun UserPostEntity.toPost(): Post = Post(
     comments = comments,
     isLiked = isLiked,
     isReported = isReported,
-    timeAgo = timeAgo
+    timeAgo = timeAgo,
+    createdAt = createdAt
 )
-
-/**
- * Map Post to UserPostEntity
- */
 
 /**
  * Map LikedPostEntity to Post domain model
  */
 fun LikedPostEntity.toPost(): Post = Post(
     id = id,
+    userId = userId,
     userName = userName,
     userUrl = userAvatar ?: "",
     postText = postText,
     mediaType = when (mediaType) {
         "IMAGE" -> MediaType.IMAGE
         "VIDEO" -> MediaType.VIDEO
+        "PDF" -> MediaType.PDF
         else -> MediaType.IMAGE
     },
     mediaUrls = if (mediaUrlsStr.isBlank()) emptyList() else mediaUrlsStr.split(","),
@@ -65,39 +65,10 @@ fun LikedPostEntity.toPost(): Post = Post(
     comments = comments,
     isLiked = isLiked,
     isReported = isReported,
-    timeAgo = timeAgo
-)
-
-/**
- * Map Post to LikedPostEntity
- */
-fun Post.toLikedPostEntity(
-    userId: String = "current_user",
-    createdAt: Long = Clock.System.now().toEpochMilliseconds(),
-    likedAt: Long = Clock.System.now().toEpochMilliseconds()
-): LikedPostEntity = LikedPostEntity(
-    id = id,
-    userId = userId,
-    userName = userName,
-    userAvatar = userUrl,
-    postText = postText,
-    mediaType = mediaType.name,
-    mediaUrlsStr = mediaUrls?.joinToString(",") ?: "",
-    locality = null,
-    district = null,
-    state = null,
-    postLevel = postLevel.name,
-    likes = likes,
-    comments = comments,
-    isLiked = true,
     timeAgo = timeAgo,
-    createdAt = createdAt,
-    likedAt = likedAt,
-    cachedAt = Clock.System.now().toEpochMilliseconds(),
-    location = ""
+    createdAt = createdAt
 )
 
 enum class Sort {
     LATEST, OLDEST, POPULAR
 }
-

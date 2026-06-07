@@ -7,34 +7,30 @@ import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
 import kotlin.time.Clock
 
-/**
- * Room entity for caching posts locally
- */
 @Entity(tableName = "posts")
 data class PostEntity(
     @PrimaryKey
     val id: String,
+    val userId: String,
     val userUrl: String,
     val userName: String,
     val timeAgo: String,
-    val postLevel: String, // Store as String to avoid Room enum issues
+    val postLevel: String,
     val location: String,
     val postText: String,
-    val mediaType: String, // Store as String
-    val mediaUrlsStr: String, // Comma separated list
+    val mediaType: String,
+    val mediaUrlsStr: String,
     val likes: Int,
     val comments: Int,
-    val cachedAt: Long, // Timestamp when cached
+    val cachedAt: Long,
     val isLiked: Boolean = false,
     val isReported: Boolean = false
 )
 
-/**
- * Convert PostEntity to domain Post model
- */
 fun PostEntity.toPost(): Post {
     return Post(
         id = id,
+        userId = userId,
         userUrl = userUrl,
         userName = userName,
         timeAgo = timeAgo,
@@ -46,16 +42,14 @@ fun PostEntity.toPost(): Post {
         comments = comments,
         isLiked = isLiked,
         isReported = isReported,
-        locality = location // Map back location to locality for now
+        locality = location
     )
 }
 
-/**
- * Convert domain Post model to PostEntity
- */
 fun Post.toEntity(cachedAt: Long = Clock.System.now().toEpochMilliseconds()): PostEntity {
     return PostEntity(
         id = id,
+        userId = userId,
         userUrl = userUrl,
         userName = userName,
         timeAgo = timeAgo,
@@ -71,4 +65,3 @@ fun Post.toEntity(cachedAt: Long = Clock.System.now().toEpochMilliseconds()): Po
         isReported = isReported
     )
 }
-

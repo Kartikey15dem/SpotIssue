@@ -64,9 +64,9 @@ class ProfileRepositoryImpl(
             ),
             pagingSourceFactory = { 
                 when (sort.uppercase()) {
-                    "OLDEST" -> database.userPostDao().pagingSourceOldest(CURRENT_USER_ID)
-                    "POPULAR" -> database.userPostDao().pagingSourcePopular(CURRENT_USER_ID)
-                    else -> database.userPostDao().pagingSource(CURRENT_USER_ID)
+                    "OLDEST" -> database.userPostDao().pagingSourceOldest()
+                    "POPULAR" -> database.userPostDao().pagingSourcePopular()
+                    else -> database.userPostDao().pagingSource()
                 }
             },
         ).flow.map { pagingData ->
@@ -86,9 +86,9 @@ class ProfileRepositoryImpl(
             ),
             pagingSourceFactory = { 
                 when (sort.uppercase()) {
-                    "OLDEST" -> database.likedPostDao().pagingSourceOldest(CURRENT_USER_ID)
-                    "POPULAR" -> database.likedPostDao().pagingSourcePopular(CURRENT_USER_ID)
-                    else -> database.likedPostDao().pagingSource(CURRENT_USER_ID)
+                    "OLDEST" -> database.likedPostDao().pagingSourceOldest()
+                    "POPULAR" -> database.likedPostDao().pagingSourcePopular()
+                    else -> database.likedPostDao().pagingSource()
                 }
             },
         ).flow.map { pagingData ->
@@ -153,7 +153,10 @@ class ProfileRepositoryImpl(
         }
 
         val profileDto = profileService.updateMyProfile(MultiPartFormDataContent(multipartParts))
-        localDataSource.saveProfile(profileDto.toEntity())
+        val entity = profileDto.toEntity()
+        localDataSource.saveProfile(entity)
+        database.userPostDao().updateUserInfo(ownerId = entity.userId, name = entity.name, avatar = entity.imageUrl)
+        database.likedPostDao().updateUserInfo(ownerId = entity.userId, name = entity.name, avatar = entity.imageUrl)
     }
 
     override suspend fun requestEmailChange(newEmail: String): DataState<Unit> = safeApiCall {
@@ -166,6 +169,9 @@ class ProfileRepositoryImpl(
     ): DataState<Unit> = safeApiCall {
         profileService.verifyEmailChange(EmailChangeVerifyRequest(newEmail, code))
         val profileDto = profileService.getMyProfile()
-        localDataSource.saveProfile(profileDto.toEntity())
+        val entity = profileDto.toEntity()
+        localDataSource.saveProfile(entity)
+        database.userPostDao().updateUserInfo(ownerId = entity.userId, name = entity.name, avatar = entity.imageUrl)
+        database.likedPostDao().updateUserInfo(ownerId = entity.userId, name = entity.name, avatar = entity.imageUrl)
     }
 }

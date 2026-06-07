@@ -8,7 +8,6 @@ import org.example.project.core.network.dto.CreatePostRequestDto
 import org.example.project.core.network.dto.AddCommentRequestDto
 import org.example.project.core.network.dto.ReportPostRequestDto
 import org.example.project.core.model.home.Post
-import org.example.project.core.data.mappers.toPost
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
@@ -31,6 +30,8 @@ import org.example.project.core.utils.safeApiCall
 import org.example.project.core.database.IssueSpotDatabase
 import co.touchlab.kermit.Logger
 import org.example.project.core.database.entities.toEntity
+import org.example.project.core.data.mappers.toPost
+import org.example.project.core.data.mappers.toUserPostEntity
 
 class PostRepositoryImpl(
     private val postService: PostService,
@@ -137,7 +138,7 @@ class PostRepositoryImpl(
         return result
     }
 
-    override suspend fun createPost(post: org.example.project.core.model.createPost.CreatePost): DataState<Unit> = safeApiCall {
+    override suspend fun createPost(post: org.example.project.core.model.createPost.CreatePost): DataState<Post> {
         logger.d { "Creating post" }
         val request = CreatePostRequestDto(
             postText = post.postText,
@@ -183,8 +184,34 @@ class PostRepositoryImpl(
             )
         }
         
-        postService.createPost(MultiPartFormDataContent(multipartParts))
-        Unit
+        val result = safeApiCall {
+            val dto = postService.createPost(MultiPartFormDataContent(multipartParts))
+            dto.toPost()
+        }
+
+        if (result is DataState.Success) {
+            val createdPost = result.data
+            // 1. Add to user posts for instant visibility
+            database.userPostDao().insertPosts(listOf(createdPost.toUserPostEntity()))
+            
+            // 2. Update profile stats locally
+            val profile = database.profileDao().getProfile()
+            if (profile != null) {
+                val newTotalPosts = profile.totalPosts + 1
+                val postByArea = profile.postByAreaStr?.split(",")?.map { it.toIntOrNull() ?: 0 }?.toMutableList() ?: mutableListOf(0, 0, 0, 0)
+                if (postByArea.size >= 4) {
+                    postByArea[0] = postByArea[0] + 1 // Add to LOCALITY level
+                }
+                val newPostByAreaStr = postByArea.joinToString(",")
+                
+                database.profileDao().upsertProfile(profile.copy(
+                    totalPosts = newTotalPosts,
+                    postByAreaStr = newPostByAreaStr
+                ))
+            }
+        }
+        
+        return result
     }
 
     override suspend fun deletePost(postId: String): DataState<Unit> {

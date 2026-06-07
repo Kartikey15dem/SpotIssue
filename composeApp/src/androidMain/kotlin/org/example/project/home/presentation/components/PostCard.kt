@@ -58,7 +58,7 @@ fun PostCard(
     onDeleteClick: () -> Unit = {},
     onPostClick: () -> Unit = {},
     onCollapseClick: () -> Unit = {},
-    isExpanded: Boolean = false
+    isDetailMode: Boolean = false
 ) {
     var showReportDialog by rememberSaveable { mutableStateOf(false) }
     var hasOverflow by remember { mutableStateOf(false) }
@@ -67,7 +67,7 @@ fun PostCard(
         Card(
             modifier = modifier
                 .then(
-                    if (isExpanded) {
+                    if (isDetailMode) {
                         Modifier.fillMaxSize()
                     } else {
                         Modifier.fillMaxWidth()
@@ -76,29 +76,30 @@ fun PostCard(
             colors = CardDefaults.cardColors(containerColor = IssueSpotColors.CardBackground),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
-            Box(Modifier.fillMaxSize()) {
-                Column(modifier = Modifier.padding(16.dp)
-                    .fillMaxSize()) {
-
+            Box(modifier = Modifier.fillMaxWidth().then(if (isDetailMode) Modifier.fillMaxHeight() else Modifier)) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .then(if (isDetailMode) Modifier.fillMaxHeight() else Modifier)
+                ) {
                     Column(
-                        modifier = Modifier.clickable {
-                            if (!isExpanded) {
+                        modifier = Modifier
+                            .then(if (isDetailMode) Modifier.weight(1f) else Modifier)
+                            .clickable(enabled = !isDetailMode) {
                                 onPostClick()
                             }
-                        }
                     ) {
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(24.dp)) // Space for buttons
 
                         PostHeader(
                             userName = post.userName,
+                            userImageUrl = post.userUrl,
                             timeAgo = post.timeAgo,
                             postLevel = post.postLevel,
                             location = post.locality + "," +
                                     post.district + "," +
                                     post.state + "," +
-                                    post.country,
-                            isExpanded = isExpanded,
-                            onCollapseClick = onCollapseClick
+                                    post.country
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -106,14 +107,14 @@ fun PostCard(
                         Text(
                             text = post.postText,
                             style = IssueSpotTypography.bodyLarge,
-                            maxLines = if (isExpanded) Int.MAX_VALUE else 4,
+                            maxLines = if (isDetailMode) Int.MAX_VALUE else 4,
                             overflow = TextOverflow.Ellipsis,
                             onTextLayout = {
                                 hasOverflow = it.hasVisualOverflow
                             }
                         )
 
-                        if (!isExpanded && hasOverflow) {
+                        if (!isDetailMode && hasOverflow) {
                             Text(
                                 text = "More",
                                 style = IssueSpotTypography.bodyMedium,
@@ -125,23 +126,22 @@ fun PostCard(
                                     }
                             )
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                    if (!post.mediaUrls.isNullOrEmpty()) {
-                        PostMediaPreview(post)
+                        if (!post.mediaUrls.isNullOrEmpty()) {
+                            PostMediaPreview(post)
+                        }
                     }
-                    Spacer(modifier = Modifier.weight(1f))
 
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
-                        modifier = Modifier.padding(8.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             painter = painterResource(
-                                id = if (isLiked) R.drawable.ic_like else R.drawable.ic_like
+                                id = R.drawable.ic_like
                             ),
                             contentDescription = "Like",
                             modifier = Modifier
@@ -156,7 +156,7 @@ fun PostCard(
                             color = if (isLiked) IssueSpotColors.LikeActiveColor else IssueSpotColors.OnSurfaceVariant
                         )
 
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(16.dp))
 
                         Icon(
                             painter = painterResource(R.drawable.ic_comment),
@@ -189,7 +189,7 @@ fun PostCard(
                             tint = if (isReported) IssueSpotColors.Error else IssueSpotColors.OnSurfaceVariant
                         )
 
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(16.dp))
 
                         Icon(
                             painter = painterResource(R.drawable.ic_share),
@@ -197,11 +197,12 @@ fun PostCard(
                             modifier = Modifier
                                 .clickable { onShareClick() }
                                 .size(20.dp)
-                                .padding(end = 2.dp)
+                                .padding(end = 2.dp),
+                            tint = IssueSpotColors.OnSurfaceVariant
                         )
                     }
-
                 }
+
                 if (canDelete) {
                     IconButton(
                         onClick = onDeleteClick,
@@ -209,105 +210,120 @@ fun PostCard(
                             .align(Alignment.TopEnd)
                             .offset(x = (-12).dp, y = 12.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .size(36.dp)
+                            .size(32.dp)
                             .background(IssueSpotColors.Error),
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.ic_delete),
                             contentDescription = "Delete post",
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(18.dp),
                             tint = IssueSpotColors.Surface
                         )
                     }
                 }
 
-            }
-
-            if (showReportDialog) {
-                ReportPostDialog(
-                    onDismiss = { showReportDialog = false },
-                    onSubmit = { reason ->
-                        onReportClick(reason)
-                        showReportDialog = false
+                if (isDetailMode) {
+                    IconButton(
+                        onClick = onCollapseClick,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .offset(x = 12.dp, y = 12.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .size(32.dp)
+                            .background(IssueSpotColors.SurfaceVariant),
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_close),
+                            contentDescription = "Close",
+                            modifier = Modifier.size(18.dp),
+                            tint = IssueSpotColors.OnSurfaceVariant
+                        )
                     }
-                )
+                }
             }
         }
 
+        if (showReportDialog) {
+            ReportPostDialog(
+                onDismiss = { showReportDialog = false },
+                onSubmit = { reason ->
+                    onReportClick(reason)
+                    showReportDialog = false
+                }
+            )
+        }
     }
 }
 
 @Composable
 fun PostHeader(
     userName: String,
+    userImageUrl: String? = null,
     timeAgo: String? = null,
     postLevel: PostLevel,
     location: String,
-    modifier: Modifier = Modifier,
-    isExpanded: Boolean = false,
-    onCollapseClick: () -> Unit = {}
+    modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (isExpanded) {
-            IconButton(
-                onClick = onCollapseClick,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .size(24.dp)
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_close),
-                    contentDescription = "Close",
-                    tint = IssueSpotColors.OnBackground
-                )
-            }
-        }
         Box(
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
                 .background(IssueSpotColors.SurfaceVariant),
-            contentAlignment = Alignment.TopCenter
+            contentAlignment = Alignment.Center
         ) {
-            Image(
-                painter = painterResource(R.drawable.ic_user_avatar),
-                contentDescription = "$userName's avatar",
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
+            if (!userImageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = userImageUrl.toUri(),
+                    contentDescription = "$userName's avatar",
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Image(
+                    painter = painterResource(R.drawable.ic_user_avatar),
+                    contentDescription = "$userName's avatar",
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            }
         }
-        Column {
+        Column(
+            modifier = Modifier
+                .padding(start = 12.dp)
+                .weight(1f)
+        ) {
             Row(
-                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp, start = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = userName,
                     style = IssueSpotTypography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
                 if (timeAgo != null) {
                     Text(
                         modifier = Modifier.padding(start = 8.dp),
                         text = timeAgo,
                         style = IssueSpotTypography.bodySmall,
-                        color = IssueSpotColors.OnSurfaceVariant
+                        color = IssueSpotColors.OnSurfaceVariant,
+                        maxLines = 1
                     )
                 }
             }
             Row(
-                modifier = Modifier.padding(start = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                PostLevelChip(
-                    postLevel = postLevel,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
                 Icon(
                     painter = painterResource(R.drawable.ic_location_on),
                     contentDescription = null,
@@ -318,13 +334,17 @@ fun PostHeader(
                     modifier = Modifier.padding(start = 4.dp),
                     text = location,
                     style = IssueSpotTypography.bodySmall,
-                    color = IssueSpotColors.OnSurfaceVariant
+                    color = IssueSpotColors.OnSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
+        
+        Spacer(modifier = Modifier.width(8.dp))
+        PostLevelChip(postLevel)
     }
 }
-
 @Composable
 fun PostLevelChip(
     postLevel: PostLevel,
@@ -378,6 +398,7 @@ fun PostCardPreview() {
 }
 val samplePost = Post(
     id = "1",
+    userId = "user1",
     userName = "John Doe",
     userUrl = "https://example.com/avatar.jpg", // Replace with a real or placeholder image URL if needed for preview
 //    location = "Downtown, Mumbai Central",

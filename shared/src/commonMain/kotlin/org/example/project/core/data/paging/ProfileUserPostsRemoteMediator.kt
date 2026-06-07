@@ -28,11 +28,7 @@ class ProfileUserPostsRemoteMediator(
     private val maxCachedPosts = 100
 
     override suspend fun initialize(): InitializeAction {
-        return if (userPostDao.getUserPostCount(targetUserId) == 0) {
-            InitializeAction.LAUNCH_INITIAL_REFRESH
-        } else {
-            InitializeAction.SKIP_INITIAL_REFRESH
-        }
+        return InitializeAction.LAUNCH_INITIAL_REFRESH
     }
 
     override suspend fun load(loadType: LoadType, state: PagingState<Int, UserPostEntity>): MediatorResult {
@@ -56,16 +52,14 @@ class ProfileUserPostsRemoteMediator(
 
             val entities = response.items.map { dto ->
                 val post = dto.toPost()
-                post.toUserPostEntity(
-                    userId = targetUserId,
-                )
+                post.toUserPostEntity()
             }
 
             val endOfPaginationReached = response.nextKey == null || entities.isEmpty()
 
             if (loadType == LoadType.REFRESH) {
                 remoteKeysDao.clearRemoteKeys(keyType)
-                userPostDao.deleteAllUserPosts(targetUserId)
+                userPostDao.deleteAllUserPosts()
             }
 
             remoteKeysDao.insertAll(
@@ -80,7 +74,7 @@ class ProfileUserPostsRemoteMediator(
             )
 
             userPostDao.insertPosts(entities)
-            userPostDao.trimUserPosts(userId = targetUserId, maxPosts = maxCachedPosts)
+            userPostDao.trimUserPosts(maxPosts = maxCachedPosts)
 
             MediatorResult.Success(endOfPaginationReached = endOfPaginationReached)
         } catch (t: Throwable) {

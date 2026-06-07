@@ -16,7 +16,7 @@ interface PostRepository {
     fun getPagedComments(postId: String): Flow<PagingData<Comment>>
     suspend fun getComments(postId: String, page: Int, limit: Int): DataState<PagedResponse<CommentDto>>
     suspend fun addComment(postId: String, comment: String): DataState<Unit>
-    suspend fun createPost(post : CreatePost): DataState<Unit>
+    suspend fun createPost(post : CreatePost): DataState<Post>
     suspend fun deletePost(postId: String):DataState<Unit>
     suspend fun getPost(postId: String): DataState<Post>
 }

@@ -36,7 +36,7 @@ interface PostService {
 
     @Multipart
     @POST(ApiEndPoints.POSTS)
-    suspend fun createPost(@Body body: MultiPartFormDataContent)
+    suspend fun createPost(@Body body: MultiPartFormDataContent): PostWithProfileDto
 
     @DELETE(ApiEndPoints.POSTS + "/{postid}")
     suspend fun deletePost(@Path("postid") id: String)

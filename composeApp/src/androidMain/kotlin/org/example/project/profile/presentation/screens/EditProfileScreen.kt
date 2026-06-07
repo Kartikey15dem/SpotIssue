@@ -178,10 +178,10 @@ fun EditProfileScreen(
                 )
             } 
         },
-        containerColor = IssueSpotColors.Background
+        containerColor = Color.White
     ) { paddingValues ->
         EditProfileContent(
-            modifier = modifier.padding(paddingValues),
+            modifier = modifier.padding(paddingValues).background(Color.White),
             state = state,
             onIntent = viewModel::onIntent,
             onCameraClick = {
@@ -333,8 +333,8 @@ fun EditProfileContent(
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = IssueSpotColors.SurfaceVariant,
-                focusedContainerColor = IssueSpotColors.SurfaceVariant,
+                unfocusedContainerColor = Color.White,
+                focusedContainerColor = Color.White,
                 unfocusedBorderColor = IssueSpotColors.Outline,
                 focusedBorderColor = IssueSpotColors.Primary
             )
@@ -354,20 +354,19 @@ fun EditProfileContent(
         Spacer(Modifier.height(8.dp))
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().background(Color.White),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedTextField(
                 value = state.email,
-                onValueChange = { },
-                readOnly = true,
+                onValueChange = { onIntent(EditProfileIntent.EmailChanged(it)) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = IssueSpotColors.SurfaceVariant,
-                    focusedContainerColor = IssueSpotColors.SurfaceVariant,
+                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = Color.White,
                     unfocusedBorderColor = IssueSpotColors.Outline,
                     focusedBorderColor = IssueSpotColors.Primary
                 )

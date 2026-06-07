@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "0c5f97e2e7ea75e4c45abfc187112369",
+    "identityHash": "d8f4224424cc630521104a6191bde7ae",
     "entities": [
       {
         "tableName": "profile",
@@ -75,11 +75,17 @@
       },
       {
         "tableName": "posts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userUrl` TEXT NOT NULL, `userName` TEXT NOT NULL, `timeAgo` TEXT NOT NULL, `postLevel` TEXT NOT NULL, `location` TEXT NOT NULL, `postText` TEXT NOT NULL, `mediaType` TEXT NOT NULL, `mediaUrlsStr` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, `isLiked` INTEGER NOT NULL, `isReported` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `userUrl` TEXT NOT NULL, `userName` TEXT NOT NULL, `timeAgo` TEXT NOT NULL, `postLevel` TEXT NOT NULL, `location` TEXT NOT NULL, `postText` TEXT NOT NULL, `mediaType` TEXT NOT NULL, `mediaUrlsStr` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, `isLiked` INTEGER NOT NULL, `isReported` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
             "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "userId",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -514,7 +520,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0c5f97e2e7ea75e4c45abfc187112369')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd8f4224424cc630521104a6191bde7ae')"
     ]
   }
 }

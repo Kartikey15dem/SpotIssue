@@ -59,6 +59,9 @@ class EditProfileViewModel(
             is EditProfileIntent.VerifyEmailChangeClicked -> verifyEmailChange(intent.otp)
             EditProfileIntent.DismissEmailChangeDialog -> dismissEmailChangeDialog()
             is EditProfileIntent.NewEmailChanged -> updateNewEmail(intent.email)
+            is EditProfileIntent.EmailChanged -> {
+                _uiState.update { it.copy(email = intent.email, newEmail = intent.email) }
+            }
             EditProfileIntent.ShowEmailChangeDialogClicked -> _uiState.update { it.copy(showEmailChangeDialog = true, emailChangeStep = EmailChangeStep.Request) }
         }
     }
@@ -281,6 +284,7 @@ sealed interface EditProfileIntent {
     data class VerifyEmailChangeClicked(val otp: String) : EditProfileIntent
     data object DismissEmailChangeDialog : EditProfileIntent
     data class NewEmailChanged(val email: String) : EditProfileIntent
+    data class EmailChanged(val email: String) : EditProfileIntent
 }
 
 enum class EmailChangeStep {
