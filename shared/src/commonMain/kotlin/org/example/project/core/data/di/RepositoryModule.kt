@@ -13,14 +13,14 @@ import org.koin.dsl.module
 
 val RepositoryModule = module {
     // Auth
-    single { AuthRepositoryImpl(get(), get()) } bind AuthRepository::class
+    single { AuthRepositoryImpl(get(), get(), get()) } bind AuthRepository::class
 
     // Feed
-    single { FeedRepositoryImpl(get(), get(), get()) } bind FeedRepository::class
+    single { FeedRepositoryImpl(get(), get(), get(), get()) } bind FeedRepository::class
 
     // Post
-    single { PostRepositoryImpl(get(), get()) } bind PostRepository::class
+    single { PostRepositoryImpl(get(), get(), get()) } bind PostRepository::class
 
     // Profile
-    single { ProfileRepositoryImpl(get(), get(), get(), get()) } bind ProfileRepository::class
+    single { ProfileRepositoryImpl(get(), get(), get(), get(), get()) } bind ProfileRepository::class
 }

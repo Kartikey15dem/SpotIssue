@@ -14,14 +14,9 @@ import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
 import android.net.Uri
-import org.example.project.utils.AndroidImagePicker
-import org.example.project.utils.media.MediaCompressorUtil
-import android.content.Context
 
 class EditProfileViewModel(
-    private val context: Context,
-    private val profileRepository: ProfileRepository,
-    private val imagePicker: AndroidImagePicker
+    private val profileRepository: ProfileRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(EditProfileState())
@@ -47,14 +42,6 @@ class EditProfileViewModel(
             EditProfileIntent.DismissImagePicker -> dismissImagePicker()
             EditProfileIntent.BackPressed -> viewModelScope.launch { _sideEffects.emit(EditProfileSideEffect.BackPreseed) }
             EditProfileIntent.ErrorShown -> clearError()
-            is EditProfileIntent.CameraImageCaptured -> {
-                if (intent.success) {
-                    _uiState.value.pendingCameraUri?.let { uri ->
-                        updateImageUrl(uri.toString())
-                    }
-                }
-                _uiState.update { it.copy(pendingCameraUri = null) }
-            }
             EditProfileIntent.RequestEmailChangeClicked -> requestEmailChange()
             is EditProfileIntent.VerifyEmailChangeClicked -> verifyEmailChange(intent.otp)
             EditProfileIntent.DismissEmailChangeDialog -> dismissEmailChangeDialog()
@@ -187,9 +174,7 @@ class EditProfileViewModel(
 
     private fun captureFromCamera() {
         viewModelScope.launch {
-            val uri = imagePicker.createImageUri()
-            _uiState.update { it.copy(pendingCameraUri = uri) }
-            _sideEffects.emit(EditProfileSideEffect.ShowCamera(uri))
+            _sideEffects.emit(EditProfileSideEffect.ShowCamera)
         }
     }
 
@@ -205,14 +190,11 @@ class EditProfileViewModel(
 
             _uiState.update { it.copy(isSaving = true) }
 
-            var localImagePath: String? = null
-            if (currentState.imageUrl.startsWith("content://") || currentState.imageUrl.startsWith("file://")) {
-                val compressedFile = MediaCompressorUtil.compressImage(context, currentState.imageUrl)
-                localImagePath = compressedFile?.absolutePath
-            }
+            val isLocalPath = currentState.imageUrl.startsWith("/") || currentState.imageUrl.startsWith("file://")
+            val localImagePath = if (isLocalPath) currentState.imageUrl.removePrefix("file://") else null
 
             val updatedProfile = currentState.originalProfile?.copy(
-                imageUrl = if (localImagePath != null) "" else currentState.imageUrl,
+                imageUrl = if (isLocalPath) "" else currentState.imageUrl,
                 name = currentState.name,
             )
 
@@ -278,7 +260,6 @@ sealed interface EditProfileIntent {
     data object BackPressed : EditProfileIntent
     data object DismissImagePicker : EditProfileIntent
     data object ErrorShown : EditProfileIntent
-    data class CameraImageCaptured(val success: Boolean) : EditProfileIntent
     data object ShowEmailChangeDialogClicked : EditProfileIntent
     data object RequestEmailChangeClicked : EditProfileIntent
     data class VerifyEmailChangeClicked(val otp: String) : EditProfileIntent
@@ -305,8 +286,7 @@ data class EditProfileState(
     val isSaving: Boolean = false,
     val isLoadingImage: Boolean = false,
     val showImagePickerDialog: Boolean = false,
-    val error: String? = null,
-    val pendingCameraUri: Uri? = null
+    val error: String? = null
 )
 
 sealed interface EditProfileSideEffect {
@@ -315,6 +295,6 @@ sealed interface EditProfileSideEffect {
     data object ProfileSaved : EditProfileSideEffect
     data object BackPreseed : EditProfileSideEffect
     data object ShowImagePicker : EditProfileSideEffect
-    data class ShowCamera(val uri: Uri) : EditProfileSideEffect
+    data object ShowCamera : EditProfileSideEffect
     data object EmailChanged : EditProfileSideEffect
 }

@@ -69,10 +69,15 @@ import android.content.pm.PackageManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 
-import androidx.compose.material3.AlertDialog
+import androidx.core.content.FileProvider
+import java.io.File
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.AlertDialog
 import org.example.project.profile.presentation.viewmodel.EmailChangeStep
+import org.example.project.utils.media.MediaCompressorUtil
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * Edit Profile Screen with ViewModel integration
@@ -88,8 +93,9 @@ fun EditProfileScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val context = LocalContext.current
-
-    // ... (rest of launchers)
+    var cameraUri by remember { mutableStateOf<Uri?>(null) }
+    var cameraFilePath by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -104,14 +110,28 @@ fun EditProfileScreen(
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
-        viewModel.onIntent(EditProfileIntent.CameraImageCaptured(success))
+        if (success) {
+            coroutineScope.launch {
+                cameraFilePath?.let {
+                    val compressedFile = MediaCompressorUtil.compressImage(context, "file://$it")
+                    viewModel.onIntent(EditProfileIntent.ImageUrlChanged(compressedFile?.absolutePath ?: it))
+                }
+            }
+        }
     }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
-            viewModel.onIntent(EditProfileIntent.ImageUrlChanged(uri.toString()))
+            coroutineScope.launch {
+                val compressedFile = MediaCompressorUtil.compressImage(context, uri.toString())
+                if (compressedFile != null) {
+                    viewModel.onIntent(EditProfileIntent.ImageUrlChanged(compressedFile.absolutePath))
+                } else {
+                    viewModel.onIntent(EditProfileIntent.ImageUrlChanged(uri.toString()))
+                }
+            }
         }
     }
 
@@ -133,8 +153,16 @@ fun EditProfileScreen(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                     )
                 }
-                is EditProfileSideEffect.ShowCamera -> {
-                    cameraLauncher.launch(effect.uri)
+                EditProfileSideEffect.ShowCamera -> {
+                    val file = File(context.filesDir, "camera_photo_${System.currentTimeMillis()}.jpg")
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file
+                    )
+                    cameraUri = uri
+                    cameraFilePath = file.absolutePath
+                    cameraLauncher.launch(uri)
                 }
 
                 else -> {}

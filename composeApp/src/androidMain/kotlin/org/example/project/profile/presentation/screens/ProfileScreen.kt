@@ -283,7 +283,24 @@ fun ProfileScreenContent(
                     }
 
                     if (pagingItems != null) {
-                        if (pagingItems.loadState.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
+                        val refreshError = pagingItems.loadState.refresh as? LoadState.Error
+                        val appendError = pagingItems.loadState.append as? LoadState.Error
+
+                        if (refreshError != null && pagingItems.itemCount == 0) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(32.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        refreshError.error.message ?: "An error occurred",
+                                        color = IssueSpotColors.OnBackground
+                                    )
+                                }
+                            }
+                        } else if (pagingItems.loadState.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
                             item {
                                 Box(
                                     modifier = Modifier
@@ -349,6 +366,16 @@ fun ProfileScreenContent(
                                 Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                                     CircularProgressIndicator(color = IssueSpotColors.Primary)
                                 }
+                            }
+                        }
+
+                        if (appendError != null && pagingItems.itemCount > 0) {
+                            item {
+                                Text(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    text = appendError.error.message ?: "An error occurred",
+                                    color = IssueSpotColors.OnBackground
+                                )
                             }
                         }
                     }

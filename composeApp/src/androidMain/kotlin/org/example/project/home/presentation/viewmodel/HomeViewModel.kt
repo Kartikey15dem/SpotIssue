@@ -48,10 +48,16 @@ class HomeViewModel(
             ) { level, userData ->
                 level to userData.userLocation
             }.collect { (level, location) ->
-                updateState { it.copy(
-                    postLevel = level,
-                    postsFlow = feedRepository.getPagedPosts(level, location, forceRefresh = true).cachedIn(viewModelScope)
-                ) }
+                updateState {
+                    it.copy(
+                        postLevel = level,
+                        postsFlow = feedRepository.getPagedPosts(
+                            level,
+                            location,
+                            forceRefresh = true
+                        ).cachedIn(viewModelScope)
+                    )
+                }
                 observeActiveIssues(level)
             }
         }
@@ -94,7 +100,11 @@ class HomeViewModel(
             updateState { it.copy(isRefreshing = true) }
             updateState {
                 it.copy(
-                    postsFlow = feedRepository.getPagedPosts(currentLevel, currentLocation, forceRefresh = true).cachedIn(viewModelScope),
+                    postsFlow = feedRepository.getPagedPosts(
+                        currentLevel,
+                        currentLocation,
+                        forceRefresh = true
+                    ).cachedIn(viewModelScope),
                 )
             }
             updateState { it.copy(isRefreshing = false) }
@@ -135,7 +145,7 @@ class HomeViewModel(
             when (val result = postRepository.likePost(postId)) {
                 is DataState.Error -> {
                     updateOverride(postId, isLiked = currentIsLiked, likesCount = currentLikesCount)
-                    handleError(Throwable("Failed to update like status. Please try again."))
+                    handleError(result.exception)
                 }
                 else -> Unit
             }
@@ -150,7 +160,7 @@ class HomeViewModel(
                 is DataState.Success -> _sideEffects.emit(HomeSideEffect.ShowSnackbar("Post reported successfully"))
                 is DataState.Error -> {
                     updateOverride(postId, isReported = currentIsReported)
-                    handleError(Throwable("Failed to submit report. Please check your connection."))
+                    handleError(result.exception)
                 }
                 else -> Unit
             }
@@ -196,7 +206,7 @@ class HomeViewModel(
                 }
                 is DataState.Error -> {
                     updateOverride(postId, commentsCount = currentCommentCount)
-                    handleError(Throwable("Could not post comment. Connection lost."))
+                    handleError(result.exception)
                 }
                 else -> Unit
             }

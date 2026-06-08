@@ -4,13 +4,17 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
+import org.example.project.core.network.NetworkMonitor
 import org.example.project.core.network.services.HomeService
 import org.example.project.core.data.mappers.toPost
+import org.example.project.core.utils.DataState
+import org.example.project.core.utils.safeApiCall
 
 class SearchPostsPagingSource(
     private val homeService: HomeService,
     private val query: String,
     private val postLevel: PostLevel,
+    private val networkMonitor: NetworkMonitor,
 ) : PagingSource<Int, Post>() {
 
     override fun getRefreshKey(state: PagingState<Int, Post>): Int? {
@@ -24,14 +28,16 @@ class SearchPostsPagingSource(
         val page = params.key ?: 1
         val limit = params.loadSize
 
-        return try {
-            val response = homeService.searchPosts(
+        return when (val result = safeApiCall(networkMonitor) {
+            homeService.searchPosts(
                 query = query,
                 level = postLevel.name,
                 page = page,
                 limit = limit,
             )
-
+        }) {
+            is DataState.Success -> {
+                val response = result.data
             val posts = response.items.map { it.toPost() }
             val endReached = posts.isEmpty()
 
@@ -40,8 +46,9 @@ class SearchPostsPagingSource(
                 prevKey = if (page == 1) null else page - 1,
                 nextKey = if (endReached) null else page + 1,
             )
-        } catch (t: Throwable) {
-            LoadResult.Error(t)
+            }
+            is DataState.Error -> LoadResult.Error(result.exception)
+            DataState.Loading -> LoadResult.Error(IllegalStateException("Unexpected paging loading state"))
         }
     }
 }

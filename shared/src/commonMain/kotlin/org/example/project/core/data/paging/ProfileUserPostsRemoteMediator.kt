@@ -11,13 +11,17 @@ import org.example.project.core.network.services.ProfileService
 import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.local.ProfileLocalDataSource
 import org.example.project.core.data.mappers.toUserPostEntity
+import org.example.project.core.network.NetworkMonitor
+import org.example.project.core.utils.DataState
+import org.example.project.core.utils.safeApiCall
 
 @OptIn(ExperimentalPagingApi::class)
 class ProfileUserPostsRemoteMediator(
     private val profileService: ProfileService,
     private val database: IssueSpotDatabase,
     private val localDataSource: ProfileLocalDataSource,
-    private val sort: String
+    private val sort: String,
+    private val networkMonitor: NetworkMonitor,
 ) : RemoteMediator<Int, UserPostEntity>() {
 
     private val remoteKeysDao = database.remoteKeysDao()
@@ -28,7 +32,11 @@ class ProfileUserPostsRemoteMediator(
     private val maxCachedPosts = 100
 
     override suspend fun initialize(): InitializeAction {
-        return InitializeAction.LAUNCH_INITIAL_REFRESH
+        return if (userPostDao.getUserPostCount() > 0) {
+            InitializeAction.SKIP_INITIAL_REFRESH
+        } else {
+            InitializeAction.LAUNCH_INITIAL_REFRESH
+        }
     }
 
     override suspend fun load(loadType: LoadType, state: PagingState<Int, UserPostEntity>): MediatorResult {
@@ -43,12 +51,15 @@ class ProfileUserPostsRemoteMediator(
             }
         }
 
-        return try {
-            val response = profileService.getMyPosts(
+        return when (val result = safeApiCall(networkMonitor) {
+            profileService.getMyPosts(
                 page = page,
                 limit = state.config.pageSize,
                 sort = sort
             )
+        }) {
+            is DataState.Success -> {
+                val response = result.data
 
             val entities = response.items.map { dto ->
                 val post = dto.toPost()
@@ -77,8 +88,9 @@ class ProfileUserPostsRemoteMediator(
             userPostDao.trimUserPosts(maxPosts = maxCachedPosts)
 
             MediatorResult.Success(endOfPaginationReached = endOfPaginationReached)
-        } catch (t: Throwable) {
-            MediatorResult.Error(t)
+            }
+            is DataState.Error -> MediatorResult.Error(result.exception)
+            DataState.Loading -> MediatorResult.Error(IllegalStateException("Unexpected paging loading state"))
         }
     }
 

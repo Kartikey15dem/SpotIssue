@@ -46,6 +46,12 @@ import org.example.project.theme.IssueSpotTypography
 import androidx.compose.foundation.clickable
 import kotlinx.coroutines.flow.collectLatest
 
+import androidx.core.content.FileProvider
+import java.io.File
+import org.example.project.utils.media.MediaCompressorUtil
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+
 @Composable
 fun NameCaptureScreen(
     viewModel: NameCaptureViewModel
@@ -53,6 +59,9 @@ fun NameCaptureScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    var cameraUri by remember { mutableStateOf<Uri?>(null) }
+    var cameraFilePath by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -65,14 +74,28 @@ fun NameCaptureScreen(
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
-        viewModel.handleIntent(NameCaptureIntent.CameraImageCaptured(success))
+        if (success) {
+            coroutineScope.launch {
+                cameraFilePath?.let {
+                    val compressedFile = MediaCompressorUtil.compressImage(context, "file://$it")
+                    viewModel.handleIntent(NameCaptureIntent.ImageUrlChanged(compressedFile?.absolutePath ?: it))
+                }
+            }
+        }
     }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
-            viewModel.handleIntent(NameCaptureIntent.ImageUrlChanged(uri.toString()))
+            coroutineScope.launch {
+                val compressedFile = MediaCompressorUtil.compressImage(context, uri.toString())
+                if (compressedFile != null) {
+                    viewModel.handleIntent(NameCaptureIntent.ImageUrlChanged(compressedFile.absolutePath))
+                } else {
+                    viewModel.handleIntent(NameCaptureIntent.ImageUrlChanged(uri.toString()))
+                }
+            }
         }
     }
 
@@ -87,8 +110,16 @@ fun NameCaptureScreen(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                     )
                 }
-                is NameCaptureEffect.ShowCamera -> {
-                    cameraLauncher.launch(effect.uri)
+                NameCaptureEffect.ShowCamera -> {
+                    val file = File(context.filesDir, "camera_photo_${System.currentTimeMillis()}.jpg")
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file
+                    )
+                    cameraUri = uri
+                    cameraFilePath = file.absolutePath
+                    cameraLauncher.launch(uri)
                 }
             }
         }
@@ -226,7 +257,7 @@ fun NameCaptureContent(
                 enabled = !uiState.isLoadingImage
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_report), // Using ic_report as camera placeholder if ic_camera doesn't exist
+                    painter = painterResource(R.drawable.ic_video),
                     contentDescription = null,
                     modifier = Modifier.size(16.dp)
                 )

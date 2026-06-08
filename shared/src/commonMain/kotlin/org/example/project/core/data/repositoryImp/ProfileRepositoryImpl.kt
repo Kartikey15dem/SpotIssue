@@ -18,6 +18,7 @@ import org.example.project.core.model.home.Post
 import org.example.project.core.data.local.ProfileLocalDataSource
 import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
+import org.example.project.core.utils.asDataStateFlow
 import org.example.project.core.utils.safeApiCall
 import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.mappers.toEntity
@@ -38,12 +39,14 @@ import okio.buffer
 import okio.SYSTEM
 import org.example.project.core.network.dto.EmailChangeRequest
 import org.example.project.core.network.dto.EmailChangeVerifyRequest
+import org.example.project.core.network.NetworkMonitor
 
 class ProfileRepositoryImpl(
     private val profileService: ProfileService,
     private val database: IssueSpotDatabase,
     private val localDataSource: ProfileLocalDataSource,
-    private val prefRepository: UserPreferencesRepository
+    private val prefRepository: UserPreferencesRepository,
+    private val networkMonitor: NetworkMonitor,
 ) : ProfileRepository {
 
     private val logger = Logger.Companion.withTag("ProfileRepository")
@@ -60,7 +63,8 @@ class ProfileRepositoryImpl(
                 profileService = profileService,
                 database = database,
                 localDataSource = localDataSource,
-                sort = sort
+                sort = sort,
+                networkMonitor = networkMonitor,
             ),
             pagingSourceFactory = { 
                 when (sort.uppercase()) {
@@ -82,7 +86,8 @@ class ProfileRepositoryImpl(
                 profileService = profileService,
                 database = database,
                 localDataSource = localDataSource,
-                sort = sort
+                sort = sort,
+                networkMonitor = networkMonitor,
             ),
             pagingSourceFactory = { 
                 when (sort.uppercase()) {
@@ -101,21 +106,20 @@ class ProfileRepositoryImpl(
         prefRepository.userData
     ) { entity, userData ->
         if (entity != null) {
-            val domainProfile = entity.toProfile().copy(
+            entity.toProfile().copy(
                 location = userData.userLocation?.address ?: "No location set"
             )
-            DataState.Success(domainProfile)
         } else {
-            DataState.Error(Exception("Profile not found"))
+            throw Exception("Profile not found")
         }
-    }.onStart { emit(DataState.Loading) }
+    }.asDataStateFlow()
 
-    override suspend fun refreshProfile(): DataState<Unit> = safeApiCall {
+    override suspend fun refreshProfile(): DataState<Unit> = safeApiCall(networkMonitor) {
         val profileDto = profileService.getMyProfile()
         localDataSource.saveProfile(profileDto.toEntity())
     }
 
-    override suspend fun updateProfile(profile: Profile, imagePath: String?): DataState<Unit> = safeApiCall {
+    override suspend fun updateProfile(profile: Profile, imagePath: String?): DataState<Unit> = safeApiCall(networkMonitor) {
         val request = UpsertProfileRequest(
             name = profile.name,
             email = profile.email,
@@ -159,14 +163,14 @@ class ProfileRepositoryImpl(
         database.likedPostDao().updateUserInfo(ownerId = entity.userId, name = entity.name, avatar = entity.imageUrl)
     }
 
-    override suspend fun requestEmailChange(newEmail: String): DataState<Unit> = safeApiCall {
+    override suspend fun requestEmailChange(newEmail: String): DataState<Unit> = safeApiCall(networkMonitor) {
         profileService.requestEmailChange(EmailChangeRequest(newEmail))
     }
 
     override suspend fun verifyEmailChange(
         newEmail: String,
         code: String
-    ): DataState<Unit> = safeApiCall {
+    ): DataState<Unit> = safeApiCall(networkMonitor) {
         profileService.verifyEmailChange(EmailChangeVerifyRequest(newEmail, code))
         val profileDto = profileService.getMyProfile()
         val entity = profileDto.toEntity()

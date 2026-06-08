@@ -1,14 +1,22 @@
 package org.example.project.core.network
 
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import org.example.project.core.utils.DataState
+import org.example.project.core.utils.NETWORK_ERROR_MESSAGE
 
-/**
- * Multiplatform network monitor.
- *
- * Repository layer uses this to decide whether to page from network or from Room.
- * ViewModels should not contain online/offline branching logic.
- */
 interface NetworkMonitor {
-    val isOnline: StateFlow<Boolean>
+    val isOnline: Flow<Boolean>
+}
+
+fun <T> NetworkMonitor.withNetworkCheck(
+    upstream: Flow<DataState<T>>,
+): Flow<DataState<T>> = combine(isOnline, upstream) { isOnline, dataState ->
+    when {
+        dataState is DataState.Success -> dataState
+        dataState is DataState.Loading -> dataState
+        !isOnline -> DataState.Error(Exception(NETWORK_ERROR_MESSAGE))
+        else -> dataState
+    }
 }
 

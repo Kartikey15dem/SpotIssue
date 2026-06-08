@@ -32,17 +32,19 @@ import co.touchlab.kermit.Logger
 import org.example.project.core.database.entities.toEntity
 import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.mappers.toUserPostEntity
+import org.example.project.core.network.NetworkMonitor
 
 class PostRepositoryImpl(
     private val postService: PostService,
-    private val database: IssueSpotDatabase
+    private val database: IssueSpotDatabase,
+    private val networkMonitor: NetworkMonitor,
 ) : PostRepository {
 
     private val logger = Logger.withTag("PostRepository")
 
     override suspend fun likePost(postId: String): DataState<Unit> {
         logger.d { "Liking post: $postId" }
-        val result = safeApiCall {
+        val result = safeApiCall(networkMonitor) {
             postService.likePost(postId)
         }
         if (result is DataState.Success) {
@@ -65,7 +67,7 @@ class PostRepositoryImpl(
             database.likedPostDao().updatePostLikeStatus(postId, newLikesCount, newIsLiked)
             
             // Sync with fresh data from API
-            safeApiCall { postService.getPost(postId) }.let { freshResult ->
+            safeApiCall(networkMonitor) { postService.getPost(postId) }.let { freshResult ->
                 if (freshResult is DataState.Success) {
                     val entity = freshResult.data.toPost().toEntity()
                     database.postDao().insertPosts(listOf(entity))
@@ -79,7 +81,7 @@ class PostRepositoryImpl(
 
     override suspend fun reportPost(postId: String, reason: String?): DataState<Unit> {
         logger.d { "Reporting post: $postId, reason: $reason" }
-        val result = safeApiCall {
+        val result = safeApiCall(networkMonitor) {
             postService.reportPost(postId, ReportPostRequestDto(reason))
         }
         if (result is DataState.Success) {
@@ -94,25 +96,25 @@ class PostRepositoryImpl(
 
     override suspend fun sharePost(postId: String): DataState<Unit> {
         logger.d { "Sharing post: $postId" }
-        return safeApiCall {
+        return safeApiCall(networkMonitor) {
             postService.sharePost(postId)
         }
     }
 
-    override suspend fun getComments(postId: String, page: Int, limit: Int): DataState<PagedResponse<CommentDto>> = safeApiCall {
+    override suspend fun getComments(postId: String, page: Int, limit: Int): DataState<PagedResponse<CommentDto>> = safeApiCall(networkMonitor) {
         postService.getComments(postId, page, limit)
     }
 
     override fun getPagedComments(postId: String): Flow<PagingData<Comment>> {
         return Pager(
             config = PagingConfig(pageSize = 20),
-            pagingSourceFactory = { org.example.project.core.data.paging.CommentPagingSource(postService, postId) }
+            pagingSourceFactory = { org.example.project.core.data.paging.CommentPagingSource(postService, postId, networkMonitor) }
         ).flow
     }
 
     override suspend fun addComment(postId: String, comment: String): DataState<Unit> {
         logger.d { "Adding comment to post: $postId" }
-        val result = safeApiCall {
+        val result = safeApiCall(networkMonitor) {
             postService.addComment(postId, AddCommentRequestDto(comment))
         }
         if (result is DataState.Success) {
@@ -127,7 +129,7 @@ class PostRepositoryImpl(
             database.likedPostDao().updateCommentsCount(postId, newCommentsCount)
             
             
-            safeApiCall { postService.getPost(postId) }.let { freshResult ->
+            safeApiCall(networkMonitor) { postService.getPost(postId) }.let { freshResult ->
                 if (freshResult is DataState.Success) {
                     database.postDao().insertPosts(listOf(freshResult.data.toPost().toEntity()))
                 }
@@ -184,7 +186,7 @@ class PostRepositoryImpl(
             )
         }
         
-        val result = safeApiCall {
+        val result = safeApiCall(networkMonitor) {
             val dto = postService.createPost(MultiPartFormDataContent(multipartParts))
             dto.toPost()
         }
@@ -221,7 +223,7 @@ class PostRepositoryImpl(
         database.userPostDao().deletePost(postId)
         database.likedPostDao().deleteLikedPost(postId)
         
-        val result = safeApiCall {
+        val result = safeApiCall(networkMonitor) {
             postService.deletePost(postId)
         }
         if (result !is DataState.Success) {
@@ -230,7 +232,7 @@ class PostRepositoryImpl(
         return result
     }
 
-    override suspend fun getPost(postId: String): DataState<Post> = safeApiCall {
+    override suspend fun getPost(postId: String): DataState<Post> = safeApiCall(networkMonitor) {
         val dto = postService.getPost(postId)
         dto.toPost()
     }

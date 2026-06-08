@@ -17,11 +17,9 @@ val authModule = module {
     viewModelOf(::LocationFetchViewModel)
     viewModel { params ->
         NameCaptureViewModel(
-            context = get(),
             email = params.get<String>(),
             prefRepository = get(),
-            profileRepository = get(),
-            imagePicker = get()
+            profileRepository = get()
         )
     }
 }

@@ -6,6 +6,7 @@ import org.example.project.core.network.dto.AuthRequestOtpResponse
 import org.example.project.core.network.dto.LoginRequestDto
 import org.example.project.core.network.dto.VerifyRequestDto
 import org.example.project.core.network.dto.VerifyResponseDto
+import org.example.project.core.network.NetworkMonitor
 import org.example.project.core.network.services.AuthenticationService
 import org.example.project.core.utils.DataState
 import org.example.project.core.utils.safeApiCall
@@ -13,9 +14,10 @@ import org.example.project.core.utils.safeApiCall
 class AuthRepositoryImpl(
     private val authenticationService: AuthenticationService,
     private val userPreferencesRepository: UserPreferencesRepository,
+    private val networkMonitor: NetworkMonitor,
 ) : AuthRepository {
 
-    override suspend fun requestOtp(email: String): DataState<AuthRequestOtpResponse> = safeApiCall {
+    override suspend fun requestOtp(email: String): DataState<AuthRequestOtpResponse> = safeApiCall(networkMonitor) {
         val request = LoginRequestDto(email)
         authenticationService.requestOtp(request)
     }
@@ -23,7 +25,7 @@ class AuthRepositoryImpl(
     override suspend fun verifyOtp(
         email: String,
         otp: String
-    ): DataState<VerifyResponseDto> = safeApiCall {
+    ): DataState<VerifyResponseDto> = safeApiCall(networkMonitor) {
         val request = VerifyRequestDto(email, otp)
         val response = authenticationService.verifyOtp(request)
 

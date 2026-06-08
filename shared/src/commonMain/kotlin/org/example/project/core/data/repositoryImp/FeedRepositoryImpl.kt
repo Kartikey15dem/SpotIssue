@@ -21,12 +21,15 @@ import org.example.project.core.database.entities.toPost
 import org.example.project.core.model.auth.UserLocation
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
+import org.example.project.core.network.NetworkMonitor
 import org.example.project.core.utils.DataState
+import org.example.project.core.utils.asDataStateFlow
 
 class FeedRepositoryImpl(
     private val homeService: HomeService,
     private val database: IssueSpotDatabase,
     private val localDataSource: FeedLocalDataSource,
+    private val networkMonitor: NetworkMonitor,
 ) : FeedRepository {
     private val logger = Logger.Companion.withTag("FeedRepository")
 
@@ -41,6 +44,7 @@ class FeedRepositoryImpl(
                 database = database,
                 localDataSource = localDataSource,
                 forceRefresh = forceRefresh,
+                networkMonitor = networkMonitor,
             ),
             pagingSourceFactory = { database.postDao().pagingSourceByLevel(postLevel.name) },
         ).flow.map { pagingData ->
@@ -48,18 +52,16 @@ class FeedRepositoryImpl(
         }
     }
 
-    override fun observeActiveIssuesCount(postLevel: PostLevel): Flow<DataState<Int>> = flow {
-
-        val dbFlow = localDataSource.observeCachedActiveIssues(postLevel)
-            .map { DataState.Success(it ?: 0) as DataState<Int> }
-
-        emitAll(dbFlow)
-    }.onStart { emit(DataState.Loading) }
+    override fun observeActiveIssuesCount(postLevel: PostLevel): Flow<DataState<Int>> {
+        return localDataSource.observeCachedActiveIssues(postLevel)
+            .map { it ?: 0 }
+            .asDataStateFlow()
+    }
 
     override fun getPagedSearchPosts(query: String, postLevel: PostLevel): Flow<PagingData<Post>> {
         return Pager(
             config = PagingConfig(pageSize = 20),
-            pagingSourceFactory = { org.example.project.core.data.paging.SearchPostsPagingSource(homeService, query, postLevel) }
+            pagingSourceFactory = { org.example.project.core.data.paging.SearchPostsPagingSource(homeService, query, postLevel, networkMonitor) }
         ).flow
     }
 }

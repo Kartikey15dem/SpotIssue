@@ -14,23 +14,18 @@ import org.example.project.core.datastore.UserPreferencesRepository
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
-import android.net.Uri
-import android.content.Context
-import org.example.project.utils.AndroidImagePicker
-import org.example.project.utils.media.MediaCompressorUtil
 
 sealed class NameCaptureEffect {
     data class ShowSnackbar(val message: String) : NameCaptureEffect()
     data object ShowImagePicker : NameCaptureEffect()
-    data class ShowCamera(val uri: Uri) : NameCaptureEffect()
+    data object ShowCamera : NameCaptureEffect()
 }
 
 data class NameCaptureUiState(
     val name: String = "",
     val imageUrl: String = "",
     val isLoading: Boolean = false,
-    val isLoadingImage: Boolean = false,
-    val pendingCameraUri: Uri? = null
+    val isLoadingImage: Boolean = false
 )
 
 sealed class NameCaptureIntent {
@@ -39,15 +34,12 @@ sealed class NameCaptureIntent {
     data object SubmitClicked : NameCaptureIntent()
     data object PickFromGalleryClicked : NameCaptureIntent()
     data object CaptureFromCameraClicked : NameCaptureIntent()
-    data class CameraImageCaptured(val success: Boolean) : NameCaptureIntent()
 }
 
 class NameCaptureViewModel(
-    private val context: Context,
     private val email: String,
     private val prefRepository: UserPreferencesRepository,
-    private val profileRepository: ProfileRepository,
-    private val imagePicker: AndroidImagePicker
+    private val profileRepository: ProfileRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(NameCaptureUiState())
@@ -63,14 +55,6 @@ class NameCaptureViewModel(
             is NameCaptureIntent.SubmitClicked -> submitProfile()
             NameCaptureIntent.PickFromGalleryClicked -> pickFromGallery()
             NameCaptureIntent.CaptureFromCameraClicked -> captureFromCamera()
-            is NameCaptureIntent.CameraImageCaptured -> {
-                if (intent.success) {
-                    _uiState.value.pendingCameraUri?.let { uri ->
-                        updateImageUrl(uri.toString())
-                    }
-                }
-                _uiState.update { it.copy(pendingCameraUri = null) }
-            }
         }
     }
 
@@ -90,9 +74,7 @@ class NameCaptureViewModel(
 
     private fun captureFromCamera() {
         viewModelScope.launch {
-            val uri = imagePicker.createImageUri()
-            _uiState.update { it.copy(pendingCameraUri = uri) }
-            _effect.emit(NameCaptureEffect.ShowCamera(uri))
+            _effect.emit(NameCaptureEffect.ShowCamera)
         }
     }
 
@@ -108,16 +90,13 @@ class NameCaptureViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
-            var localImagePath: String? = null
-            if (currentImageUrl.startsWith("content://") || currentImageUrl.startsWith("file://")) {
-                val compressedFile = MediaCompressorUtil.compressImage(context, currentImageUrl)
-                localImagePath = compressedFile?.absolutePath
-            }
-
+            val isLocalPath = currentImageUrl.startsWith("/") || currentImageUrl.startsWith("file://")
+            val localImagePath = if (isLocalPath) currentImageUrl.removePrefix("file://") else null
+            
             val profile = Profile(
                 name = currentName,
                 email = email.trim(),
-                imageUrl = if (localImagePath != null) "" else currentImageUrl,
+                imageUrl = if (isLocalPath) "" else currentImageUrl,
                 totalPosts = 0,
                 acks = 0,
                 postByArea = listOf(0, 0, 0, 0),
@@ -135,7 +114,7 @@ class NameCaptureViewModel(
                 }
                 DataState.Loading -> {}
             }
-
+            
             // Clean up temp file
             localImagePath?.let { java.io.File(it).delete() }
         }

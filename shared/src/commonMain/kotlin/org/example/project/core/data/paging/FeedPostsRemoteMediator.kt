@@ -17,6 +17,9 @@ import org.example.project.core.data.mappers.toPost
 import org.example.project.core.database.entities.toEntity
 import org.example.project.core.model.auth.UserLocation
 import org.example.project.core.model.home.PostLevel
+import org.example.project.core.network.NetworkMonitor
+import org.example.project.core.utils.DataState
+import org.example.project.core.utils.safeApiCall
 
 @OptIn(ExperimentalPagingApi::class)
 class FeedPostsRemoteMediator(
@@ -26,6 +29,7 @@ class FeedPostsRemoteMediator(
     private val database: IssueSpotDatabase,
     private val localDataSource: FeedLocalDataSource,
     private val forceRefresh: Boolean,
+    private val networkMonitor: NetworkMonitor,
 ) : RemoteMediator<Int, PostEntity>() {
 
     private val postDao = database.postDao()
@@ -60,16 +64,8 @@ class FeedPostsRemoteMediator(
             }
         }
 
-        return try {
-            if (loadType == LoadType.REFRESH) {
-                runCatching {
-                    homeService.getActiveIssuesCount(postLevel.name)
-                }.onSuccess { dto ->
-                    localDataSource.cacheActiveIssues(postLevel, dto.totalActiveIssues)
-                }
-            }
-
-            val response = homeService.getPosts(
+        return when (val result = safeApiCall(networkMonitor) {
+            homeService.getPosts(
                 level = postLevel.name,
                 locality = userLocation?.locality,
                 district = userLocation?.district,
@@ -80,6 +76,9 @@ class FeedPostsRemoteMediator(
                 page = page,
                 limit = state.config.pageSize,
             )
+        }) {
+            is DataState.Success -> {
+                val response = result.data
 
             val posts = response.items.map { dto ->
                 val post = dto.toPost()
@@ -105,6 +104,9 @@ class FeedPostsRemoteMediator(
 
             postDao.insertPosts(posts)
             postDao.trimPostsByLevel(postLevel.name, maxCachedPosts)
+            response.activeIssuesCount?.let { count ->
+                localDataSource.cacheActiveIssues(postLevel, count)
+            }
 
             val now = Clock.System.now().toEpochMilliseconds()
             cacheMetadataDao.insertMetadata(
@@ -115,8 +117,9 @@ class FeedPostsRemoteMediator(
             )
 
             MediatorResult.Success(endOfPaginationReached = endOfPaginationReached)
-        } catch (t: Throwable) {
-            MediatorResult.Error(t)
+            }
+            is DataState.Error -> MediatorResult.Error(result.exception)
+            DataState.Loading -> MediatorResult.Error(IllegalStateException("Unexpected paging loading state"))
         }
     }
 

@@ -13,11 +13,5 @@ import org.koin.dsl.module
 val profileUiModule = module {
     // Presentation layer - ViewModels
     viewModelOf(::ProfileViewModel)
-    viewModel {
-        EditProfileViewModel(
-            context = get(),
-            profileRepository = get(),
-            imagePicker = get()
-        )
-    }
+    viewModelOf(::EditProfileViewModel)
 }
