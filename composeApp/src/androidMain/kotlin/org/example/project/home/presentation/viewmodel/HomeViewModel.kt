@@ -66,7 +66,7 @@ class HomeViewModel(
     private fun observeActiveIssues(level: PostLevel) {
         viewModelScope.launch {
             feedRepository.observeActiveIssuesCount(level).collect { dataState ->
-                updateState { it.copy(activeIssues = dataState) }
+                updateState { it.copy(activeIssues = dataState.data?:0) }
             }
         }
     }
@@ -280,7 +280,7 @@ sealed interface HomeIntent {
 
 data class HomeState(
     val postLevel: PostLevel = PostLevel.LOCALITY,
-    val activeIssues: DataState<Int> = DataState.Loading,
+    val activeIssues: Int = 0,
     val isRefreshing: Boolean = false,
     val postsFlow: Flow<PagingData<Post>>? = null,
     val searchPostsFlow: Flow<PagingData<Post>>? = null,

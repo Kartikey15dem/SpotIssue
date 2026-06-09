@@ -83,9 +83,6 @@ fun NavigationRoot(
                     onProfileClick = {
                         rootBackStack.add(Route.Profile)
                     },
-                    onNavigateToPost = { postId ->
-                        rootBackStack.add(Route.PostDetail(postId))
-                    },
                     onBack = {
                         rootBackStack.removeLastOrNull()
                     }
@@ -107,14 +104,6 @@ fun NavigationRoot(
             entry<Route.CreatePost>{
                 CreatePostNavigation(
                     onBack = {
-                        rootBackStack.removeLastOrNull()
-                    }
-                )
-            }
-            entry<Route.PostDetail> { key ->
-                PostDetailScreen(
-                    postId = key.postId,
-                    onNavigateBack = {
                         rootBackStack.removeLastOrNull()
                     }
                 )

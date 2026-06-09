@@ -143,7 +143,7 @@ fun HomeContent(
 
     PullToRefreshBox(
         isRefreshing = isRefreshing,
-        onRefresh = { isManualRefreshing = true; onIntent(HomeIntent.Refresh) },
+        onRefresh = { onIntent(HomeIntent.Refresh) },
         modifier = modifier
             .fillMaxSize()
             .background(IssueSpotColors.Background)
@@ -420,14 +420,10 @@ private fun HomeHeader(
 
                 Spacer(Modifier.width(10.dp))
 
-                val activeIssuesText = when (val res = state.activeIssues) {
-                    is DataState.Success -> "${res.data} active issues"
-                    is DataState.Error -> "Error loading issues"
-                    DataState.Loading -> "Loading issues..."
-                }
+
 
                 Text(
-                    text = "  $activeIssuesText".replace("\u0005", "↗"),
+                    text = state.activeIssues.toString(),
                     style = IssueSpotTypography.bodyLarge,
                     color = IssueSpotColors.OnSurfaceVariant
                 )

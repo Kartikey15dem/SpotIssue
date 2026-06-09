@@ -178,4 +178,11 @@ class ProfileRepositoryImpl(
         database.userPostDao().updateUserInfo(ownerId = entity.userId, name = entity.name, avatar = entity.imageUrl)
         database.likedPostDao().updateUserInfo(ownerId = entity.userId, name = entity.name, avatar = entity.imageUrl)
     }
+
+    override suspend fun logOut() {
+        prefRepository.logOut()
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            database.clearAllTables()
+        }
+    }
 }

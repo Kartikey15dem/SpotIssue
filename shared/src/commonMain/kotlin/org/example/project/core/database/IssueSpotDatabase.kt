@@ -10,7 +10,9 @@ import org.example.project.core.database.dao.RemoteKeysDao
 
 
 
-expect abstract class IssueSpotDatabase {
+import androidx.room.RoomDatabase
+
+expect abstract class IssueSpotDatabase : RoomDatabase {
     abstract fun profileDao(): ProfileDao
     abstract fun postDao(): PostDao
     abstract fun cacheMetadataDao(): CacheMetadataDao

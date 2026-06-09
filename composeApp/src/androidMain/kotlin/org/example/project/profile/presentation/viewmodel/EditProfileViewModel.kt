@@ -50,6 +50,16 @@ class EditProfileViewModel(
                 _uiState.update { it.copy(email = intent.email, newEmail = intent.email) }
             }
             EditProfileIntent.ShowEmailChangeDialogClicked -> _uiState.update { it.copy(showEmailChangeDialog = true, emailChangeStep = EmailChangeStep.Request) }
+            EditProfileIntent.LogoutClicked -> logout()
+        }
+    }
+
+    private fun logout() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            profileRepository.logOut()
+            _uiState.update { it.copy(isLoading = false) }
+            _sideEffects.emit(EditProfileSideEffect.LogoutSuccess)
         }
     }
 
@@ -212,9 +222,12 @@ class EditProfileViewModel(
                     DataState.Loading -> Unit
                 }
             }
-            
-            // Clean up temp file
-            localImagePath?.let { java.io.File(it).delete() }
+
+            localImagePath?.let { path -> 
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    java.io.File(path).delete() 
+                }
+            }
         }
     }
 
@@ -266,6 +279,7 @@ sealed interface EditProfileIntent {
     data object DismissEmailChangeDialog : EditProfileIntent
     data class NewEmailChanged(val email: String) : EditProfileIntent
     data class EmailChanged(val email: String) : EditProfileIntent
+    data object LogoutClicked : EditProfileIntent
 }
 
 enum class EmailChangeStep {
@@ -297,4 +311,5 @@ sealed interface EditProfileSideEffect {
     data object ShowImagePicker : EditProfileSideEffect
     data object ShowCamera : EditProfileSideEffect
     data object EmailChanged : EditProfileSideEffect
+    data object LogoutSuccess : EditProfileSideEffect
 }

@@ -148,6 +148,9 @@ fun EditProfileScreen(
                 EditProfileSideEffect.ProfileSaved ,EditProfileSideEffect.BackPreseed -> {
                     onNavigateBack()
                 }
+                EditProfileSideEffect.LogoutSuccess -> {
+                    onNavigateBack()
+                }
                 EditProfileSideEffect.ShowImagePicker -> {
                     imagePickerLauncher.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -464,6 +467,29 @@ fun EditProfileContent(
                 }
                 Spacer(Modifier.width(4.dp))
                 Text("Save Changes")
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // Logout Button
+        Button(
+            onClick = { onIntent(EditProfileIntent.LogoutClicked) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = IssueSpotColors.Error,
+                contentColor = Color.White
+            ),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            if (state.isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text("Logout")
             }
         }
 

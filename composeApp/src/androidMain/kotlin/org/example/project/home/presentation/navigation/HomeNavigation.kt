@@ -18,7 +18,6 @@ import org.koin.compose.koinInject
 fun HomeNavigation(
     onCreatePost : () -> Unit,
     onProfileClick : () -> Unit,
-    onNavigateToPost: (String) -> Unit,
     onBack: () -> Unit
 ) {
     val homeBackStack = rememberNavBackStack(Route.Home)

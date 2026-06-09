@@ -116,7 +116,11 @@ class NameCaptureViewModel(
             }
             
             // Clean up temp file
-            localImagePath?.let { java.io.File(it).delete() }
+            localImagePath?.let { path ->
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    java.io.File(path).delete()
+                }
+            }
         }
     }
 

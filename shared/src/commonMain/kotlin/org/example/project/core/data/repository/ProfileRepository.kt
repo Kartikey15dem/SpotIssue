@@ -46,4 +46,6 @@ interface ProfileRepository {
      * Verify email change (verify OTP and update email)
      */
     suspend fun verifyEmailChange(newEmail: String, code: String): DataState<Unit>
+
+    suspend fun logOut()
 }

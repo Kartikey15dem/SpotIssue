@@ -59,6 +59,7 @@ class CreatePostViewModel(
                         prefRepository.updateUploadDraftState(draft.copy(status = UploadStatus.IDLE))
                     }
                     UploadStatus.SUCCESS -> {
+                        _uiState.update { it.copy(isLoading = false, description = "", selectedMedia = null) }
                         _sideEffects.emit(CreatePostSideEffect.PostCreated("new_post"))
                         prefRepository.updateUploadDraftState(UploadDraftState.DEFAULT)
                         // Wait, if they are still on this screen, close it
@@ -129,6 +130,7 @@ class CreatePostViewModel(
 
                 when (val result = postRepository.createPost(createPostModel)) {
                     is DataState.Success -> {
+                        _uiState.update { it.copy(isLoading = false, description = "", selectedMedia = null) }
                         _sideEffects.emit(CreatePostSideEffect.PostCreated(result.data.id))
                         onNavigateBack()
                     }
