@@ -51,6 +51,7 @@ import java.io.File
 import org.example.project.utils.media.MediaCompressorUtil
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import org.example.project.theme.IssueSpotTheme
 
 @Composable
 fun NameCaptureScreen(
@@ -168,24 +169,26 @@ fun NameCaptureContent(
 ) {
     val focusManager = LocalFocusManager.current
     val isLoading = uiState.isLoading
+    val spacing = IssueSpotTheme.spacing
+    val shapes = MaterialTheme.shapes
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
-            .padding(24.dp),
+            .background(IssueSpotColors.Surface)
+            .padding(spacing.large),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(60.dp))
+        Spacer(modifier = Modifier.height(spacing.huge))
 
         Text(
             text = "Complete Your Profile",
-            fontSize = 24.sp,
+            style = IssueSpotTypography.headlineMedium,
             fontWeight = FontWeight.Bold,
-            color = Color.Black
+            color = IssueSpotColors.OnSurface
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(spacing.large))
 
         // Profile picture with edit icon
         Box(
@@ -196,7 +199,7 @@ fun NameCaptureContent(
             if (uiState.isLoadingImage) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(120.dp),
-                    color = Color(0xFF4A6CF7)
+                    color = IssueSpotColors.Primary
                 )
             } else {
                 AsyncImage(
@@ -205,7 +208,7 @@ fun NameCaptureContent(
                     modifier = Modifier
                         .size(120.dp)
                         .clip(CircleShape)
-                        .border(3.dp, Color(0xFF4A6CF7), CircleShape)
+                        .border(3.dp, IssueSpotColors.Primary, CircleShape)
                         .clickable { onAction(NameCaptureIntent.PickFromGalleryClicked) },
                     contentScale = ContentScale.Crop,
                     error = painterResource(R.drawable.ic_user_avatar),
@@ -219,72 +222,75 @@ fun NameCaptureContent(
                     .align(Alignment.BottomEnd)
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF4A6CF7))
+                    .background(IssueSpotColors.Primary)
                     .clickable { onCameraClick() }
-                    .padding(8.dp),
+                    .padding(spacing.small),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_edit),
                     contentDescription = "Edit Picture",
-                    tint = Color.White,
+                    tint = IssueSpotColors.OnPrimary,
                     modifier = Modifier.size(20.dp)
                 )
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(spacing.medium))
 
         // Image source buttons
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(spacing.small)
         ) {
             OutlinedButton(
                 onClick = { onAction(NameCaptureIntent.PickFromGalleryClicked) },
-                enabled = !uiState.isLoadingImage
+                enabled = !uiState.isLoadingImage,
+                shape = shapes.medium
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_photo),
                     contentDescription = null,
                     modifier = Modifier.size(16.dp)
                 )
-                Spacer(Modifier.width(4.dp))
-                Text("Gallery")
+                Spacer(Modifier.width(spacing.extraSmall))
+                Text("Gallery", style = IssueSpotTypography.labelMedium)
             }
 
             OutlinedButton(
                 onClick = onCameraClick,
-                enabled = !uiState.isLoadingImage
+                enabled = !uiState.isLoadingImage,
+                shape = shapes.medium
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_video),
                     contentDescription = null,
                     modifier = Modifier.size(16.dp)
                 )
-                Spacer(Modifier.width(4.dp))
-                Text("Camera")
+                Spacer(Modifier.width(spacing.extraSmall))
+                Text("Camera", style = IssueSpotTypography.labelMedium)
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(spacing.extraLarge))
 
         Text(
             text = "Tell us the name by which you want to post issues",
-            fontSize = 16.sp,
-            color = Color.Gray,
+            style = IssueSpotTypography.bodyLarge,
+            color = IssueSpotColors.OnSurfaceVariant,
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(spacing.medium))
 
 
         OutlinedTextField(
             value = uiState.name,
             onValueChange = { onAction(NameCaptureIntent.NameChanged(it)) },
-            label = { Text("Full name") },
+            label = { Text("Full name", style = IssueSpotTypography.bodyMedium) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             enabled = !isLoading,
+            shape = shapes.medium,
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Words,
                 keyboardType = KeyboardType.Text,
@@ -294,36 +300,39 @@ fun NameCaptureContent(
                 onNext = { focusManager.clearFocus() }
             ),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFF4A6CF7),
-                focusedLabelColor = Color(0xFF4A6CF7)
+                focusedBorderColor = IssueSpotColors.Primary,
+                focusedLabelColor = IssueSpotColors.Primary,
+                unfocusedBorderColor = IssueSpotColors.Outline
             )
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(spacing.large))
 
         Button(
             onClick = {
                 focusManager.clearFocus()
                 onAction(NameCaptureIntent.SubmitClicked)
             },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A6CF7)),
-            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = IssueSpotColors.Primary,
+                contentColor = IssueSpotColors.OnPrimary
+            ),
+            shape = shapes.medium,
             enabled = uiState.name.isNotBlank() && !isLoading
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(24.dp),
-                    color = Color.White,
+                    color = IssueSpotColors.OnPrimary,
                     strokeWidth = 2.dp
                 )
             } else {
                 Text(
                     text = "Get Started",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    style = IssueSpotTypography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = spacing.extraSmall)
                 )
             }
         }

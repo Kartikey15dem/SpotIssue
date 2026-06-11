@@ -32,6 +32,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.paging.LoadState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -62,6 +63,7 @@ import org.example.project.home.presentation.viewmodel.HomeViewModel
 import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTypography
 import org.example.project.core.components.CommentsBottomSheet
+import org.example.project.theme.IssueSpotTheme
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -141,6 +143,7 @@ fun HomeContent(
 
 
 
+    val spacing = IssueSpotTheme.spacing
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = { onIntent(HomeIntent.Refresh) },
@@ -211,9 +214,9 @@ fun HomeContent(
 
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(spacing.smallMedium)
                     ) {
-                        item { Spacer(Modifier.height(8.dp)) }
+                        item { Spacer(Modifier.height(spacing.small)) }
 
                         if (pagingItems != null) {
                             items(
@@ -232,7 +235,7 @@ fun HomeContent(
                                     PostCard(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 12.dp),
+                                            .padding(horizontal = spacing.smallMedium),
                                         post = post,
                                         isLiked = isLiked,
                                         likesCount = resolvedLikes,
@@ -275,7 +278,7 @@ fun HomeContent(
                             }
                         }
 
-                        item { Spacer(Modifier.height(16.dp)) }
+                        item { Spacer(Modifier.height(spacing.medium)) }
 
                         val refreshError = pagingItems?.loadState?.refresh as? LoadState.Error
                         val appendError = pagingItems?.loadState?.append as? LoadState.Error
@@ -283,19 +286,20 @@ fun HomeContent(
                         if (refreshError != null && pagingItems.itemCount == 0) {
                             item {
                                 Box(
-                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = refreshError.error.message ?: "An error occurred",
-                                        color = IssueSpotColors.OnBackground
+                                        color = IssueSpotColors.OnBackground,
+                                        style = IssueSpotTypography.bodyMedium
                                     )
                                 }
                             }
                         } else if (pagingItems?.loadState?.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
                             item {
                                 Box(
-                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     CircularProgressIndicator(color = IssueSpotColors.Primary)
@@ -306,9 +310,10 @@ fun HomeContent(
                         if (appendError != null && pagingItems.itemCount > 0) {
                             item {
                                 Text(
-                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
                                     text = appendError.error.message ?: "An error occurred",
-                                    color = IssueSpotColors.OnBackground
+                                    color = IssueSpotColors.OnBackground,
+                                    style = IssueSpotTypography.bodyMedium
                                 )
                             }
                         }
@@ -348,10 +353,12 @@ private fun HomeHeader(
     state: HomeState,
     onIntent: (HomeIntent) -> Unit,
 ) {
+    val spacing = IssueSpotTheme.spacing
+    val shapes = MaterialTheme.shapes
     Column(
         modifier = modifier
             .background(IssueSpotColors.Surface)
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .padding(horizontal = spacing.smallMedium, vertical = spacing.small)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -378,7 +385,7 @@ private fun HomeHeader(
                 modifier = Modifier
                     .weight(1f)
                     .height(48.dp),
-                shape = RoundedCornerShape(14.dp),
+                shape = shapes.medium,
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedContainerColor = IssueSpotColors.SurfaceVariant,
                     focusedContainerColor = IssueSpotColors.SurfaceVariant,
@@ -389,7 +396,7 @@ private fun HomeHeader(
                 )
             )
 
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(spacing.small))
 
             Button(
                 onClick = { onIntent(HomeIntent.CreatePostClicked) },
@@ -397,20 +404,20 @@ private fun HomeHeader(
                     containerColor = IssueSpotColors.PostButtonBackground,
                     contentColor = IssueSpotColors.PostButtonText
                 ),
-                shape = RoundedCornerShape(14.dp),
+                shape = shapes.medium,
                 modifier = Modifier.defaultMinSize(minWidth = 0.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                contentPadding = PaddingValues(horizontal = spacing.smallMedium, vertical = spacing.extraSmall),
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_add),
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(spacing.small))
                 Text("Post", style = IssueSpotTypography.bodyLarge)
             }
 
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(spacing.small))
 
             IconButton(onClick = { onIntent(HomeIntent.ProfileClicked) }) {
                 Icon(
@@ -422,13 +429,13 @@ private fun HomeHeader(
         }
 
         if (state.query.isBlank()) {
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(spacing.smallMedium))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
 
                 PostLevelChip(postLevel = state.postLevel)
 
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(spacing.small))
 
 
 
@@ -439,7 +446,7 @@ private fun HomeHeader(
                 )
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(spacing.smallMedium))
 
             Text(
                 text = "${state.postLevel.displayName} Issues",
@@ -448,7 +455,7 @@ private fun HomeHeader(
                 fontWeight = FontWeight.Bold
             )
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(spacing.extraSmall))
 
             Text(
                 text = state.postLevel.getText(),

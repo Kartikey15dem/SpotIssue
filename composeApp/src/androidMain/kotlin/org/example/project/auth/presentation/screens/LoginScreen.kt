@@ -25,6 +25,9 @@ import org.example.project.auth.presentation.viewmodel.AuthEffect
 import org.example.project.auth.presentation.viewmodel.AuthIntent
 import org.example.project.auth.presentation.viewmodel.AuthUiState
 import org.example.project.auth.presentation.viewmodel.AuthViewModel
+import org.example.project.theme.IssueSpotColors
+import org.example.project.theme.IssueSpotTheme
+import org.example.project.theme.IssueSpotTypography
 
 @Composable
 fun LoginScreen(
@@ -79,82 +82,89 @@ fun LoginContent(
     onAction: (AuthIntent) -> Unit
 ) {
     val isLoading = uiState.isLoading
+    val spacing = IssueSpotTheme.spacing
+    val shapes = MaterialTheme.shapes
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
-            .padding(24.dp),
+            .background(IssueSpotColors.Surface)
+            .padding(spacing.large),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(spacing.huge))
 
         Image(
             painter = painterResource(id = R.drawable.logo_issue),
             contentDescription = "Company Logo",
             modifier = Modifier
                 .size(160.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(Color.White),
+                .clip(shapes.large)
+                .background(IssueSpotColors.Surface),
             contentScale = ContentScale.Crop
         )
 
         Text(
             text = "IssueSpot",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.Black,
-            modifier = Modifier.padding(top = 20.dp)
+            style = IssueSpotTypography.headlineLarge,
+            color = IssueSpotColors.OnSurface,
+            modifier = Modifier.padding(top = spacing.medium)
         )
 
-        Spacer(modifier = Modifier.height(36.dp))
+        Spacer(modifier = Modifier.height(spacing.huge))
 
         OutlinedTextField(
             value = uiState.email,
             onValueChange = { onAction(AuthIntent.EmailChanged(it)) },
-            label = { Text("Email Address") },
+            label = { Text("Email Address", style = IssueSpotTypography.bodyMedium) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             modifier = Modifier.fillMaxWidth(),
+            shape = shapes.medium,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFF4A6CF7),
-                focusedLabelColor = Color(0xFF4A6CF7)
+                focusedBorderColor = IssueSpotColors.Primary,
+                focusedLabelColor = IssueSpotColors.Primary,
+                unfocusedBorderColor = IssueSpotColors.Outline,
+                cursorColor = IssueSpotColors.Primary
             ),
+            textStyle = IssueSpotTypography.bodyLarge,
             enabled = !isLoading,
             singleLine = true
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(spacing.large))
 
         Text(
             text = "We will use your email address for verification\npurpose. An OTP will be sent to your email.",
-            fontSize = 12.sp,
-            color = Color.Gray,
+            style = IssueSpotTypography.bodySmall,
+            color = IssueSpotColors.OnSurfaceVariant,
             textAlign = TextAlign.Center,
             lineHeight = 16.sp
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(spacing.extraLarge))
 
         Button(
             onClick = { onAction(AuthIntent.SendOtpClicked) },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A6CF7)),
-            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = IssueSpotColors.Primary,
+                contentColor = IssueSpotColors.OnPrimary
+            ),
+            shape = shapes.medium,
             enabled = uiState.email.contains("@") && uiState.email.contains(".") && !isLoading
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(24.dp),
-                    color = Color.White,
+                    color = IssueSpotColors.OnPrimary,
                     strokeWidth = 2.dp
                 )
             } else {
                 Text(
-                    text = "Login/Sign up",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    text = "Login / Sign up",
+                    style = IssueSpotTypography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = spacing.extraSmall)
                 )
             }
         }

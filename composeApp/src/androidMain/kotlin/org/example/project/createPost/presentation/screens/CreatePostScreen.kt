@@ -173,6 +173,9 @@ fun CreatePostScreenContent(
     state: CreatePostState,
     onIntent: (CreatePostIntent) -> Unit = {}
 ) {
+    val spacing = IssueSpotTheme.spacing
+    val shapes = MaterialTheme.shapes
+
     Surface(
         modifier = modifier.fillMaxSize(),
         color = IssueSpotColors.Surface
@@ -181,7 +184,7 @@ fun CreatePostScreenContent(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(12.dp)
+                    .padding(spacing.smallMedium)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -195,11 +198,11 @@ fun CreatePostScreenContent(
                         Icon(
                             painter = painterResource(R.drawable.ic_close),
                             contentDescription = "Close",
-                            tint = IssueSpotColors.OnBackground
+                            tint = IssueSpotColors.OnSurface
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(spacing.small))
 
                     Box(
                         modifier = Modifier
@@ -229,7 +232,7 @@ fun CreatePostScreenContent(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(spacing.smallMedium))
 
                     Column(
                         modifier = Modifier.weight(1f)
@@ -254,7 +257,7 @@ fun CreatePostScreenContent(
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(spacing.smallMedium))
 
                     Button(
                         onClick = { onIntent(CreatePostIntent.PostIssueClicked) },
@@ -262,10 +265,10 @@ fun CreatePostScreenContent(
                             containerColor = IssueSpotColors.PostButtonBackground,
                             contentColor = IssueSpotColors.PostButtonText
                         ),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = shapes.extraLarge,
                         contentPadding = PaddingValues(
-                            horizontal = 18.dp,
-                            vertical = 8.dp
+                            horizontal = spacing.medium,
+                            vertical = spacing.small
                         ),
                         elevation = ButtonDefaults.buttonElevation(
                             defaultElevation = 0.dp
@@ -273,18 +276,18 @@ fun CreatePostScreenContent(
                     ) {
                         Text(
                             text = "Post",
-                            style = IssueSpotTypography.bodyMedium,
+                            style = IssueSpotTypography.labelMedium,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
 
                 HorizontalDivider(
-                    modifier = Modifier.padding(top = 12.dp),
+                    modifier = Modifier.padding(top = spacing.smallMedium),
                     color = IssueSpotColors.Outline.copy(alpha = 0.15f)
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(spacing.smallMedium))
 
                 var boxHeightPx by remember { mutableIntStateOf(0) }
                 var cursorYInText by remember { mutableFloatStateOf(0f) }
@@ -299,8 +302,8 @@ fun CreatePostScreenContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f, fill = false)
-                        .background(Color.Transparent, RoundedCornerShape(12.dp))
-                        .border(1.dp, IssueSpotColors.OnSecondaryContainer, RoundedCornerShape(12.dp))
+                        .background(Color.Transparent, shapes.medium)
+                        .border(1.dp, IssueSpotColors.Outline, shapes.medium)
                         .onGloballyPositioned { coordinates ->
                             boxHeightPx = coordinates.size.height
                         }
@@ -362,16 +365,16 @@ fun CreatePostScreenContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .defaultMinSize(minHeight = 150.dp)
-                                .padding(12.dp),
-                            textStyle = IssueSpotTypography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurface
+                                .padding(spacing.smallMedium),
+                            textStyle = IssueSpotTypography.bodyLarge.copy(
+                                color = IssueSpotColors.OnSurface
                             ),
                             decorationBox = { innerTextField ->
                                 Box(modifier = Modifier.fillMaxWidth()) {
                                     if (textFieldValue.text.isEmpty()) {
                                         Text(
                                             text = "Describe the issue you want to report...",
-                                            style = IssueSpotTypography.bodyMedium,
+                                            style = IssueSpotTypography.bodyLarge,
                                             color = IssueSpotColors.OnSurfaceVariant
                                         )
                                     }
@@ -408,15 +411,15 @@ fun CreatePostScreenContent(
                         .align(Alignment.BottomCenter)
                         .imePadding()
                         .background(Color.Transparent)
-                        .padding(bottom = 24.dp, start = 2.dp, top = 2.dp, end = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+                        .padding(bottom = spacing.large, start = spacing.extraSmall, top = spacing.extraSmall, end = spacing.large),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.small, Alignment.End)
                 ) {
                     Box(
                         modifier = Modifier
                             .size(44.dp)
                             .background(
                                 color = IssueSpotColors.OnSurfaceVariant.copy(alpha = 0.1f),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = shapes.small
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -438,7 +441,7 @@ fun CreatePostScreenContent(
                             .size(44.dp)
                             .background(
                                 color = IssueSpotColors.OnSurfaceVariant.copy(alpha = 0.1f),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = shapes.small
                             ),
                         contentAlignment = Alignment.Center
                     ) {

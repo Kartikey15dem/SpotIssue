@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -68,6 +69,9 @@ import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.rememberLottieComposition
+import org.example.project.theme.IssueSpotColors
+import org.example.project.theme.IssueSpotTheme
+import org.example.project.theme.IssueSpotTypography
 
 @Composable
 fun LocationFetchScreenWithPermissions(
@@ -171,11 +175,14 @@ private fun LocationFetchContent(
     uiState: LocationFetchUiState,
     onIntent: (LocationFetchIntent) -> Unit
 ) {
+    val spacing = IssueSpotTheme.spacing
+    val shapes = MaterialTheme.shapes
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
-            .padding(24.dp),
+            .background(IssueSpotColors.Surface)
+            .padding(spacing.large),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -193,7 +200,7 @@ private fun LocationFetchContent(
                         modifier = Modifier
                             .fillMaxWidth(0.8f)
                             .aspectRatio(1f)
-                            .background(Color(0xFFF3F4F6), RoundedCornerShape(16.dp)),
+                            .background(IssueSpotColors.SurfaceVariant, shapes.medium),
                         contentAlignment = Alignment.Center
                     ) {
 
@@ -208,7 +215,7 @@ private fun LocationFetchContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(spacing.extraLarge))
 
         if (uiState.currentStep != LocationFetchStep.ERROR) {
             Text(
@@ -217,67 +224,73 @@ private fun LocationFetchContent(
                     LocationFetchStep.COMPLETED -> "Location fetched successfully!"
                     else -> ""
                 },
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black,
+                style = IssueSpotTypography.titleLarge,
+                color = IssueSpotColors.OnSurface,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(spacing.small))
         }
 
         if (uiState.currentStep == LocationFetchStep.COMPLETED && uiState.address != null) {
             Text(
                 text = uiState.address,
-                fontSize = 14.sp,
-                color = Color.Gray,
+                style = IssueSpotTypography.bodyMedium,
+                color = IssueSpotColors.OnSurfaceVariant,
                 textAlign = TextAlign.Center
             )
         } else if (uiState.currentStep == LocationFetchStep.ERROR && uiState.errorState != null) {
 
             Text(
                 text = uiState.errorState.message,
-                fontSize = 15.sp,
-                color = Color.DarkGray,
+                style = IssueSpotTypography.bodyLarge,
+                color = IssueSpotColors.OnSurfaceVariant,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(spacing.huge))
 
             Button(
                 onClick = { onIntent(LocationFetchIntent.ActionClicked) },
-                modifier = Modifier.fillMaxWidth(0.9f),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A6CF7)),
-                shape = RoundedCornerShape(8.dp)
+                modifier = Modifier.fillMaxWidth(0.9f).height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = IssueSpotColors.Primary),
+                shape = shapes.medium
             ) {
                 Text(
                     text = uiState.errorState.primaryButtonText,
-                    color = Color.White,
-                    modifier = Modifier.padding(vertical = 6.dp)
+                    style = IssueSpotTypography.labelLarge,
+                    color = IssueSpotColors.OnPrimary,
+                    fontWeight = FontWeight.Bold
                 )
             }
 
             if (uiState.errorState.showSecondaryRetry) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(spacing.smallMedium))
                 OutlinedButton(
                     onClick = { onIntent(LocationFetchIntent.RetryClicked) },
-                    modifier = Modifier.fillMaxWidth(0.9f),
-                    shape = RoundedCornerShape(8.dp)
+                    modifier = Modifier.fillMaxWidth(0.9f).height(56.dp),
+                    shape = shapes.medium,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = IssueSpotColors.Primary),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, IssueSpotColors.Primary)
                 ) {
-                    Text("I've turned it on, Retry", color = Color(0xFF4A6CF7))
+                    Text(
+                        text = "I've turned it on, Retry",
+                        style = IssueSpotTypography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(spacing.large))
 
             Text(
                 text = "Continue without location",
-                color = Color(0xFF4A6CF7),
-                fontSize = 14.sp,
+                color = IssueSpotColors.Primary,
+                style = IssueSpotTypography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 textDecoration = TextDecoration.Underline,
                 modifier = Modifier
                     .clickable { onIntent(LocationFetchIntent.ContinueWithoutLocation) }
-                    .padding(8.dp)
+                    .padding(spacing.small)
             )
         }
     }

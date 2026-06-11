@@ -60,6 +60,8 @@ fun PostCard(
     onCollapseClick: () -> Unit = {},
     isDetailMode: Boolean = false
 ) {
+    val spacing = IssueSpotTheme.spacing
+    val shapes = MaterialTheme.shapes
     var showReportDialog by rememberSaveable { mutableStateOf(false) }
     var hasOverflow by remember { mutableStateOf(false) }
 
@@ -74,12 +76,13 @@ fun PostCard(
                     }
                 ),
             colors = CardDefaults.cardColors(containerColor = IssueSpotColors.CardBackground),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            shape = shapes.medium
         ) {
             Box(modifier = Modifier.fillMaxWidth().then(if (isDetailMode) Modifier.fillMaxHeight() else Modifier)) {
                 Column(
                     modifier = Modifier
-                        .padding(16.dp)
+                        .padding(spacing.medium)
                         .then(if (isDetailMode) Modifier.fillMaxHeight() else Modifier)
                 ) {
                     Column(
@@ -89,7 +92,7 @@ fun PostCard(
                                 onPostClick()
                             }
                     ) {
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(spacing.small))
 
                         PostHeader(
                             userName = post.userName,
@@ -104,7 +107,7 @@ fun PostCard(
                             onCollapseClick = onCollapseClick
                         )
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(spacing.medium))
 
                         Text(
                             text = post.postText,
@@ -122,23 +125,23 @@ fun PostCard(
                                 style = IssueSpotTypography.bodyMedium,
                                 color = IssueSpotColors.Primary,
                                 modifier = Modifier
-                                    .padding(top = 4.dp)
+                                    .padding(top = spacing.extraSmall)
                                     .clickable {
                                         onPostClick()
                                     }
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(spacing.smallMedium))
 
                         if (!post.mediaUrls.isNullOrEmpty()) {
                             PostMediaPreview(post)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(spacing.smallMedium))
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = spacing.small, vertical = spacing.extraSmall),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -160,7 +163,7 @@ fun PostCard(
                             style = IssueSpotTypography.bodyLarge,
                         )
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(spacing.medium))
 
                         Icon(
                             painter = painterResource(R.drawable.ic_comment),
@@ -193,7 +196,7 @@ fun PostCard(
                             tint = if (isReported) IssueSpotColors.Error else IssueSpotColors.OnSurfaceVariant
                         )
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(spacing.medium))
 
                         Icon(
                             painter = painterResource(R.drawable.ic_share),
@@ -206,7 +209,7 @@ fun PostCard(
                         )
 
                         if (canDelete) {
-                            Spacer(modifier = Modifier.width(16.dp))
+                            Spacer(modifier = Modifier.width(spacing.medium))
                             Icon(
                                 painter = painterResource(R.drawable.ic_delete),
                                 contentDescription = "Delete",
@@ -248,6 +251,7 @@ fun PostHeader(
     isDetailMode: Boolean = false,
     onCollapseClick: () -> Unit = {}
 ) {
+    val spacing = IssueSpotTheme.spacing
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top
@@ -266,7 +270,7 @@ fun PostHeader(
                 )
             }
 
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(spacing.extraSmall))
         }
 
         Box(
@@ -296,7 +300,7 @@ fun PostHeader(
             }
         }
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(spacing.smallMedium))
 
         Column(
             modifier = Modifier.weight(1f)
@@ -316,7 +320,7 @@ fun PostHeader(
                     modifier = Modifier.weight(1f)
                 )
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(spacing.small))
 
                 PostLevelChip(postLevel)
             }
@@ -349,6 +353,7 @@ fun PostLevelChip(
     postLevel: PostLevel,
     modifier: Modifier = Modifier
 ) {
+    val spacing = IssueSpotTheme.spacing
     Box(
         modifier = modifier
             .background(
@@ -363,7 +368,7 @@ fun PostLevelChip(
         Text(
             text = postLevel.displayName,
             color = postLevel.getColor(),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = spacing.smallMedium, vertical = spacing.extraSmall),
             style = IssueSpotTypography.bodySmall,
             fontWeight = FontWeight.Bold
         )

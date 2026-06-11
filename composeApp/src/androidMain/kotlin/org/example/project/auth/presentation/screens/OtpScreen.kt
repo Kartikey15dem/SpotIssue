@@ -3,6 +3,7 @@ package org.example.project.auth.presentation.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -27,6 +28,9 @@ import org.example.project.auth.presentation.viewmodel.AuthEffect
 import org.example.project.auth.presentation.viewmodel.AuthIntent
 import org.example.project.auth.presentation.viewmodel.AuthUiState
 import org.example.project.auth.presentation.viewmodel.AuthViewModel
+import org.example.project.theme.IssueSpotColors
+import org.example.project.theme.IssueSpotTheme
+import org.example.project.theme.IssueSpotTypography
 
 @Composable
 fun OTPScreen(
@@ -75,6 +79,8 @@ fun OTPContent(
     val otpDigits = remember(otpString) {
         List(6) { index -> otpString.getOrNull(index)?.toString() ?: "" }
     }
+    val spacing = IssueSpotTheme.spacing
+    val shapes = MaterialTheme.shapes
 
     val focusRequesters = remember { List(6) { FocusRequester() } }
     val focusManager = LocalFocusManager.current
@@ -82,34 +88,34 @@ fun OTPContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
-            .padding(24.dp),
+            .background(IssueSpotColors.Surface)
+            .padding(spacing.large),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(80.dp))
+        Spacer(modifier = Modifier.height(spacing.huge * 2))
 
         Text(
             text = "Enter verification code",
-            fontSize = 24.sp,
+            style = IssueSpotTypography.headlineMedium,
             fontWeight = FontWeight.Bold,
-            color = Color.Black
+            color = IssueSpotColors.OnSurface
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(spacing.small))
 
         Text(
             text = "We have sent you a 6 digit verification\ncode to ${uiState.email}",
-            fontSize = 14.sp,
-            color = Color.Gray,
+            style = IssueSpotTypography.bodyMedium,
+            color = IssueSpotColors.OnSurfaceVariant,
             textAlign = TextAlign.Center,
             lineHeight = 20.sp
         )
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(spacing.huge))
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(horizontal = 32.dp)
+            horizontalArrangement = Arrangement.spacedBy(spacing.smallMedium),
+            modifier = Modifier.padding(horizontal = spacing.medium)
         ) {
             repeat(6) { index ->
                 val digit = otpDigits.getOrNull(index) ?: ""
@@ -134,33 +140,35 @@ fun OTPContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(spacing.extraLarge))
 
         Button(
             onClick = { onAction(AuthIntent.VerifyOtpClicked) },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A6CF7)),
-            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = IssueSpotColors.Primary,
+                contentColor = IssueSpotColors.OnPrimary
+            ),
+            shape = shapes.medium,
             enabled = otpString.length == 6 && !isLoading
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(24.dp),
-                    color = Color.White,
+                    color = IssueSpotColors.OnPrimary,
                     strokeWidth = 2.dp
                 )
             } else {
                 Text(
                     text = "Verify OTP",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    style = IssueSpotTypography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = spacing.extraSmall)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(spacing.medium))
 
         TextButton(
             onClick = { onAction(AuthIntent.SendOtpClicked) },
@@ -168,8 +176,8 @@ fun OTPContent(
         ) {
             Text(
                 text = "Resend Code",
-                color = Color(0xFF4A6CF7),
-                fontSize = 14.sp
+                style = IssueSpotTypography.labelLarge,
+                color = IssueSpotColors.Primary
             )
         }
 
@@ -239,13 +247,13 @@ fun OTPDigitField(
             previousText = newText
         },
         modifier = modifier
-            .size(50.dp)
+            .height(56.dp)
             .border(
                 width = 1.dp,
-                color = if (value.isEmpty()) Color.Gray.copy(alpha = 0.5f) else Color(0xFF4A6CF7),
-                shape = RoundedCornerShape(8.dp)
+                color = if (value.isEmpty()) IssueSpotColors.Outline else IssueSpotColors.Primary,
+                shape = MaterialTheme.shapes.small
             )
-            .background(Color.White)
+            .background(IssueSpotColors.Surface)
             .focusRequester(focusRequester),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Number,
@@ -253,11 +261,10 @@ fun OTPDigitField(
         ),
         singleLine = true,
         enabled = enabled,
-        textStyle = LocalTextStyle.current.copy(
+        textStyle = IssueSpotTypography.bodyLarge.copy(
             textAlign = TextAlign.Center,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color.Black
+            fontWeight = FontWeight.Bold,
+            color = IssueSpotColors.OnSurface
         ),
         decorationBox = { innerTextField ->
             Box(
@@ -267,8 +274,8 @@ fun OTPDigitField(
                 if (value.isEmpty()) {
                     Box(
                         modifier = Modifier
-                            .size(6.dp)
-                            .background(Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(3.dp))
+                            .size(8.dp)
+                            .background(IssueSpotColors.Outline, CircleShape)
                     )
                 }
                 innerTextField()

@@ -46,6 +46,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import org.example.project.core.components.CommentsBottomSheet
 import android.content.Intent
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Snackbar
 
@@ -83,6 +84,7 @@ import org.example.project.profile.presentation.viewmodel.ProfileSideEffect
 import org.example.project.profile.presentation.viewmodel.ProfileState
 import org.example.project.profile.presentation.viewmodel.ProfileViewModel
 import org.example.project.theme.IssueSpotColors
+import org.example.project.theme.IssueSpotTheme
 import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -172,6 +174,7 @@ fun ProfileScreenContent(
 ) {
     val pagingItems = state.activePostsFlow?.collectAsLazyPagingItems()
     var postToDelete by remember { mutableStateOf<String?>(null) }
+    val spacing = IssueSpotTheme.spacing
 
     if (state.profile == null) {
         Box(
@@ -182,8 +185,12 @@ fun ProfileScreenContent(
                 CircularProgressIndicator(color = IssueSpotColors.Primary)
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(state.profileError ?: "Error loading profile", color = IssueSpotColors.OnBackground)
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = state.profileError ?: "Error loading profile",
+                        color = IssueSpotColors.OnBackground,
+                        style = IssueSpotTypography.bodyLarge
+                    )
+                    Spacer(modifier = Modifier.height(spacing.medium))
                     Button(
                         onClick = { onIntent(ProfileIntent.RetryProfileClicked) },
                         colors = ButtonDefaults.buttonColors(containerColor = IssueSpotColors.Primary)
@@ -235,10 +242,10 @@ fun ProfileScreenContent(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                        .padding(horizontal = spacing.medium),
+                    verticalArrangement = Arrangement.spacedBy(spacing.smallMedium)
                 ) {
-                    item { Spacer(Modifier.height(8.dp)) }
+                    item { Spacer(Modifier.height(spacing.small)) }
 
                     item {
                         ProfileHeader(state.profile, onIntent)
@@ -248,10 +255,10 @@ fun ProfileScreenContent(
                         Column {
                             Text(
                                 text = "Posts by Area",
-                                style = IssueSpotTypography.bodyLarge,
+                                style = IssueSpotTypography.titleLarge,
                                 fontWeight = FontWeight.SemiBold
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(spacing.extraSmall))
                             PostLevel.entries.forEachIndexed { i, entry ->
                                 PostByAreaBar(
                                     postByArea = state.profile.postByArea.getOrElse(i) { 0 },
@@ -268,7 +275,8 @@ fun ProfileScreenContent(
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = IssueSpotColors.Primary,
                                 contentColor = Color.White
-                            )
+                            ),
+                            shape = MaterialTheme.shapes.medium
                         ) {
                             Text(
                                 text = "+  Post New Issue",
@@ -291,12 +299,13 @@ fun ProfileScreenContent(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(32.dp),
+                                        .padding(spacing.huge),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        refreshError.error.message ?: "An error occurred",
-                                        color = IssueSpotColors.OnBackground
+                                        text = refreshError.error.message ?: "An error occurred",
+                                        color = IssueSpotColors.OnBackground,
+                                        style = IssueSpotTypography.bodyMedium
                                     )
                                 }
                             }
@@ -316,10 +325,14 @@ fun ProfileScreenContent(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(32.dp),
+                                        .padding(spacing.huge),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("No posts found", color = IssueSpotColors.OnBackground)
+                                    Text(
+                                        text = "No posts found",
+                                        color = IssueSpotColors.OnBackground,
+                                        style = IssueSpotTypography.bodyLarge
+                                    )
                                 }
                             }
                         } else {
@@ -363,7 +376,7 @@ fun ProfileScreenContent(
 
                         if (pagingItems.loadState.append is LoadState.Loading) {
                             item {
-                                Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                Box(modifier = Modifier.fillMaxWidth().padding(spacing.medium), contentAlignment = Alignment.Center) {
                                     CircularProgressIndicator(color = IssueSpotColors.Primary)
                                 }
                             }
@@ -372,15 +385,16 @@ fun ProfileScreenContent(
                         if (appendError != null && pagingItems.itemCount > 0) {
                             item {
                                 Text(
-                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
                                     text = appendError.error.message ?: "An error occurred",
-                                    color = IssueSpotColors.OnBackground
+                                    color = IssueSpotColors.OnBackground,
+                                    style = IssueSpotTypography.bodyMedium
                                 )
                             }
                         }
                     }
                     
-                    item { Spacer(Modifier.height(16.dp)) }
+                    item { Spacer(Modifier.height(spacing.medium)) }
                 }
             }
         }
@@ -390,19 +404,19 @@ fun ProfileScreenContent(
         AlertDialog(
             onDismissRequest = { postToDelete = null },
             title = { Text("Delete Post", style = IssueSpotTypography.titleMedium, fontWeight = FontWeight.Bold, color = IssueSpotColors.OnBackground) },
-            text = { Text("Are you sure you want to delete this post? This action cannot be undone.", color = IssueSpotColors.OnSurfaceVariant) },
+            text = { Text("Are you sure you want to delete this post? This action cannot be undone.", color = IssueSpotColors.OnSurfaceVariant, style = IssueSpotTypography.bodyMedium) },
             containerColor = IssueSpotColors.Surface,
             confirmButton = {
                 TextButton(onClick = { 
                     onIntent(ProfileIntent.DeletePostClicked(postToDelete!!)) 
                     postToDelete = null 
                 }) { 
-                    Text("Delete", color = Color.Red, fontWeight = FontWeight.Bold) 
+                    Text("Delete", color = Color.Red, fontWeight = FontWeight.Bold, style = IssueSpotTypography.labelLarge) 
                 }
             },
             dismissButton = {
                 TextButton(onClick = { postToDelete = null }) { 
-                    Text("Cancel", color = IssueSpotColors.Primary) 
+                    Text("Cancel", color = IssueSpotColors.Primary, style = IssueSpotTypography.labelLarge) 
                 }
             }
         )
@@ -433,6 +447,7 @@ fun ProfileScreenContent(
 
 @Composable
 private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
+    val spacing = IssueSpotTheme.spacing
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -465,18 +480,18 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                     )
                 }
             }
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(spacing.small))
             Column (
                 modifier = Modifier.weight(1f)
             ){
                 Text(
                     text = profile.name,
-                    style = IssueSpotTypography.bodyLarge,
+                    style = IssueSpotTypography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(3.dp))
+                Spacer(modifier = Modifier.height(spacing.extraSmall))
                 Text(
                     text = profile.location.ifBlank { "No location set" },
                     style = IssueSpotTypography.bodyMedium,
@@ -493,13 +508,13 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                     .size(20.dp)
             )
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(spacing.medium))
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             StatsCard(count = profile.totalPosts, label = "Total Posts", modifier = Modifier.weight(1f))
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(spacing.smallMedium))
             StatsCard(count = profile.acks, label = "Acknowledgements", modifier = Modifier.weight(1f))
         }
     }
@@ -507,23 +522,28 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
 
 @Composable
 private fun StatsCard(count: Int, label: String, modifier: Modifier = Modifier) {
-    Card(modifier = modifier) {
+    val spacing = IssueSpotTheme.spacing
+    Card(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 10.dp),
+                .padding(vertical = spacing.smallMedium),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = count.toString(),
                 textAlign = TextAlign.Center,
-                style = IssueSpotTypography.bodyLarge,
+                style = IssueSpotTypography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp
             )
             Text(
                 text = label,
                 textAlign = TextAlign.Center,
+                style = IssueSpotTypography.labelSmall,
                 fontSize = 12.sp
             )
         }
@@ -536,9 +556,10 @@ fun PostByAreaBar(
     postByArea: Int,
     postLevel: PostLevel
 ) {
+    val spacing = IssueSpotTheme.spacing
     Row(
         modifier = modifier
-            .padding(4.dp)
+            .padding(spacing.extraSmall)
             .fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -556,6 +577,7 @@ fun ProfilePostTabsHeader(
     state: ProfileState,
     onIntent: (ProfileIntent) -> Unit
 ) {
+    val spacing = IssueSpotTheme.spacing
     Column {
         SegmentedControl(
             items = listOf("My Posts", "Liked Posts"),
@@ -566,7 +588,7 @@ fun ProfilePostTabsHeader(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(spacing.large))
 
         SegmentedControlFilter(
             items = listOf("Latest", "Oldest", "Popular"),
@@ -586,7 +608,7 @@ fun ProfilePostTabsHeader(
             },
             modifier = Modifier.fillMaxWidth()
         )
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(spacing.large))
     }
 }
 
@@ -597,12 +619,13 @@ fun SegmentedControl(
     onItemSelected: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val spacing = IssueSpotTheme.spacing
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .height(32.dp)
+            .height(36.dp)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(3.dp),
+            .padding(spacing.extraSmall),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         items.forEachIndexed { index, title ->
@@ -611,18 +634,19 @@ fun SegmentedControl(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .height(ButtonDefaults.MinHeight)
+                    .fillMaxHeight()
                     .clip(RoundedCornerShape(50))
                     .background(
                         if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent
                     )
                     .clickable { onItemSelected(index) }
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = spacing.small),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = title,
                     color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = IssueSpotTypography.labelLarge,
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -636,7 +660,7 @@ fun SegmentedControlFilter(
     selectedIndex: Int,
     onItemSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    height: Dp = 30.dp,
+    height: Dp = 32.dp,
     gap: Dp = 10.dp,
     cornerRadius: Dp = 12.dp
 ) {
@@ -657,7 +681,7 @@ fun SegmentedControlFilter(
                     .height(height)
                     .clip(shape)
                     .background(
-                        color = if (selected) Color(0xFF030213) else MaterialTheme.colorScheme.surface
+                        color = if (selected) IssueSpotColors.OnBackground else MaterialTheme.colorScheme.surface
                     )
                     .border(0.4.dp, borderColor, shape)
                     .clickable { onItemSelected(index) },

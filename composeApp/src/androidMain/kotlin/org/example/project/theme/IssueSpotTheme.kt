@@ -3,6 +3,7 @@ package org.example.project.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -34,6 +35,7 @@ private val IssueSpotColorScheme = lightColorScheme(
 
 @Composable
 fun IssueSpotTheme(
+    spacing: IssueSpotSpacing = IssueSpotSpacing(),
     content: @Composable () -> Unit
 ) {
     val view = LocalView.current
@@ -45,9 +47,23 @@ fun IssueSpotTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = IssueSpotColorScheme,
-        typography = IssueSpotTypography,
-        content = content
-    )
+    CompositionLocalProvider(
+        LocalIssueSpotSpacing provides spacing
+    ) {
+        MaterialTheme(
+            colorScheme = IssueSpotColorScheme,
+            typography = IssueSpotTypography,
+            shapes = IssueSpotShapes,
+            content = content
+        )
+    }
+}
+
+/**
+ * Accessor object for the IssueSpot theme properties.
+ */
+object IssueSpotTheme {
+    val spacing: IssueSpotSpacing
+        @Composable
+        get() = LocalIssueSpotSpacing.current
 }
