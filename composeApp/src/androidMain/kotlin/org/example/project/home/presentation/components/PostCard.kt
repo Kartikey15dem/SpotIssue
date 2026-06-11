@@ -51,6 +51,7 @@ fun PostCard(
     isReported: Boolean,
     modifier: Modifier = Modifier,
     canDelete: Boolean = false,
+    canReport : Boolean = true,
     onLikeClick: () -> Unit,
     onCommentIconClick: () -> Unit,
     onShareClick: () -> Unit,
@@ -179,22 +180,24 @@ fun PostCard(
                             style = IssueSpotTypography.bodyLarge,
                             color = IssueSpotColors.OnSurfaceVariant
                         )
-
                         Spacer(modifier = Modifier.weight(1f))
 
-                        Icon(
-                            painter = painterResource(
-                                id = if (isReported) R.drawable.ic_report_filled else R.drawable.ic_report
-                            ),
-                            contentDescription = "Report",
-                            modifier = Modifier
-                                .clickable(enabled = !isReported) {
-                                    showReportDialog = true
-                                }
-                                .size(20.dp)
-                                .padding(end = 2.dp),
-                            tint = if (isReported) IssueSpotColors.Error else IssueSpotColors.OnSurfaceVariant
-                        )
+                        if(canReport) {
+
+                            Icon(
+                                painter = painterResource(
+                                    id = if (isReported) R.drawable.ic_report_filled else R.drawable.ic_report
+                                ),
+                                contentDescription = "Report",
+                                modifier = Modifier
+                                    .clickable(enabled = !isReported) {
+                                        showReportDialog = true
+                                    }
+                                    .size(20.dp)
+                                    .padding(end = 2.dp),
+                                tint = if (isReported) IssueSpotColors.Error else IssueSpotColors.OnSurfaceVariant
+                            )
+                        }
 
                         Spacer(modifier = Modifier.width(spacing.medium))
 

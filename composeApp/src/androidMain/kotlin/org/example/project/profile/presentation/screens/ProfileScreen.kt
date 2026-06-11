@@ -227,6 +227,7 @@ fun ProfileScreenContent(
                     commentsCount = resolvedComments,
                     isReported = isReported,
                     canDelete = state.isMine,
+                    canReport = !state.isMine,
                     onDeleteClick = { postToDelete = post.id },
                     onLikeClick = {
                         onIntent(ProfileIntent.LikeClicked(post.id, isLiked, resolvedLikes))
@@ -361,6 +362,7 @@ fun ProfileScreenContent(
                                         commentsCount = resolvedComments,
                                         isReported = isReported,
                                         canDelete = state.isMine,
+                                        canReport = !state.isMine,
                                         onDeleteClick = { postToDelete = post.id },
                                         onLikeClick = {
                                             onIntent(ProfileIntent.LikeClicked(post.id, isLiked, resolvedLikes))

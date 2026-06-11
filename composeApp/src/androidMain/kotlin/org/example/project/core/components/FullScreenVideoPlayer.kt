@@ -33,17 +33,18 @@ import org.example.project.R // Make sure to import your R file
 fun FullScreenVideoPlayer(url: String) {
     val context = LocalContext.current
 
+    // State for Mute Button
+    var isMuted by remember { mutableStateOf(false) }
+
     // 1. Initialize ExoPlayer
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(url))
+            volume = if (isMuted) 0f else 1f
             prepare()
             playWhenReady = true
         }
     }
-
-    // State for Mute Button
-    var isMuted by remember { mutableStateOf(true) }
 
     // 2. Manage Lifecycle (Clean up when closed)
     DisposableEffect(Unit) {
@@ -74,12 +75,15 @@ fun FullScreenVideoPlayer(url: String) {
             modifier = Modifier.fillMaxSize()
         )
 
-        // 4. Loading Spinner logic
+        // 4. Loading Spinner and Volume Sync logic
         var isBuffering by remember { mutableStateOf(true) }
         DisposableEffect(exoPlayer) {
             val listener = object : Player.Listener {
                 override fun onPlaybackStateChanged(state: Int) {
                     isBuffering = (state == Player.STATE_BUFFERING)
+                }
+                override fun onVolumeChanged(volume: Float) {
+                    isMuted = volume == 0f
                 }
             }
             exoPlayer.addListener(listener)

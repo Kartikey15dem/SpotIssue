@@ -90,6 +90,10 @@ fun VideoPreviewPlayer(
                     showPlayButton = true // Show the play button so user can restart
                 }
             }
+
+            override fun onVolumeChanged(volume: Float) {
+                isMuted = volume == 0f
+            }
         }
         exoPlayer.addListener(listener)
         onDispose {
