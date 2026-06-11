@@ -28,6 +28,20 @@ class ProfileViewModel(
     private val postRepository: PostRepository
 ) : ViewModel() {
 
+    /* ===================================================================================
+     * SECTION: PROFILE & SMART SORTING ARCHITECTURE
+     * ===================================================================================
+     * Manages the complex intersection of user profile analytics and their personal feed.
+     * 
+     * Optimistic UI (PostOverrides):
+     * Implements a local override map (`postOverrides`) to instantly reflect likes and
+     * comments in the UI without waiting for an expensive Paging3 invalidation/network call.
+     * 
+     * Smart Sorting:
+     * Listens to tab changes (My Posts vs Liked Posts) and Sorting parameters (Latest, 
+     * Oldest, Popular) and swaps the underlying PagingData Flow dynamically.
+     */
+
     private val _uiState = MutableStateFlow(ProfileState())
     val uiState: StateFlow<ProfileState> = _uiState.asStateFlow()
 
@@ -99,7 +113,7 @@ class ProfileViewModel(
         viewModelScope.launch {
             when (val result = postRepository.deletePost(postId)) {
                 is DataState.Success -> {
-                    _sideEffects.emit(ProfileSideEffect.ShowSnackbar("Post deleted successfully"))
+                    // Do nothing
                 }
                 is DataState.Error -> {
                     handleError(result.exception)
@@ -130,7 +144,7 @@ class ProfileViewModel(
         updateOverride(postId, isReported = true)
         viewModelScope.launch {
             when (val result = postRepository.reportPost(postId, reason)) {
-                is DataState.Success -> _sideEffects.emit(ProfileSideEffect.ShowSnackbar("Post reported successfully"))
+                is DataState.Success -> {}
                 is DataState.Error -> {
                     updateOverride(postId, isReported = currentIsReported)
                     handleError(result.exception)
@@ -175,7 +189,7 @@ class ProfileViewModel(
         viewModelScope.launch {
             when (val result = postRepository.addComment(postId, comment)) {
                 is DataState.Success -> {
-                    _sideEffects.emit(ProfileSideEffect.ShowSnackbar("Comment posted successfully!"))
+                    // Do nothing
                 }
                 is DataState.Error -> {
                     updateOverride(postId, commentsCount = currentCommentCount)

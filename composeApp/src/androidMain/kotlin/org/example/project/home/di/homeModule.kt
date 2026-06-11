@@ -7,7 +7,7 @@ import org.koin.core.module.dsl.viewModelOf
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
-val homeUiModule = module {
+val homeModule = module {
 
     viewModelOf(::HomeViewModel)
     viewModel { parameters -> PostDetailViewModel(postId = parameters.get(), postRepository = get()) }

@@ -4,7 +4,7 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import org.example.project.core.model.home.Comment
 import org.example.project.core.model.home.toComment
-import org.example.project.core.network.NetworkMonitor
+import org.example.project.core.utils.NetworkMonitor
 import org.example.project.core.network.services.PostService
 import org.example.project.core.utils.DataState
 import org.example.project.core.utils.safeApiCall

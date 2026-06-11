@@ -8,15 +8,15 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.NetworkRequest.Builder
 import androidx.core.content.getSystemService
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
+import org.example.project.core.utils.NetworkMonitor
 
- class ConnectivityManagerNetworkMonitor(
+class ConnectivityManagerNetworkMonitor(
     private val context: Context,
 
 ) : NetworkMonitor {

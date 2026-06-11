@@ -14,15 +14,29 @@ import org.example.project.core.utils.parseIsoEpochMillis
 import kotlin.time.Clock
 import org.example.project.core.data.local.FeedLocalDataSource
 import org.example.project.core.data.mappers.toPost
-import org.example.project.core.database.entities.toEntity
 import org.example.project.core.model.auth.UserLocation
 import org.example.project.core.model.home.PostLevel
-import org.example.project.core.network.NetworkMonitor
-import org.example.project.core.database.dao.MediatorTransactionDao
+import org.example.project.core.utils.NetworkMonitor
 import org.example.project.core.utils.DataState
 import org.example.project.core.utils.safeApiCall
 
 @OptIn(ExperimentalPagingApi::class)
+/**
+ * ===================================================================================
+ * SECTION: OFFLINE-FIRST PAGING ARCHITECTURE
+ * ===================================================================================
+ * This RemoteMediator is the core of the offline-first experience for the Home feed.
+ * It sits between the local Room database (cache) and the Ktor network service.
+ * 
+ * Logic Flow:
+ * 1. Checks `initialize()` to see if the cache is stale or a forced refresh is requested.
+ * 2. On `load()`, it determines the correct pagination key (page number).
+ * 3. Fetches data from the network.
+ * 4. Uses `MediatorTransactionDao` to atomically clear old data and insert new data into the 
+ *    local database. This atomicity prevents UI flickering (empty screens) during refreshes.
+ * 5. The UI observes the local database directly via PagingSource, ensuring instant loads
+ *    on subsequent app launches.
+ */
 class FeedPostsRemoteMediator(
     private val postLevel: PostLevel,
     private val userLocation: UserLocation?,

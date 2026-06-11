@@ -20,6 +20,7 @@ data class UserPostEntity(
     val locality: String? = null,
     val district: String? = null,
     val state: String? = null,
+    val country: String? = null,
     val postLevel: String, // "LOCALITY", "DISTRICT", "STATE", "COUNTRY"
     val likes: Int = 0,
     val comments: Int = 0,

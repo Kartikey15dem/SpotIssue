@@ -21,6 +21,14 @@ suspend fun pdfToBitmaps(context: Context, uri: Uri): List<Bitmap> {
         var tempFile: File? = null
         try {
             android.util.Log.d("PdfToBitmap", "Loading PDF from URI: $uri, scheme: ${uri.scheme}")
+            
+            /* WHY THIS CONDITIONAL LOGIC EXISTS:
+             * Android's `PdfRenderer` natively requires a seekable `ParcelFileDescriptor`.
+             * It absolutely cannot read a remote stream (http/https) directly.
+             * Therefore, if the URI is a remote network URL, we MUST download it to a 
+             * local temporary cache file first, get a file descriptor for that local file, 
+             * and then pass it to the PdfRenderer.
+             */
             val fileDescriptor: ParcelFileDescriptor? = if (uri.scheme == "http" || uri.scheme == "https") {
                 tempFile = File(context.cacheDir, "temp_pdf_${System.currentTimeMillis()}.pdf")
                 android.util.Log.d("PdfToBitmap", "Downloading remote PDF to ${tempFile.absolutePath}")
@@ -51,22 +59,23 @@ suspend fun pdfToBitmaps(context: Context, uri: Uri): List<Bitmap> {
                 val renderer = PdfRenderer(fd)
                 android.util.Log.d("PdfToBitmap", "PDF opened successfully. Page count: ${renderer.pageCount}")
 
-                // 2. Loop through all pages
                 for (i in 0 until renderer.pageCount) {
                     val page = renderer.openPage(i)
 
-                    // 3. Create a bitmap (A4 size scaled to screen density helps)
-                    // We use a fixed width for consistency
                     val width = 1080
                     val height = (width.toFloat() / page.width * page.height).toInt()
 
                     val bitmap = createBitmap(width, height, Bitmap.Config.ARGB_8888)
                     
-                    // Fill with white background (PDFs often have transparent backgrounds)
+                    /* WHY DRAW A WHITE BACKGROUND:
+                     * By default, `createBitmap` has a transparent alpha channel.
+                     * Many PDFs do not explicitly define a background color (they assume white paper).
+                     * If we render directly, the transparent background often shows up as solid black 
+                     * in Android ImageViews, hiding dark text. Drawing white first fixes this.
+                     */
                     val canvas = Canvas(bitmap)
                     canvas.drawColor(Color.WHITE)
 
-                    // 4. Render the page onto the bitmap
                     page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                     bitmaps.add(bitmap)
 
@@ -78,6 +87,10 @@ suspend fun pdfToBitmaps(context: Context, uri: Uri): List<Bitmap> {
             android.util.Log.e("PdfToBitmap", "Error rendering PDF: ${e.message}", e)
             e.printStackTrace()
         } finally {
+            /* 
+             * Crucial cleanup step. We must delete the temporary file after rendering
+             * the Bitmaps into memory so the device's cache folder doesn't bloat.
+             */
             try {
                 tempFile?.delete()
                 android.util.Log.d("PdfToBitmap", "Deleted temp file")

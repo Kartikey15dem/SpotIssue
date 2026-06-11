@@ -14,7 +14,6 @@ actual val platformDatabaseModule: Module = module{
     single<IssueSpotDatabase> {
         val ioContext: CoroutineContext = Dispatchers.IO
 
-        // Now this will compile perfectly!
         AppDatabaseFactory(androidApplication())
             .createDatabase(IssueSpotDatabase::class.java, "issuespot.db")
             .fallbackToDestructiveMigration(true)

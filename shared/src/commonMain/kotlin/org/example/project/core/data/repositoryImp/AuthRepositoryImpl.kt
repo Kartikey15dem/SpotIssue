@@ -6,7 +6,7 @@ import org.example.project.core.network.dto.AuthRequestOtpResponse
 import org.example.project.core.network.dto.LoginRequestDto
 import org.example.project.core.network.dto.VerifyRequestDto
 import org.example.project.core.network.dto.VerifyResponseDto
-import org.example.project.core.network.NetworkMonitor
+import org.example.project.core.utils.NetworkMonitor
 import org.example.project.core.network.services.AuthenticationService
 import org.example.project.core.utils.DataState
 import org.example.project.core.utils.safeApiCall

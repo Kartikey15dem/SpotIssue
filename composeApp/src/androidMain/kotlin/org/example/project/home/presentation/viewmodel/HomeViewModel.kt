@@ -37,6 +37,21 @@ class HomeViewModel(
     private val currentLevelManager: CurrentLevelManager
 ) : ViewModel() {
 
+    /* ===================================================================================
+     * SECTION: HYBRID LOCAL/REMOTE FEED ORCHESTRATION
+     * ===================================================================================
+     * Acts as the central hub connecting the offline-first repository with the UI.
+     * 
+     * Key Mechanisms:
+     * 1. Dual-Observation: Combines the globally selected `PostLevel` with the user's 
+     *    `UserLocation` (from DataStore) to dynamically switch the Paging flow.
+     * 2. Optimistic UI (`updateOverride`): Instantly injects newly authored comments 
+     *    (using the locally observed profile avatar) and toggles likes natively before 
+     *    the backend responds.
+     * 3. Cache-First Loading: Inits Paging requests with `forceRefresh = false` to 
+     *    instantly display cached Room data while the RemoteMediator syncs silently.
+     */
+
     private val _uiState = MutableStateFlow(HomeState())
     val uiState: StateFlow<HomeState> = _uiState.asStateFlow()
 
@@ -180,7 +195,7 @@ class HomeViewModel(
         updateOverride(postId, isReported = true)
         viewModelScope.launch {
             when (val result = postRepository.reportPost(postId, reason)) {
-                is DataState.Success -> _sideEffects.emit(HomeSideEffect.ShowSnackbar("Post reported successfully"))
+                is DataState.Success -> {}
                 is DataState.Error -> {
                     updateOverride(postId, isReported = currentIsReported)
                     handleError(result.exception)
@@ -225,7 +240,7 @@ class HomeViewModel(
         viewModelScope.launch {
             when (val result = postRepository.addComment(postId, comment)) {
                 is DataState.Success -> {
-                    _sideEffects.emit(HomeSideEffect.ShowSnackbar("Comment posted successfully!"))
+                    // Do nothing
                 }
                 is DataState.Error -> {
                     updateOverride(postId, commentsCount = currentCommentCount)

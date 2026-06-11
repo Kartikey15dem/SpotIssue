@@ -139,7 +139,7 @@ fun CreatePostScreen(
                     snackbarHostState.showSnackbar(effect.message)
                 }
                 is CreatePostSideEffect.PostCreated -> {
-                    snackbarHostState.showSnackbar("Post created successfully!")
+                    // Do nothing
                 }
                 CreatePostSideEffect.StartBackgroundUpload -> {
                     val workRequest = OneTimeWorkRequestBuilder<PostUploadWorker>().build()

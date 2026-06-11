@@ -7,19 +7,8 @@ import org.koin.core.module.dsl.viewModelOf
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
-/**
- * Android-specific Auth module for ViewModels
- * Contains only Android UI layer dependencies (ViewModels)
- */
 val authModule = module {
-    // ViewModels with dependencies
     viewModelOf(::AuthViewModel)
     viewModelOf(::LocationFetchViewModel)
-    viewModel { params ->
-        NameCaptureViewModel(
-            email = params.get<String>(),
-            prefRepository = get(),
-            profileRepository = get()
-        )
-    }
+    viewModelOf(::NameCaptureViewModel)
 }

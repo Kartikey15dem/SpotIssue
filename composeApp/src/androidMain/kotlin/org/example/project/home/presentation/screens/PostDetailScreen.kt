@@ -1,6 +1,5 @@
 package org.example.project.home.presentation.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
@@ -14,7 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.paging.compose.collectAsLazyPagingItems
 import org.example.project.R
 import org.example.project.core.components.CommentItem
-import org.example.project.home.presentation.components.PostCard
+import org.example.project.core.components.PostCard
 import org.example.project.home.presentation.viewmodel.PostDetailViewModel
 import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTypography

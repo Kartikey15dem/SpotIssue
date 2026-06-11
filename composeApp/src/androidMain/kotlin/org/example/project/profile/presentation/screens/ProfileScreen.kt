@@ -22,7 +22,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -32,13 +31,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.activity.compose.BackHandler
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.derivedStateOf
@@ -73,9 +70,8 @@ import androidx.paging.LoadState
 import androidx.paging.compose.itemKey
 import kotlinx.coroutines.flow.collectLatest
 import org.example.project.R
-import org.example.project.core.utils.DataState
-import org.example.project.home.presentation.components.PostCard
-import org.example.project.home.presentation.components.PostLevelChip
+import org.example.project.core.components.PostCard
+import org.example.project.core.components.PostLevelChip
 import org.example.project.core.data.mappers.Sort
 import org.example.project.core.model.home.PostLevel
 import org.example.project.core.model.profile.Profile

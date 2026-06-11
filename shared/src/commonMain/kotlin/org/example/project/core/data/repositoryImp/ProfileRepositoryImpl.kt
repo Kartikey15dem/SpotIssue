@@ -8,7 +8,6 @@ import androidx.paging.map
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import androidx.paging.ExperimentalPagingApi
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.database.IssueSpotDatabase
@@ -32,20 +31,17 @@ import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.content.PartData
 import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.core.build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.encodeToString
 import okio.FileSystem
 import okio.Path.Companion.toPath
 import okio.buffer
 import okio.SYSTEM
 import org.example.project.core.network.dto.EmailChangeRequest
 import org.example.project.core.network.dto.EmailChangeVerifyRequest
-import org.example.project.core.network.NetworkMonitor
+import org.example.project.core.utils.NetworkMonitor
 
 class ProfileRepositoryImpl(
     private val profileService: ProfileService,

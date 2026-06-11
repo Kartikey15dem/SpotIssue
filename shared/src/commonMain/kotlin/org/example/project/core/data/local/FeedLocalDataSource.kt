@@ -22,25 +22,6 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
     private val cacheMetadataDao = database.cacheMetadataDao()
     private val activeIssuesDao = database.activeIssuesDao()
 
-    /**
-     * Get cached posts for a specific level
-     */
-    suspend fun getCachedPosts(postLevel: PostLevel): List<Post> {
-        return postDao.getPostsByLevel(postLevel.name).map { it.toPost() }
-    }
-
-    /**
-     * Observe cached posts for a specific level
-     */
-    fun observeCachedPosts(postLevel: PostLevel): Flow<List<Post>> {
-        return postDao.observePostsByLevel(postLevel.name).map { list ->
-            list.map { it.toPost() }
-        }
-    }
-
-    /**
-     * Cache posts for a specific level
-     */
     suspend fun cachePosts(postLevel: PostLevel, posts: List<Post>) {
         val now = Clock.System.now().toEpochMilliseconds()
 
@@ -77,11 +58,6 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
     }
 
     /**
-     * Paging source backed by Room for offline paging.
-     */
-    fun pagingSource(postLevel: PostLevel) = postDao.pagingSourceByLevel(postLevel.name)
-
-    /**
      * Check if cached posts are stale
      */
     suspend fun isPostsCacheStale(postLevel: PostLevel): Boolean {
@@ -89,13 +65,6 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
             CacheMetadataEntity.Companion.postsKey(postLevel.name)
         )
         return metadata?.isStale() ?: true
-    }
-
-    /**
-     * Get cached active issues count
-     */
-    suspend fun getCachedActiveIssues(postLevel: PostLevel): Int? {
-        return activeIssuesDao.getActiveIssues(postLevel.name)?.count
     }
 
     /**
@@ -126,22 +95,4 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
         cacheMetadataDao.insertMetadata(metadata)
     }
 
-    /**
-     * Check if active issues cache is stale
-     */
-    suspend fun isActiveIssuesCacheStale(postLevel: PostLevel): Boolean {
-        val metadata = cacheMetadataDao.getMetadata(
-            CacheMetadataEntity.Companion.activeIssuesKey(postLevel.name)
-        )
-        return metadata?.isStale() ?: true
-    }
-
-    /**
-     * Clear all cached data
-     */
-    suspend fun clearAllCache() {
-        postDao.clearAll()
-        activeIssuesDao.clearAll()
-        cacheMetadataDao.clearAll()
-    }
 }

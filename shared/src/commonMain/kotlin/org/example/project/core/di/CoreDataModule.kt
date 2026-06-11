@@ -13,7 +13,6 @@ val coreDataModule = module {
     includes(DaoModule)
     includes(platformNetworkModule)
 
-    // Local data sources
     single { FeedLocalDataSource(get()) }
-    single { ProfileLocalDataSource(get(), get(), get()) }
+    single { ProfileLocalDataSource(get()) }
 }

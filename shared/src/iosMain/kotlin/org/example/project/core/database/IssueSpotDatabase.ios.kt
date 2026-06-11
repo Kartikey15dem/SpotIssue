@@ -31,7 +31,8 @@ import org.example.project.core.database.entities.RemoteKeysEntity
         RemoteKeysEntity::class
     ],
     version = 5,
-    exportSchema = true
+    exportSchema = true,
+    autoMigrations = []
 )
 @ConstructedBy(AppDatabaseConstructor::class)
 actual abstract class IssueSpotDatabase : RoomDatabase() {

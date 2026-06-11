@@ -224,7 +224,6 @@ private fun LocationFetchContent(
                 text = when (uiState.currentStep) {
                     LocationFetchStep.FETCHING -> "Fetching your location..."
                     LocationFetchStep.COMPLETED -> "Location fetched successfully!"
-                    else -> ""
                 },
                 style = IssueSpotTypography.titleLarge,
                 color = IssueSpotColors.OnSurface,

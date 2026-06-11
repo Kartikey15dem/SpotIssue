@@ -4,7 +4,7 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
-import org.example.project.core.network.NetworkMonitor
+import org.example.project.core.utils.NetworkMonitor
 import org.example.project.core.network.services.HomeService
 import org.example.project.core.data.mappers.toPost
 import org.example.project.core.utils.DataState

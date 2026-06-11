@@ -33,6 +33,11 @@ fun CommentsBottomSheet(
     comments: LazyPagingItems<Comment>?,
     onDismiss: () -> Unit,
     onSubmit: (String) -> Unit,
+    /* WHY PASS CURRENT USER IMAGE URL:
+     * We pass this from the ViewModel so that when the user submits a comment, 
+     * we can immediately inject it into the top of the PagingData stream (Optimistic UI).
+     * This avoids a "flash" or waiting for the network response, making the app feel instant.
+     */
     currentUserImageUrl: String? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)

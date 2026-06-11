@@ -1,9 +1,7 @@
-package org.example.project.core.network
+package org.example.project.core.utils
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-import org.example.project.core.utils.DataState
-import org.example.project.core.utils.NETWORK_ERROR_MESSAGE
 
 interface NetworkMonitor {
     val isOnline: Flow<Boolean>

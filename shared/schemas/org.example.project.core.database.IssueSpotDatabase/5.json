@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "d8f4224424cc630521104a6191bde7ae",
+    "identityHash": "1222162f4fd4f28546ac10b727789e8a",
     "entities": [
       {
         "tableName": "profile",
@@ -75,7 +75,7 @@
       },
       {
         "tableName": "posts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `userUrl` TEXT NOT NULL, `userName` TEXT NOT NULL, `timeAgo` TEXT NOT NULL, `postLevel` TEXT NOT NULL, `location` TEXT NOT NULL, `postText` TEXT NOT NULL, `mediaType` TEXT NOT NULL, `mediaUrlsStr` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, `isLiked` INTEGER NOT NULL, `isReported` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `userUrl` TEXT NOT NULL, `userName` TEXT NOT NULL, `timeAgo` TEXT NOT NULL, `postLevel` TEXT NOT NULL, `location` TEXT NOT NULL, `locality` TEXT, `district` TEXT, `state` TEXT, `country` TEXT, `postText` TEXT NOT NULL, `mediaType` TEXT NOT NULL, `mediaUrlsStr` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, `isLiked` INTEGER NOT NULL, `isReported` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -118,6 +118,26 @@
             "columnName": "location",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "locality",
+            "columnName": "locality",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "district",
+            "columnName": "district",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "country",
+            "columnName": "country",
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "postText",
@@ -237,7 +257,7 @@
       },
       {
         "tableName": "user_posts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `userName` TEXT NOT NULL, `userAvatar` TEXT, `postText` TEXT NOT NULL, `mediaType` TEXT, `mediaUrlsStr` TEXT NOT NULL, `location` TEXT NOT NULL, `locality` TEXT, `district` TEXT, `state` TEXT, `postLevel` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `isLiked` INTEGER NOT NULL, `isReported` INTEGER NOT NULL, `timeAgo` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `userName` TEXT NOT NULL, `userAvatar` TEXT, `postText` TEXT NOT NULL, `mediaType` TEXT, `mediaUrlsStr` TEXT NOT NULL, `location` TEXT NOT NULL, `locality` TEXT, `district` TEXT, `state` TEXT, `country` TEXT, `postLevel` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `isLiked` INTEGER NOT NULL, `isReported` INTEGER NOT NULL, `timeAgo` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -298,6 +318,11 @@
           {
             "fieldPath": "state",
             "columnName": "state",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "country",
+            "columnName": "country",
             "affinity": "TEXT"
           },
           {
@@ -358,7 +383,7 @@
       },
       {
         "tableName": "liked_posts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `userName` TEXT NOT NULL, `userAvatar` TEXT, `postText` TEXT NOT NULL, `mediaType` TEXT, `mediaUrlsStr` TEXT NOT NULL, `location` TEXT NOT NULL, `locality` TEXT, `district` TEXT, `state` TEXT, `postLevel` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `isLiked` INTEGER NOT NULL, `isReported` INTEGER NOT NULL, `timeAgo` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `likedAt` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `userName` TEXT NOT NULL, `userAvatar` TEXT, `postText` TEXT NOT NULL, `mediaType` TEXT, `mediaUrlsStr` TEXT NOT NULL, `location` TEXT NOT NULL, `locality` TEXT, `district` TEXT, `state` TEXT, `country` TEXT, `postLevel` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `isLiked` INTEGER NOT NULL, `isReported` INTEGER NOT NULL, `timeAgo` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `likedAt` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -419,6 +444,11 @@
           {
             "fieldPath": "state",
             "columnName": "state",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "country",
+            "columnName": "country",
             "affinity": "TEXT"
           },
           {
@@ -520,7 +550,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd8f4224424cc630521104a6191bde7ae')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1222162f4fd4f28546ac10b727789e8a')"
     ]
   }
 }

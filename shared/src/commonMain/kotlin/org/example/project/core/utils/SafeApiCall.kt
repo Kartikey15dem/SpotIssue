@@ -13,7 +13,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.io.IOException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
-import org.example.project.core.network.NetworkMonitor
 import org.example.project.core.network.dto.ErrorResponseDto
 
 const val NETWORK_ERROR_MESSAGE = "Check network connection"

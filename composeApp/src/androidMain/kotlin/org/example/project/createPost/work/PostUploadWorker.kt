@@ -22,6 +22,20 @@ class PostUploadWorker(
     workerParams: WorkerParameters
 ) : CoroutineWorker(appContext, workerParams), KoinComponent {
 
+    /* ===================================================================================
+     * SECTION: RELIABLE BACKGROUND MEDIA UPLOADS
+     * ===================================================================================
+     * Uses Android's WorkManager to ensure that large media uploads (images, videos, PDFs)
+     * complete successfully even if the user minimizes or closes the app.
+     * 
+     * Pipeline:
+     * 1. Reads the draft state from UserPreferences (DataStore).
+     * 2. Validates file sizes (blocks > 50MB).
+     * 3. Compresses Images / Prepares Videos and PDFs locally using MediaCompressorUtil.
+     * 4. Triggers the KMP PostRepository multipart upload.
+     * 5. Cleans up temporary compressed files locally, regardless of success or failure.
+     */
+
     private val prefRepository: UserPreferencesRepository by inject()
     private val postRepository: PostRepository by inject()
 

@@ -116,8 +116,7 @@ class NameCaptureViewModel(
                 }
                 DataState.Loading -> {}
             }
-            
-            // Clean up temp file
+
             localImagePath?.let { path ->
                 withContext(Dispatchers.IO) {
                     java.io.File(path).delete()

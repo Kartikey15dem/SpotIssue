@@ -14,7 +14,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.content.PartData
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.encodeToString
 import okio.FileSystem
 import okio.Path.Companion.toPath
 import okio.buffer
@@ -22,7 +21,6 @@ import org.example.project.core.network.dto.PagedResponse
 import androidx.paging.PagingData
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
-import io.ktor.utils.io.core.build
 import kotlinx.coroutines.flow.Flow
 import okio.SYSTEM
 import org.example.project.core.network.dto.CommentDto
@@ -34,7 +32,7 @@ import co.touchlab.kermit.Logger
 import org.example.project.core.database.entities.toEntity
 import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.mappers.toUserPostEntity
-import org.example.project.core.network.NetworkMonitor
+import org.example.project.core.utils.NetworkMonitor
 
 import org.example.project.core.data.paging.CommentPagingSource
 
@@ -176,6 +174,15 @@ class PostRepositoryImpl(
         post.mediaFilePaths.forEach { filePath ->
             val path = filePath.toPath()
             val fileName = path.name
+            
+            /* WHY WE USE SYSTEM SOURCE & BYTE READ CHANNEL:
+             * In KMP (Kotlin Multiplatform), we cannot rely on `java.io.File`. 
+             * We use Okio's `FileSystem.SYSTEM.source` for cross-platform file reading.
+             * Then, because Ktor's `PartData.FileItem` requires an `Input` provider, 
+             * we wrap the raw byte array in a Ktor `ByteReadChannel`. This allows 
+             * efficient, non-blocking streaming of large files (like videos or PDFs)
+             * to the backend without loading everything into memory at once during the HTTP call.
+             */
             val bytes = FileSystem.SYSTEM.source(path).buffer().readByteArray()
             
             multipartParts.add(

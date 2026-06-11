@@ -11,8 +11,7 @@ import org.example.project.core.network.services.ProfileService
 import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.local.ProfileLocalDataSource
 import org.example.project.core.data.mappers.toLikedPostEntity
-import org.example.project.core.network.NetworkMonitor
-import org.example.project.core.database.dao.MediatorTransactionDao
+import org.example.project.core.utils.NetworkMonitor
 import org.example.project.core.utils.DataState
 import org.example.project.core.utils.safeApiCall
 

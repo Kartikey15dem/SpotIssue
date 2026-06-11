@@ -17,6 +17,10 @@ data class PostEntity(
     val timeAgo: String,
     val postLevel: String,
     val location: String,
+    val locality: String? = null,
+    val district: String? = null,
+    val state: String? = null,
+    val country: String? = null,
     val postText: String,
     val mediaType: String,
     val mediaUrlsStr: String,
@@ -42,7 +46,10 @@ fun PostEntity.toPost(): Post {
         comments = comments,
         isLiked = isLiked,
         isReported = isReported,
-        locality = location
+        locality = locality,
+        district = district,
+        state = state,
+        country = country
     )
 }
 
@@ -60,7 +67,11 @@ fun Post.toEntity(cachedAt: Long = Clock.System.now().toEpochMilliseconds()): Po
         likes = likes,
         comments = comments,
         cachedAt = cachedAt,
-        location = locality ?: "",
+        location = locality ?: "", // Deprecated, keeping for fallback
+        locality = locality,
+        district = district,
+        state = state,
+        country = country,
         isLiked = isLiked,
         isReported = isReported
     )

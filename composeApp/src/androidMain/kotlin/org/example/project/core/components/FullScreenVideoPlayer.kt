@@ -82,6 +82,13 @@ fun FullScreenVideoPlayer(url: String) {
                 override fun onPlaybackStateChanged(state: Int) {
                     isBuffering = (state == Player.STATE_BUFFERING)
                 }
+                
+                /* WHY WE OBSERVE VOLUME HERE:
+                 * If the user taps the device's physical volume buttons or interacts with 
+                 * ExoPlayer's default UI controls, the actual volume of the video changes. 
+                 * By listening here, we ensure our custom `isMuted` Compose state (and 
+                 * thus the UI icon) is always 100% in sync with what the user actually hears.
+                 */
                 override fun onVolumeChanged(volume: Float) {
                     isMuted = volume == 0f
                 }

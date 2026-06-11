@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,7 +40,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -53,9 +51,8 @@ import androidx.paging.compose.itemKey
 import kotlinx.coroutines.flow.collectLatest
 import org.example.project.R
 import org.example.project.core.model.home.getText
-import org.example.project.core.utils.DataState
-import org.example.project.home.presentation.components.PostCard
-import org.example.project.home.presentation.components.PostLevelChip
+import org.example.project.core.components.PostCard
+import org.example.project.core.components.PostLevelChip
 import org.example.project.home.presentation.viewmodel.HomeIntent
 import org.example.project.home.presentation.viewmodel.HomeSideEffect
 import org.example.project.home.presentation.viewmodel.HomeState

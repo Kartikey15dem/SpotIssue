@@ -35,7 +35,11 @@ fun UserPostEntity.toPost(): Post = Post(
     isLiked = isLiked,
     isReported = isReported,
     timeAgo = timeAgo,
-    createdAt = createdAt
+    createdAt = createdAt,
+    locality = locality,
+    district = district,
+    state = state,
+    country = country
 )
 
 /**
@@ -66,7 +70,11 @@ fun LikedPostEntity.toPost(): Post = Post(
     isLiked = isLiked,
     isReported = isReported,
     timeAgo = timeAgo,
-    createdAt = createdAt
+    createdAt = createdAt,
+    locality = locality,
+    district = district,
+    state = state,
+    country = country
 )
 
 enum class Sort {

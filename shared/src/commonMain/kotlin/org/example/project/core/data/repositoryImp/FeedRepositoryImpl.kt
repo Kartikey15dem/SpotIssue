@@ -6,24 +6,18 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import androidx.paging.ExperimentalPagingApi
 import org.example.project.core.data.paging.FeedPostsRemoteMediator
 import org.example.project.core.database.IssueSpotDatabase
 import org.example.project.core.network.services.HomeService
-import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.local.FeedLocalDataSource
 import org.example.project.core.data.repository.FeedRepository
 import org.example.project.core.database.entities.toPost
 import org.example.project.core.model.auth.UserLocation
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
-import org.example.project.core.network.NetworkMonitor
-import org.example.project.core.utils.DataState
-import org.example.project.core.utils.asDataStateFlow
+import org.example.project.core.utils.NetworkMonitor
 
 import org.example.project.core.data.paging.SearchPostsPagingSource
 

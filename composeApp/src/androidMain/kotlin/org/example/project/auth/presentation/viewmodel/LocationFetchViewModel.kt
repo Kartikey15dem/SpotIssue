@@ -21,6 +21,19 @@ class LocationFetchViewModel(
     private val prefRepository: UserPreferencesRepository
 ) : ViewModel() {
 
+    /* ===================================================================================
+     * SECTION: LOCATION FETCHING STATE MACHINE
+     * ===================================================================================
+     * This ViewModel manages the complex lifecycle of obtaining high-accuracy GPS data.
+     * 
+     * States:
+     * - FETCHING: Actively polling the LocationTracker.
+     * - ERROR: Handles varied failure modes (Permissions Denied, GPS Disabled, 
+     *   Network Timeout) and provides actionable recovery paths to the user.
+     * - COMPLETED: Geocodes coordinates to a readable address and saves the 
+     *   hierarchical data (locality, district, state, country) to the local DataStore.
+     */
+
     private val _uiState = MutableStateFlow(LocationFetchUiState())
     val uiState: StateFlow<LocationFetchUiState> = _uiState.asStateFlow()
 

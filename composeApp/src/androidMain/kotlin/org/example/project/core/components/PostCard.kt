@@ -1,6 +1,5 @@
-package org.example.project.home.presentation.components
+package org.example.project.core.components
 
-import android.provider.CalendarContract
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
@@ -17,7 +16,6 @@ import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTypography
 import androidx.compose.ui.res.painterResource
 import org.example.project.R
-import androidx.compose.foundation.Image
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -32,10 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.core.net.toUri
 import coil3.compose.AsyncImage
-import org.example.project.core.components.ReportPostDialog
-import org.example.project.core.components.LocalOverlayController
-import org.example.project.core.components.PdfPreviewContent
-import org.example.project.core.components.VideoPreviewPlayer
+import coil3.compose.AsyncImagePainter
 import org.example.project.core.model.home.MediaType
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
@@ -95,15 +90,15 @@ fun PostCard(
                     ) {
                         Spacer(modifier = Modifier.height(spacing.small))
 
+                        val locationParts = listOfNotNull(post.locality, post.district, post.state, post.country).filter { it.isNotBlank() }
+                        val locationString = if (locationParts.isNotEmpty()) locationParts.joinToString(", ") else "Unknown Location"
+
                         PostHeader(
                             userName = post.userName,
                             userImageUrl = post.userUrl,
                             timeAgo = post.timeAgo,
                             postLevel = post.postLevel,
-                            location = post.locality + "," +
-                                    post.district + "," +
-                                    post.state + "," +
-                                    post.country,
+                            location = locationString,
                             isDetailMode = isDetailMode,
                             onCollapseClick = onCollapseClick
                         )
@@ -570,7 +565,7 @@ fun PostGridImageItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
-    onSuccess: ((coil3.compose.AsyncImagePainter.State.Success) -> Unit)? = null
+    onSuccess: ((AsyncImagePainter.State.Success) -> Unit)? = null
 ) {
     Box(modifier = modifier.clip(RoundedCornerShape(8.dp))) {
         AsyncImage(

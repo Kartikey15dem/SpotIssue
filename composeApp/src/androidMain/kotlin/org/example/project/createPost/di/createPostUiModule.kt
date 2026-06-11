@@ -4,6 +4,6 @@ import org.example.project.createPost.presentation.viewmodel.CreatePostViewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
-val createPostUiModule = module {
+val createPostModule = module {
     viewModelOf(::CreatePostViewModel)
 }

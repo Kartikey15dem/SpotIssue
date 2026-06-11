@@ -8,6 +8,20 @@ import org.example.project.core.database.entities.UserPostEntity
 import org.example.project.core.database.entities.RemoteKeysEntity
 
 @Dao
+/**
+ * ===================================================================================
+ * SECTION: KMP COMPATIBLE ATOMIC TRANSACTIONS
+ * ===================================================================================
+ * This DAO orchestrates cross-table database operations securely within a single transaction.
+ * 
+ * Why this exists:
+ * The standard Android `RoomDatabase.withTransaction {}` block is not fully supported
+ * by the `BundledSQLiteDriver` used in Kotlin Multiplatform (KMP). It causes crashes.
+ * By using the `@Transaction` annotation on DAO methods, we ensure that clearing old 
+ * Paging data and inserting new network data happens atomically across all platforms
+ * (Android and iOS). This fundamentally prevents "flickering" or blank screens when 
+ * the feed refreshes.
+ */
 interface MediatorTransactionDao {
     
     @Transaction
