@@ -30,9 +30,13 @@ import kotlinx.coroutines.flow.combine
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import io.ktor.http.content.PartData
+import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.core.build
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 import okio.FileSystem
@@ -124,10 +128,10 @@ class ProfileRepositoryImpl(
             imageUrl = profile.imageUrl,
         )
         
-        val multipartParts = mutableListOf<io.ktor.http.content.PartData>()
+        val multipartParts = mutableListOf<PartData>()
 
         multipartParts.add(
-            io.ktor.http.content.PartData.FormItem(
+            PartData.FormItem(
                 value = Json.encodeToString(request),
                 dispose = {},
                 partHeaders = Headers.build {
@@ -143,8 +147,8 @@ class ProfileRepositoryImpl(
             val bytes = FileSystem.SYSTEM.source(path).buffer().readByteArray()
 
             multipartParts.add(
-                io.ktor.http.content.PartData.FileItem(
-                    provider = { io.ktor.utils.io.ByteReadChannel(bytes) },
+                PartData.FileItem(
+                    provider = { ByteReadChannel(bytes) },
                     dispose = {},
                     partHeaders = Headers.build {
                         append(HttpHeaders.ContentDisposition, "form-data; name=\"file\"; filename=\"$fileName\"")
@@ -179,7 +183,7 @@ class ProfileRepositoryImpl(
 
     override suspend fun logOut() {
         prefRepository.logOut()
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        withContext(Dispatchers.IO) {
             database.clearAllTables()
         }
     }

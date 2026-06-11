@@ -73,6 +73,8 @@ import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTheme
 import org.example.project.theme.IssueSpotTypography
 
+import androidx.compose.foundation.BorderStroke
+
 @Composable
 fun LocationFetchScreenWithPermissions(
     onLocationFetched: () -> Unit
@@ -270,7 +272,7 @@ private fun LocationFetchContent(
                     modifier = Modifier.fillMaxWidth(0.9f).height(56.dp),
                     shape = shapes.medium,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = IssueSpotColors.Primary),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, IssueSpotColors.Primary)
+                    border = BorderStroke(1.dp, IssueSpotColors.Primary)
                 ) {
                     Text(
                         text = "I've turned it on, Retry",

@@ -30,6 +30,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import org.example.project.R
+import androidx.compose.animation.AnimatedVisibility
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -126,7 +127,7 @@ fun VideoPreviewPlayer(
         )
 
         // --- Center Play/Pause Button ---
-        androidx.compose.animation.AnimatedVisibility(
+        AnimatedVisibility(
             visible = showPlayButton,
             enter = fadeIn(),
             exit = fadeOut(),

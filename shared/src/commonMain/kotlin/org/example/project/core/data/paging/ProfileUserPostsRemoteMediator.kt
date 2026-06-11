@@ -33,11 +33,7 @@ class ProfileUserPostsRemoteMediator(
     private val maxCachedPosts = 100
 
     override suspend fun initialize(): InitializeAction {
-        return if (userPostDao.getUserPostCount() > 0) {
-            InitializeAction.SKIP_INITIAL_REFRESH
-        } else {
-            InitializeAction.LAUNCH_INITIAL_REFRESH
-        }
+        return InitializeAction.LAUNCH_INITIAL_REFRESH
     }
 
     override suspend fun load(loadType: LoadType, state: PagingState<Int, UserPostEntity>): MediatorResult {

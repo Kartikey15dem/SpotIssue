@@ -81,6 +81,8 @@ import kotlinx.coroutines.launch
 
 import androidx.compose.ui.draw.rotate
 
+import androidx.compose.material3.Snackbar
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileScreen(
@@ -210,7 +212,7 @@ fun EditProfileScreen(
         },
         snackbarHost = { 
             SnackbarHost(snackbarHostState) { data ->
-                androidx.compose.material3.Snackbar(
+                Snackbar(
                     snackbarData = data,
                     containerColor = Color(0xFF323232),
                     contentColor = Color.White,

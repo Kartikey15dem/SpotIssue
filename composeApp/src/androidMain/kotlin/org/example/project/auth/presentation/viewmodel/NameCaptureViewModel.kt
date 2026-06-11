@@ -14,6 +14,8 @@ import org.example.project.core.datastore.UserPreferencesRepository
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 
 sealed class NameCaptureEffect {
     data class ShowSnackbar(val message: String) : NameCaptureEffect()
@@ -117,7 +119,7 @@ class NameCaptureViewModel(
             
             // Clean up temp file
             localImagePath?.let { path ->
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                withContext(Dispatchers.IO) {
                     java.io.File(path).delete()
                 }
             }

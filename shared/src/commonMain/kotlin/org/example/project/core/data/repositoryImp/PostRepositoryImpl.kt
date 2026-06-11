@@ -11,6 +11,8 @@ import org.example.project.core.model.home.Post
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import io.ktor.http.content.PartData
+import io.ktor.utils.io.ByteReadChannel
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 import okio.FileSystem
@@ -33,6 +35,8 @@ import org.example.project.core.database.entities.toEntity
 import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.mappers.toUserPostEntity
 import org.example.project.core.network.NetworkMonitor
+
+import org.example.project.core.data.paging.CommentPagingSource
 
 class PostRepositoryImpl(
     private val postService: PostService,
@@ -108,7 +112,7 @@ class PostRepositoryImpl(
     override fun getPagedComments(postId: String): Flow<PagingData<Comment>> {
         return Pager(
             config = PagingConfig(pageSize = 20),
-            pagingSourceFactory = { org.example.project.core.data.paging.CommentPagingSource(postService, postId, networkMonitor) }
+            pagingSourceFactory = { CommentPagingSource(postService, postId, networkMonitor) }
         ).flow
     }
 
@@ -140,7 +144,7 @@ class PostRepositoryImpl(
         return result
     }
 
-    override suspend fun createPost(post: org.example.project.core.model.createPost.CreatePost): DataState<Post> {
+    override suspend fun createPost(post: CreatePost): DataState<Post> {
         logger.d { "Creating post" }
         val request = CreatePostRequestDto(
             postText = post.postText,
@@ -156,10 +160,10 @@ class PostRepositoryImpl(
             }
         )
         
-        val multipartParts = mutableListOf<io.ktor.http.content.PartData>()
+        val multipartParts = mutableListOf<PartData>()
         
         multipartParts.add(
-            io.ktor.http.content.PartData.FormItem(
+            PartData.FormItem(
                 value = Json.encodeToString(request),
                 dispose = {},
                 partHeaders = Headers.build {
@@ -175,8 +179,8 @@ class PostRepositoryImpl(
             val bytes = FileSystem.SYSTEM.source(path).buffer().readByteArray()
             
             multipartParts.add(
-                io.ktor.http.content.PartData.FileItem(
-                    provider = { io.ktor.utils.io.ByteReadChannel(bytes) },
+                PartData.FileItem(
+                    provider = { ByteReadChannel(bytes) },
                     dispose = {},
                     partHeaders = Headers.build {
                         append(HttpHeaders.ContentDisposition, "form-data; name=\"files\"; filename=\"$fileName\"")

@@ -87,6 +87,8 @@ import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTheme
 import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.ui.text.style.TextOverflow
 
 @Composable
 fun ProfileScreen(
@@ -164,13 +166,15 @@ fun ProfileScreen(
     }
 }
 
+
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreenContent(
     modifier: Modifier = Modifier,
     state: ProfileState,
     onIntent: (ProfileIntent) -> Unit,
-    listState: androidx.compose.foundation.lazy.LazyListState
+    listState: LazyListState
 ) {
     val pagingItems = state.activePostsFlow?.collectAsLazyPagingItems()
     var postToDelete by remember { mutableStateOf<String?>(null) }
@@ -489,7 +493,7 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                     style = IssueSpotTypography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(spacing.extraSmall))
                 Text(
@@ -497,7 +501,7 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                     style = IssueSpotTypography.bodyMedium,
                     color = IssueSpotColors.OnSurfaceVariant,
                     maxLines = 2,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             Icon(

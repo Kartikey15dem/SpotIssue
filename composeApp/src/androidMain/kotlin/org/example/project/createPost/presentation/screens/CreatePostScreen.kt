@@ -90,6 +90,9 @@ import org.example.project.core.components.VideoPreviewPlayer
 import org.example.project.core.model.home.MediaType
 import org.example.project.core.model.home.SelectedMediaItem
 
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.CircularProgressIndicator
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CreatePostScreen(
@@ -149,7 +152,7 @@ fun CreatePostScreen(
     Scaffold(
         snackbarHost = { 
             SnackbarHost(snackbarHostState) { data ->
-                androidx.compose.material3.Snackbar(
+                Snackbar(
                     snackbarData = data,
                     containerColor = Color(0xFF323232),
                     contentColor = Color.White,
@@ -400,7 +403,7 @@ fun CreatePostScreenContent(
                     modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)).clickable(enabled = false) {}, 
                     contentAlignment = Alignment.Center
                 ) {
-                    androidx.compose.material3.CircularProgressIndicator(color = IssueSpotColors.Primary)
+                    CircularProgressIndicator(color = IssueSpotColors.Primary)
                 }
             }
 

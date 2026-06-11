@@ -65,6 +65,7 @@ import org.example.project.theme.IssueSpotTypography
 import org.example.project.core.components.CommentsBottomSheet
 import org.example.project.theme.IssueSpotTheme
 import org.koin.compose.viewmodel.koinViewModel
+import androidx.compose.material3.Snackbar
 
 @Composable
 fun HomeScreen(
@@ -104,7 +105,7 @@ fun HomeScreen(
     Scaffold(
         snackbarHost = { 
             SnackbarHost(snackbarHostState) { data ->
-                androidx.compose.material3.Snackbar(
+                Snackbar(
                     snackbarData = data,
                     containerColor = Color(0xFF323232),
                     contentColor = Color.White,

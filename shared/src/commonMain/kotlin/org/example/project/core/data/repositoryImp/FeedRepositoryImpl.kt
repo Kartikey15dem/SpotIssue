@@ -25,6 +25,8 @@ import org.example.project.core.network.NetworkMonitor
 import org.example.project.core.utils.DataState
 import org.example.project.core.utils.asDataStateFlow
 
+import org.example.project.core.data.paging.SearchPostsPagingSource
+
 class FeedRepositoryImpl(
     private val homeService: HomeService,
     private val database: IssueSpotDatabase,
@@ -60,7 +62,7 @@ class FeedRepositoryImpl(
     override fun getPagedSearchPosts(query: String, postLevel: PostLevel): Flow<PagingData<Post>> {
         return Pager(
             config = PagingConfig(pageSize = 20),
-            pagingSourceFactory = { org.example.project.core.data.paging.SearchPostsPagingSource(homeService, query, postLevel, networkMonitor) }
+            pagingSourceFactory = { SearchPostsPagingSource(homeService, query, postLevel, networkMonitor) }
         ).flow
     }
 }

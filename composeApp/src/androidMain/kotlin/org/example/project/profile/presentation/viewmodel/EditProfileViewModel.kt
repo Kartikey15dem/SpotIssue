@@ -15,6 +15,9 @@ import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
 import android.net.Uri
 
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+
 class EditProfileViewModel(
     private val profileRepository: ProfileRepository
 ) : ViewModel() {
@@ -223,9 +226,9 @@ class EditProfileViewModel(
                 }
             }
 
-            localImagePath?.let { path -> 
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    java.io.File(path).delete() 
+            localImagePath?.let { path ->
+                withContext(Dispatchers.IO) {
+                    java.io.File(path).delete()
                 }
             }
         }
