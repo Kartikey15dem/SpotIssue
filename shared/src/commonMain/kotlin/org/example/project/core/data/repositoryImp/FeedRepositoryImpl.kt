@@ -52,10 +52,9 @@ class FeedRepositoryImpl(
         }
     }
 
-    override fun observeActiveIssuesCount(postLevel: PostLevel): Flow<DataState<Int>> {
+    override fun observeActiveIssuesCount(postLevel: PostLevel): Flow<Int> {
         return localDataSource.observeCachedActiveIssues(postLevel)
             .map { it ?: 0 }
-            .asDataStateFlow()
     }
 
     override fun getPagedSearchPosts(query: String, postLevel: PostLevel): Flow<PagingData<Post>> {

@@ -164,7 +164,7 @@ class ProfileViewModel(
                 text = comment,
                 timeAgo = "Just now",
                 userName = "You",
-                userImageUrl = null
+                userImageUrl = _uiState.value.profile?.imageUrl
             )
             val updatedFlow = currentFlow.map { pagingData ->
                 pagingData.insertHeaderItem(item = optimisticComment)

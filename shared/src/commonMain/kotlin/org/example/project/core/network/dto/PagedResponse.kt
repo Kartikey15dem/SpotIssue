@@ -11,6 +11,6 @@ data class PagedResponse<T>(
     val prevKey: Int?,
     @SerialName("nextKey")
     val nextKey: Int?,
-    @SerialName("activeIssuesCount")
+    @SerialName("active_issues_count")
     val activeIssuesCount: Int? = null
 )

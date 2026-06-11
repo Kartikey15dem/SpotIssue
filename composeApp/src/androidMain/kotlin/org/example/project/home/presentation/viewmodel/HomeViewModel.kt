@@ -27,9 +27,12 @@ import org.example.project.home.presentation.CurrentLevelManager
 import org.example.project.core.datastore.UserPreferencesRepository
 import kotlinx.coroutines.flow.combine
 
+import org.example.project.core.data.repository.ProfileRepository
+
 class HomeViewModel(
     private val feedRepository: FeedRepository,
     private val postRepository: PostRepository,
+    private val profileRepository: ProfileRepository,
     private val prefRepository: UserPreferencesRepository,
     private val currentLevelManager: CurrentLevelManager
 ) : ViewModel() {
@@ -41,6 +44,7 @@ class HomeViewModel(
     val sideEffects: SharedFlow<HomeSideEffect> = _sideEffects.asSharedFlow()
 
     init {
+        observeProfile()
         viewModelScope.launch {
             combine(
                 currentLevelManager.currentLevel,
@@ -48,25 +52,44 @@ class HomeViewModel(
             ) { level, userData ->
                 level to userData.userLocation
             }.collect { (level, location) ->
-                updateState {
-                    it.copy(
-                        postLevel = level,
-                        postsFlow = feedRepository.getPagedPosts(
-                            level,
-                            location,
-                            forceRefresh = true
-                        ).cachedIn(viewModelScope)
-                    )
+                val currentState = _uiState.value
+                val shouldRefresh = currentState.postLevel != level || 
+                                   (currentState.postsFlow == null && location != null)
+                
+                if (shouldRefresh || currentState.postsFlow == null) {
+                    updateState {
+                        it.copy(
+                            postLevel = level,
+                            postsFlow = feedRepository.getPagedPosts(
+                                level,
+                                location,
+                                forceRefresh = false // Use cache if available
+                            ).cachedIn(viewModelScope)
+                        )
+                    }
+                    observeActiveIssues(level)
                 }
-                observeActiveIssues(level)
             }
         }
     }
 
-    private fun observeActiveIssues(level: PostLevel) {
+    private fun observeProfile() {
         viewModelScope.launch {
-            feedRepository.observeActiveIssuesCount(level).collect { dataState ->
-                updateState { it.copy(activeIssues = dataState.data?:0) }
+            profileRepository.observeProfile().collect { dataState ->
+                if (dataState is DataState.Success && dataState.data != null) {
+                    updateState { it.copy(currentUserImage = dataState.data?.imageUrl) }
+                }
+            }
+        }
+    }
+
+    private var activeIssuesJob: Job? = null
+
+    private fun observeActiveIssues(level: PostLevel) {
+        activeIssuesJob?.cancel()
+        activeIssuesJob = viewModelScope.launch {
+            feedRepository.observeActiveIssuesCount(level).collect { count ->
+                updateState { it.copy(activeIssues = count) }
             }
         }
     }
@@ -191,7 +214,7 @@ class HomeViewModel(
                 text = comment,
                 timeAgo = "Just now",
                 userName = "You",
-                userImageUrl = null
+                userImageUrl = _uiState.value.currentUserImage
             )
             val updatedFlow = currentFlow.map { pagingData ->
                 pagingData.insertHeaderItem(item = optimisticComment)
@@ -288,7 +311,8 @@ data class HomeState(
     val error: String? = null,
     val postOverrides: Map<String, PostOverride> = emptyMap(),
     val showCommentsSheetForPostId: String? = null,
-    val expandedPost : Post? = null
+    val expandedPost : Post? = null,
+    val currentUserImage: String? = null
 )
 
 sealed interface HomeSideEffect {

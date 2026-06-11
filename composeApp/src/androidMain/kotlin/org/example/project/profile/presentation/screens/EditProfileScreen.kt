@@ -79,9 +79,8 @@ import org.example.project.utils.media.MediaCompressorUtil
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
-/**
- * Edit Profile Screen with ViewModel integration
- */
+import androidx.compose.ui.draw.rotate
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileScreen(
@@ -103,7 +102,9 @@ fun EditProfileScreen(
         if (granted) {
             viewModel.onIntent(EditProfileIntent.CaptureFromCameraClicked)
         } else {
-            // Permission denied logic
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Camera permission denied")
+            }
         }
     }
 
@@ -135,7 +136,6 @@ fun EditProfileScreen(
         }
     }
 
-    // Handle side effects
     LaunchedEffect(viewModel) {
         viewModel.sideEffects.collectLatest { effect ->
             when (effect) {
@@ -193,6 +193,15 @@ fun EditProfileScreen(
                         )
                     }
                 },
+                actions = {
+                    IconButton(onClick = { viewModel.onIntent(EditProfileIntent.LogoutClicked) }) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_logout),
+                            contentDescription = "Logout",
+                            tint = IssueSpotColors.Error
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = IssueSpotColors.Surface,
                     titleContentColor = IssueSpotColors.OnSurface
@@ -227,9 +236,6 @@ fun EditProfileScreen(
     }
 }
 
-/**
- * Content composable for Edit Profile Screen
- */
 @Composable
 fun EditProfileContent(
     modifier: Modifier = Modifier,
@@ -244,7 +250,6 @@ fun EditProfileContent(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Loading indicator
         if (state.isSaving) {
             LinearProgressIndicator(
                 modifier = Modifier.fillMaxWidth(),
@@ -252,11 +257,10 @@ fun EditProfileContent(
             )
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(4.dp))
 
-        // Profile Picture Section
         Text(
-            text = "Edit Profile",
+            text = "Profile Picture",
             style = IssueSpotTypography.titleMedium,
             color = IssueSpotColors.OnBackground,
             fontWeight = FontWeight.Bold,
@@ -265,12 +269,10 @@ fun EditProfileContent(
 
         Spacer(Modifier.height(16.dp))
 
-        // Profile picture with edit icon
         Box(
             modifier = Modifier.size(120.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Profile Image
             if (state.isLoadingImage) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(120.dp),
@@ -291,7 +293,6 @@ fun EditProfileContent(
                 )
             }
 
-            // Edit icon overlay
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -315,7 +316,6 @@ fun EditProfileContent(
 
         Spacer(Modifier.height(8.dp))
 
-        // Image source buttons
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -375,7 +375,6 @@ fun EditProfileContent(
 
         Spacer(Modifier.height(16.dp))
 
-        // Email Section
         Text(
             text = "Email Address",
             style = IssueSpotTypography.titleSmall,
@@ -420,12 +419,10 @@ fun EditProfileContent(
         Spacer(Modifier.height(24.dp))
 
 
-        // Action Buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Reset Button
             OutlinedButton(
                 onClick = { onIntent(EditProfileIntent.ResetClicked) },
                 modifier = Modifier.weight(1f),
@@ -441,7 +438,6 @@ fun EditProfileContent(
                 Text("Reset")
             }
 
-            // Save Button
             Button(
                 onClick = { onIntent(EditProfileIntent.SaveChangesClicked) },
                 modifier = Modifier.weight(1f),
@@ -470,30 +466,6 @@ fun EditProfileContent(
             }
         }
 
-        Spacer(Modifier.height(24.dp))
-
-        // Logout Button
-        Button(
-            onClick = { onIntent(EditProfileIntent.LogoutClicked) },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = IssueSpotColors.Error,
-                contentColor = Color.White
-            ),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            if (state.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    color = Color.White,
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Text("Logout")
-            }
-        }
-
-        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -590,10 +562,6 @@ fun EditProfileContentPreview() {
             state = EditProfileState(
                 name = "John Doe",
                 imageUrl = "",
-                
-                
-                
-                
                 isLoadingImage = false,
                 isSaving = false
             ),

@@ -7,6 +7,7 @@ import org.example.project.core.database.dao.ActiveIssuesDao
 import org.example.project.core.database.dao.UserPostDao
 import org.example.project.core.database.dao.LikedPostDao
 import org.example.project.core.database.dao.RemoteKeysDao
+import org.example.project.core.database.dao.MediatorTransactionDao
 
 
 
@@ -20,6 +21,6 @@ expect abstract class IssueSpotDatabase : RoomDatabase {
     abstract fun userPostDao(): UserPostDao
     abstract fun likedPostDao(): LikedPostDao
     abstract fun remoteKeysDao(): RemoteKeysDao
-
+    abstract fun mediatorTransactionDao(): MediatorTransactionDao
 }
 

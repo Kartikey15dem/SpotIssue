@@ -12,6 +12,7 @@ import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.local.ProfileLocalDataSource
 import org.example.project.core.data.mappers.toLikedPostEntity
 import org.example.project.core.network.NetworkMonitor
+import org.example.project.core.database.dao.MediatorTransactionDao
 import org.example.project.core.utils.DataState
 import org.example.project.core.utils.safeApiCall
 
@@ -68,24 +69,32 @@ class ProfileLikedPostsRemoteMediator(
 
             val endOfPaginationReached = response.nextKey == null || entities.isEmpty()
 
-            if (loadType == LoadType.REFRESH) {
-                remoteKeysDao.clearRemoteKeys(keyType)
-                likedPostDao.deleteAllLikedPosts()
+            val remoteKeys = entities.map { e ->
+                RemoteKeysEntity(
+                    id = e.id,
+                    prevKey = response.prevKey,
+                    nextKey = response.nextKey,
+                    type = keyType,
+                )
             }
 
-            remoteKeysDao.insertAll(
-                entities.map { e ->
-                    RemoteKeysEntity(
-                        id = e.id,
-                        prevKey = response.prevKey,
-                        nextKey = response.nextKey,
-                        type = keyType,
-                    )
-                },
-            )
-
-            likedPostDao.insertPosts(entities)
-            likedPostDao.trimLikedPosts(maxPosts = maxCachedPosts)
+            if (loadType == LoadType.REFRESH) {
+                database.mediatorTransactionDao().refreshLikedPosts(
+                    likedPostDao = likedPostDao,
+                    remoteKeysDao = remoteKeysDao,
+                    keyType = keyType,
+                    posts = entities,
+                    remoteKeys = remoteKeys
+                )
+            } else {
+                database.mediatorTransactionDao().appendLikedPage(
+                    likedPostDao = likedPostDao,
+                    remoteKeysDao = remoteKeysDao,
+                    posts = entities,
+                    remoteKeys = remoteKeys,
+                    maxCachedPosts = maxCachedPosts
+                )
+            }
 
             MediatorResult.Success(endOfPaginationReached = endOfPaginationReached)
             }

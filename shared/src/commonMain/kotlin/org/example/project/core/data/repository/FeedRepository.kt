@@ -21,7 +21,7 @@ interface FeedRepository {
     /**
      * Observe active issues count for a given post level (cached locally).
      */
-    fun observeActiveIssuesCount(postLevel: PostLevel): Flow<DataState<Int>>
+    fun observeActiveIssuesCount(postLevel: PostLevel): Flow<Int>
 
     /**
      * Get paged search results for a given query and post level.

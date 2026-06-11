@@ -18,6 +18,7 @@ import org.example.project.core.database.entities.toEntity
 import org.example.project.core.model.auth.UserLocation
 import org.example.project.core.model.home.PostLevel
 import org.example.project.core.network.NetworkMonitor
+import org.example.project.core.database.dao.MediatorTransactionDao
 import org.example.project.core.utils.DataState
 import org.example.project.core.utils.safeApiCall
 
@@ -52,15 +53,14 @@ class FeedPostsRemoteMediator(
         val page = when (loadType) {
             LoadType.REFRESH -> {
                 val remoteKeys = getRemoteKeyClosestToCurrentPosition(state)
-                remoteKeys?.nextKey?.minus(1) ?: 1
+                remoteKeys?.nextKey?.minus(1) ?: 0
             }
             LoadType.PREPEND -> return MediatorResult.Success(endOfPaginationReached = true)
             LoadType.APPEND -> {
                 val remoteKeys = getRemoteKeyForLastItem(state)
-                val nextKey = remoteKeys?.nextKey ?: return MediatorResult.Success(
+                remoteKeys?.nextKey ?: return MediatorResult.Success(
                     endOfPaginationReached = true
                 )
-                nextKey
             }
         }
 
@@ -79,44 +79,55 @@ class FeedPostsRemoteMediator(
         }) {
             is DataState.Success -> {
                 val response = result.data
+                val posts = response.items.map { dto ->
+                    val post = dto.toPost()
+                    post.toEntity(cachedAt = parseIsoEpochMillis(dto.createdAt))
+                }
 
-            val posts = response.items.map { dto ->
-                val post = dto.toPost()
-                post.toEntity(cachedAt = parseIsoEpochMillis(dto.createdAt))
-            }
+                val endOfPaginationReached = response.nextKey == null || posts.isEmpty()
 
-            val endOfPaginationReached = response.nextKey == null || posts.isEmpty()
+                val keys = posts.map { post ->
+                    RemoteKeysEntity(
+                        id = post.id,
+                        prevKey = response.prevKey,
+                        nextKey = response.nextKey,
+                        type = keyType,
+                    )
+                }
 
-            if (loadType == LoadType.REFRESH) {
-                remoteKeysDao.clearRemoteKeys(keyType)
-                postDao.deletePostsByLevel(postLevel.name)
-            }
+                if (loadType == LoadType.REFRESH) {
+                    database.mediatorTransactionDao().refreshFeed(
+                        postDao = postDao,
+                        remoteKeysDao = remoteKeysDao,
+                        level = postLevel.name,
+                        keyType = keyType,
+                        posts = posts,
+                        remoteKeys = keys
+                    )
+                } else {
+                    database.mediatorTransactionDao().appendPage(
+                        postDao = postDao,
+                        remoteKeysDao = remoteKeysDao,
+                        posts = posts,
+                        remoteKeys = keys,
+                        level = postLevel.name,
+                        maxCachedPosts = maxCachedPosts
+                    )
+                }
 
-            val keys = posts.map { post ->
-                RemoteKeysEntity(
-                    id = post.id,
-                    prevKey = response.prevKey,
-                    nextKey = response.nextKey,
-                    type = keyType,
+                response.activeIssuesCount?.let { count ->
+                    localDataSource.cacheActiveIssues(postLevel, count)
+                }
+
+                val now = Clock.System.now().toEpochMilliseconds()
+                cacheMetadataDao.insertMetadata(
+                    CacheMetadataEntity(
+                        cacheKey = CacheMetadataEntity.postsKey(postLevel.name),
+                        lastFetchedAt = now,
+                    ),
                 )
-            }
-            remoteKeysDao.insertAll(keys)
 
-            postDao.insertPosts(posts)
-            postDao.trimPostsByLevel(postLevel.name, maxCachedPosts)
-            response.activeIssuesCount?.let { count ->
-                localDataSource.cacheActiveIssues(postLevel, count)
-            }
-
-            val now = Clock.System.now().toEpochMilliseconds()
-            cacheMetadataDao.insertMetadata(
-                CacheMetadataEntity(
-                    cacheKey = CacheMetadataEntity.postsKey(postLevel.name),
-                    lastFetchedAt = now,
-                ),
-            )
-
-            MediatorResult.Success(endOfPaginationReached = endOfPaginationReached)
+                MediatorResult.Success(endOfPaginationReached = endOfPaginationReached)
             }
             is DataState.Error -> MediatorResult.Error(result.exception)
             DataState.Loading -> MediatorResult.Error(IllegalStateException("Unexpected paging loading state"))

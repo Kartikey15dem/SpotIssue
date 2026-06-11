@@ -11,6 +11,7 @@ import org.example.project.core.database.dao.ActiveIssuesDao
 import org.example.project.core.database.dao.UserPostDao
 import org.example.project.core.database.dao.LikedPostDao
 import org.example.project.core.database.dao.RemoteKeysDao
+import org.example.project.core.database.dao.MediatorTransactionDao
 import org.example.project.core.database.entities.ProfileEntity
 import org.example.project.core.database.entities.PostEntity
 import org.example.project.core.database.entities.CacheMetadataEntity
@@ -40,7 +41,7 @@ actual abstract class IssueSpotDatabase : RoomDatabase() {
     actual abstract fun userPostDao(): UserPostDao
     actual abstract fun likedPostDao(): LikedPostDao
     actual abstract fun remoteKeysDao(): RemoteKeysDao
-
+    actual abstract fun mediatorTransactionDao(): MediatorTransactionDao
 }
 
 

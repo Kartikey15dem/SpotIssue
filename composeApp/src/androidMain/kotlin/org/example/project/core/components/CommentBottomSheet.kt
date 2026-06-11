@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
@@ -21,12 +22,18 @@ import org.example.project.core.model.home.Comment
 import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTypography
 
+import coil3.compose.AsyncImage
+import androidx.core.net.toUri
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommentsBottomSheet(
     comments: LazyPagingItems<Comment>?,
     onDismiss: () -> Unit,
-    onSubmit: (String) -> Unit
+    onSubmit: (String) -> Unit,
+    currentUserImageUrl: String? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var commentText by rememberSaveable { mutableStateOf("") }
@@ -67,7 +74,10 @@ fun CommentsBottomSheet(
                         text = "No comments yet. Be the first to start the discussion!",
                         style = IssueSpotTypography.bodyLarge,
                         color = IssueSpotColors.OnSurfaceVariant,
-                        modifier = Modifier.align(Alignment.Center)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.Center)
+                            .padding(horizontal = 16.dp)
                     )
                 } else {
                     LazyColumn(
@@ -109,12 +119,23 @@ fun CommentsBottomSheet(
                         .background(IssueSpotColors.SurfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_person),
-                        contentDescription = "Your avatar",
-                        modifier = Modifier.size(20.dp),
-                        tint = IssueSpotColors.OnSurfaceVariant
-                    )
+                    if (!currentUserImageUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = currentUserImageUrl.toUri(),
+                            contentDescription = "Your avatar",
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            contentScale = ContentScale.Crop,
+                            error = painterResource(R.drawable.ic_user_avatar),
+                            fallback = painterResource(R.drawable.ic_user_avatar)
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_person),
+                            contentDescription = "Your avatar",
+                            modifier = Modifier.size(20.dp),
+                            tint = IssueSpotColors.OnSurfaceVariant
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -168,12 +189,16 @@ fun CommentItem(comment: Comment) {
                 .background(IssueSpotColors.SurfaceVariant),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_person), 
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = IssueSpotColors.OnSurfaceVariant
-            )
+            if (!comment.userImageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = comment.userImageUrl,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    contentScale = ContentScale.Crop,
+                    error = painterResource(R.drawable.ic_user_avatar),
+                    fallback = painterResource(R.drawable.ic_user_avatar)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(12.dp))

@@ -425,7 +425,8 @@ fun ProfileScreenContent(
                         currentCommentCount = activeOverride?.commentsCount ?: fallbackCount
                     )
                 )
-            }
+            },
+            currentUserImageUrl = state.profile?.imageUrl
         )
     }
 }

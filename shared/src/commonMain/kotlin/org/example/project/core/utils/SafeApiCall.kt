@@ -33,10 +33,10 @@ suspend fun <T> safeApiCall(
     apiCall: suspend () -> T
 ): DataState<T> {
     return withContext(dispatcher) {
-//        if (networkMonitor?.isOnline?.first() == false) {
-//            safeApiCallLogger.w { "API call skipped because network is unavailable" }
-//            return@withContext DataState.Error(Exception(NETWORK_ERROR_MESSAGE))
-//        }
+        if (networkMonitor?.isOnline?.first() == false) {
+            safeApiCallLogger.w { "API call skipped because network is unavailable" }
+            return@withContext DataState.Error(Exception(NETWORK_ERROR_MESSAGE))
+        }
 
         try {
             DataState.Success(apiCall())

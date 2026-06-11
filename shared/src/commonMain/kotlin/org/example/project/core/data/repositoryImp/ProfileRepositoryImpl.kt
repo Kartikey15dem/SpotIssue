@@ -31,6 +31,8 @@ import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.utils.io.core.build
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.flow.catch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 import okio.FileSystem
@@ -105,13 +107,9 @@ class ProfileRepositoryImpl(
         localDataSource.getProfileFlow(),
         prefRepository.userData
     ) { entity, userData ->
-        if (entity != null) {
-            entity.toProfile().copy(
-                location = userData.userLocation?.address ?: "No location set"
-            )
-        } else {
-            throw Exception("Profile not found")
-        }
+        entity?.toProfile()?.copy(
+            location = userData.userLocation?.address ?: "No location set"
+        )
     }.asDataStateFlow()
 
     override suspend fun refreshProfile(): DataState<Unit> = safeApiCall(networkMonitor) {

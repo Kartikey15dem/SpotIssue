@@ -264,6 +264,15 @@ fun HomeContent(
                                     )
                                 }
                             }
+                        } else {
+                            item {
+                                Box(
+                                    modifier = Modifier.fillParentMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(color = IssueSpotColors.Primary)
+                                }
+                            }
                         }
 
                         item { Spacer(Modifier.height(16.dp)) }
@@ -327,7 +336,8 @@ fun HomeContent(
                         currentCommentCount = activeOverride?.commentsCount ?: fallbackCount
                     )
                 )
-            }
+            },
+            currentUserImageUrl = state.currentUserImage
         )
     }
 }
@@ -423,7 +433,7 @@ private fun HomeHeader(
 
 
                 Text(
-                    text = state.activeIssues.toString(),
+                    text = "${state.activeIssues} active issues",
                     style = IssueSpotTypography.bodyLarge,
                     color = IssueSpotColors.OnSurfaceVariant
                 )

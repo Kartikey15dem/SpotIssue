@@ -143,19 +143,21 @@ fun PostCard(
                     ) {
                         Icon(
                             painter = painterResource(
-                                id = R.drawable.ic_like
+                                id = if (isLiked) R.drawable.ic_thumbs_filled else R.drawable.ic_thumbs
                             ),
                             contentDescription = "Like",
                             modifier = Modifier
                                 .clickable { onLikeClick() }
                                 .size(20.dp)
                                 .padding(end = 2.dp),
-                            tint = if (isLiked) IssueSpotColors.LikeActiveColor else IssueSpotColors.OnSurfaceVariant
+                            tint = if (isLiked)
+                                Color(0xFF0A66C2)
+                            else
+                                IssueSpotColors.OnSurfaceVariant
                         )
                         Text(
                             text = likesCount.toString(),
                             style = IssueSpotTypography.bodyLarge,
-                            color = if (isLiked) IssueSpotColors.LikeActiveColor else IssueSpotColors.OnSurfaceVariant
                         )
 
                         Spacer(modifier = Modifier.width(16.dp))
@@ -202,9 +204,9 @@ fun PostCard(
                                 .padding(end = 2.dp),
                             tint = IssueSpotColors.OnSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.width(16.dp))
 
                         if (canDelete) {
+                            Spacer(modifier = Modifier.width(16.dp))
                             Icon(
                                 painter = painterResource(R.drawable.ic_delete),
                                 contentDescription = "Delete",
