@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -24,10 +23,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.example.project.auth.presentation.viewmodel.AuthEffect
-import org.example.project.auth.presentation.viewmodel.AuthIntent
-import org.example.project.auth.presentation.viewmodel.AuthUiState
-import org.example.project.auth.presentation.viewmodel.AuthViewModel
+import org.example.project.feature.auth.viewmodel.AuthEffect
+import org.example.project.feature.auth.viewmodel.AuthIntent
+import org.example.project.feature.auth.viewmodel.AuthUiState
+import org.example.project.feature.auth.viewmodel.AuthViewModel
 import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTheme
 import org.example.project.theme.IssueSpotTypography

@@ -10,7 +10,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import org.example.project.core.navigation.Route
-import org.example.project.home.presentation.CurrentLevelManager
+import org.example.project.feature.home.CurrentLevelManager
 import org.example.project.home.presentation.screens.HomeScreen
 import org.koin.compose.koinInject
 

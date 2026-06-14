@@ -1,4 +1,4 @@
-package org.example.project.utils.location
+package org.example.project.core.utils
 
 import android.Manifest
 import android.content.Context
@@ -12,13 +12,13 @@ import androidx.annotation.RequiresPermission
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import org.example.project.core.database.getApplicationContext
 import org.example.project.core.model.auth.UserLocation
 import kotlin.coroutines.resume
 
-class LocationProvider(
-    private val context: Context
-) {
+actual class LocationProvider actual constructor() {
 
+    private val context : Context = getApplicationContext()
     private val geocoder: Geocoder? =
         if (Geocoder.isPresent()) {
             Geocoder(context)

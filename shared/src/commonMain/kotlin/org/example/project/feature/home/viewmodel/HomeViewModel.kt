@@ -1,4 +1,4 @@
-package org.example.project.home.presentation.viewmodel
+package org.example.project.feature.home.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -23,11 +23,12 @@ import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
 import org.example.project.core.model.home.Comment
 import org.example.project.core.utils.DataState
-import org.example.project.home.presentation.CurrentLevelManager
 import org.example.project.core.datastore.UserPreferencesRepository
 import kotlinx.coroutines.flow.combine
 
 import org.example.project.core.data.repository.ProfileRepository
+import org.example.project.feature.home.CurrentLevelManager
+import kotlin.time.Clock
 
 class HomeViewModel(
     private val feedRepository: FeedRepository,
@@ -224,7 +225,7 @@ class HomeViewModel(
         val currentFlow = _uiState.value.postOverrides[postId]?.commentsFlow
         if (currentFlow != null) {
             val optimisticComment = Comment(
-                id = "temp_${System.currentTimeMillis()}",
+                id = "temp_${Clock.System.now()}",
                 postId = postId,
                 text = comment,
                 timeAgo = "Just now",

@@ -71,10 +71,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.collectLatest
 import org.example.project.R
-import org.example.project.createPost.presentation.viewmodel.CreatePostIntent
-import org.example.project.createPost.presentation.viewmodel.CreatePostSideEffect
-import org.example.project.createPost.presentation.viewmodel.CreatePostState
-import org.example.project.createPost.presentation.viewmodel.CreatePostViewModel
+import org.example.project.feature.createPost.viewmodel.CreatePostIntent
+import org.example.project.feature.createPost.viewmodel.CreatePostSideEffect
+import org.example.project.feature.createPost.viewmodel.CreatePostState
+import org.example.project.feature.createPost.viewmodel.CreatePostViewModel
 import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTheme
 import org.example.project.theme.IssueSpotTypography

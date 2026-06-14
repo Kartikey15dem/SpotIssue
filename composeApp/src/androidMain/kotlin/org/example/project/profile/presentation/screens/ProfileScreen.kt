@@ -75,10 +75,10 @@ import org.example.project.core.components.PostLevelChip
 import org.example.project.core.data.mappers.Sort
 import org.example.project.core.model.home.PostLevel
 import org.example.project.core.model.profile.Profile
-import org.example.project.profile.presentation.viewmodel.ProfileIntent
-import org.example.project.profile.presentation.viewmodel.ProfileSideEffect
-import org.example.project.profile.presentation.viewmodel.ProfileState
-import org.example.project.profile.presentation.viewmodel.ProfileViewModel
+import org.example.project.feature.profile.viewmodel.ProfileIntent
+import org.example.project.feature.profile.viewmodel.ProfileSideEffect
+import org.example.project.feature.profile.viewmodel.ProfileState
+import org.example.project.feature.profile.viewmodel.ProfileViewModel
 import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTheme
 import org.example.project.theme.IssueSpotTypography

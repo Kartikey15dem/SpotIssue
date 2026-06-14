@@ -1,4 +1,4 @@
-package org.example.project.profile.presentation.viewmodel
+package org.example.project.feature.profile.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,6 +22,7 @@ import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.Comment
 import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
+import kotlin.time.Clock
 
 class ProfileViewModel(
     private val profileRepository: ProfileRepository,
@@ -173,7 +174,7 @@ class ProfileViewModel(
         val currentFlow = _uiState.value.postOverrides[postId]?.commentsFlow
         if (currentFlow != null) {
             val optimisticComment = Comment(
-                id = "temp_${System.currentTimeMillis()}",
+                id = "temp_${Clock.System.now()}",
                 postId = postId,
                 text = comment,
                 timeAgo = "Just now",

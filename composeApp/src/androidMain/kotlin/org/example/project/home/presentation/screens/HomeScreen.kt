@@ -53,10 +53,10 @@ import org.example.project.R
 import org.example.project.core.model.home.getText
 import org.example.project.core.components.PostCard
 import org.example.project.core.components.PostLevelChip
-import org.example.project.home.presentation.viewmodel.HomeIntent
-import org.example.project.home.presentation.viewmodel.HomeSideEffect
-import org.example.project.home.presentation.viewmodel.HomeState
-import org.example.project.home.presentation.viewmodel.HomeViewModel
+import org.example.project.feature.home.viewmodel.HomeIntent
+import org.example.project.feature.home.viewmodel.HomeSideEffect
+import org.example.project.feature.home.viewmodel.HomeState
+import org.example.project.feature.home.viewmodel.HomeViewModel
 import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTypography
 import org.example.project.core.components.CommentsBottomSheet

@@ -1,4 +1,4 @@
-package org.example.project.createPost.presentation.viewmodel
+package org.example.project.feature.createPost.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

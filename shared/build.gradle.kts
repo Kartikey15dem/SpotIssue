@@ -1,3 +1,5 @@
+import co.touchlab.skie.configuration.FlowInterop
+import co.touchlab.skie.configuration.SealedInterop
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.io.FileInputStream
 import java.util.Properties
@@ -10,6 +12,8 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.androidx.room)
     alias(libs.plugins.ktorfit)
+    alias(libs.plugins.skie)
+
 }
 
 val localPropsFile = rootProject.file("local.properties")
@@ -22,6 +26,15 @@ ktorfit {
     compilerPluginVersion.set("2.3.3")
 }
 
+skie {
+    features {
+        group {
+            enableSwiftUIObservingPreview = true
+            FlowInterop.Enabled(true)
+            SealedInterop.Enabled(true)
+        }
+    }
+}
 kotlin {
     androidTarget {
         compilerOptions {
@@ -36,8 +49,10 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "Shared"
             isStatic = true
+            export(libs.androidx.lifecycle.viewmodel)
         }
     }
+
     
     sourceSets {
         androidMain.dependencies {
@@ -54,6 +69,7 @@ kotlin {
           //  implementation(libs.androidx.room.sqlite.wrapper)
         }
         commonMain.dependencies {
+            api(libs.androidx.lifecycle.viewmodel)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.datetime)
             implementation(libs.koin.core)
@@ -84,6 +100,9 @@ kotlin {
             implementation(libs.kotlin.test)
         }
     }
+
+
+
 }
 
 android {
@@ -106,6 +125,9 @@ android {
     }
 
 }
+
+
+
 room {
     schemaDirectory("$projectDir/schemas")
 }

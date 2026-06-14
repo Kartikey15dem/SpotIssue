@@ -10,7 +10,7 @@ import androidx.core.content.ContextCompat
 
 /**
  * Handles location permission requests and checks.
- * Use this before calling [LocationProvider.getCurrentLocation].
+ * Use this before calling [org.example.project.core.utils.LocationProvider.getCurrentLocation].
  */
 class LocationPermissionHandler(private val context: Context) {
 

@@ -1,4 +1,4 @@
-package org.example.project.auth.presentation.viewmodel
+package org.example.project.feature.auth.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.example.project.core.datastore.UserPreferencesRepository
 import org.example.project.core.model.auth.UserLocation
-import org.example.project.utils.location.LocationProvider
+import org.example.project.core.utils.LocationProvider
 
 class LocationFetchViewModel(
     private val locationProvider: LocationProvider,

@@ -1,4 +1,4 @@
-package org.example.project.auth.presentation.viewmodel
+package org.example.project.feature.auth.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -16,6 +16,7 @@ import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 
 sealed class NameCaptureEffect {
     data class ShowSnackbar(val message: String) : NameCaptureEffect()
@@ -119,7 +120,7 @@ class NameCaptureViewModel(
 
             localImagePath?.let { path ->
                 withContext(Dispatchers.IO) {
-                    java.io.File(path).delete()
+//                    java.io.File(path).delete()
                 }
             }
         }

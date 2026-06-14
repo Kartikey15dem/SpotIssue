@@ -179,8 +179,8 @@ class ProfileRepositoryImpl(
 
     override suspend fun logOut() {
         prefRepository.logOut()
-        withContext(Dispatchers.IO) {
-            database.clearAllTables()
-        }
+//        withContext(Dispatchers.IO) {
+//            database.clearAllTables()
+//        }
     }
 }

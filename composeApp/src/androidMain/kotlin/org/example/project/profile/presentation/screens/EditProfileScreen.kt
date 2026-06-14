@@ -56,10 +56,10 @@ import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.collectLatest
 import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTypography
-import org.example.project.profile.presentation.viewmodel.EditProfileIntent
-import org.example.project.profile.presentation.viewmodel.EditProfileSideEffect
-import org.example.project.profile.presentation.viewmodel.EditProfileState
-import org.example.project.profile.presentation.viewmodel.EditProfileViewModel
+import org.example.project.feature.profile.viewmodel.EditProfileIntent
+import org.example.project.feature.profile.viewmodel.EditProfileSideEffect
+import org.example.project.feature.profile.viewmodel.EditProfileState
+import org.example.project.feature.profile.viewmodel.EditProfileViewModel
 import org.example.project.R
 import org.koin.compose.viewmodel.koinViewModel
 import org.example.project.theme.IssueSpotTheme
@@ -74,12 +74,10 @@ import java.io.File
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.AlertDialog
-import org.example.project.profile.presentation.viewmodel.EmailChangeStep
+import org.example.project.feature.profile.viewmodel.EmailChangeStep
 import org.example.project.utils.media.MediaCompressorUtil
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
-
-import androidx.compose.ui.draw.rotate
 
 import androidx.compose.material3.Snackbar
 

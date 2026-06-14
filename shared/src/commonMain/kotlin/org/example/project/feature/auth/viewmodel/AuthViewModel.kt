@@ -1,8 +1,7 @@
-package org.example.project.auth.presentation.viewmodel
+package org.example.project.feature.auth.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -15,7 +14,6 @@ import org.example.project.core.data.repository.AuthRepository
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.utils.DataState
 import org.example.project.core.datastore.UserPreferencesRepository
-import org.example.project.core.model.profile.Profile
 
 sealed class AuthEffect {
     data class NavigateToOtpScreen(val email: String) : AuthEffect()

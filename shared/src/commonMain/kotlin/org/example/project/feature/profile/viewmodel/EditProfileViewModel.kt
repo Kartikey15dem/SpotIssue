@@ -1,4 +1,4 @@
-package org.example.project.profile.presentation.viewmodel
+package org.example.project.feature.profile.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,10 +13,10 @@ import kotlinx.coroutines.launch
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
-import android.net.Uri
 
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 
 class EditProfileViewModel(
     private val profileRepository: ProfileRepository
@@ -69,7 +69,7 @@ class EditProfileViewModel(
     private fun requestEmailChange() {
         viewModelScope.launch {
             val newEmail = _uiState.value.newEmail
-            if (newEmail.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(newEmail).matches()) {
+            if (newEmail.isBlank() || !isValidEmail(newEmail)) {
                 _sideEffects.emit(EditProfileSideEffect.ShowError("Please enter a valid email"))
                 return@launch
             }
@@ -228,7 +228,7 @@ class EditProfileViewModel(
 
             localImagePath?.let { path ->
                 withContext(Dispatchers.IO) {
-                    java.io.File(path).delete()
+//                    java.io.File(path).delete()
                 }
             }
         }
@@ -315,4 +315,9 @@ sealed interface EditProfileSideEffect {
     data object ShowCamera : EditProfileSideEffect
     data object EmailChanged : EditProfileSideEffect
     data object LogoutSuccess : EditProfileSideEffect
+}
+
+fun isValidEmail(email: String): Boolean {
+    val regex = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+    return email.isNotBlank() && regex.matches(email)
 }

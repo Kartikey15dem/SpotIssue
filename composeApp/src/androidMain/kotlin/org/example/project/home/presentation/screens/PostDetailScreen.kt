@@ -14,7 +14,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import org.example.project.R
 import org.example.project.core.components.CommentItem
 import org.example.project.core.components.PostCard
-import org.example.project.home.presentation.viewmodel.PostDetailViewModel
+import org.example.project.feature.home.viewmodel.PostDetailViewModel
 import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
