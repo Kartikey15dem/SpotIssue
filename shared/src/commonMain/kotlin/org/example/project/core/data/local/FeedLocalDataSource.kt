@@ -28,12 +28,12 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
         // Delete old posts for this level
         postDao.deletePostsByLevel(postLevel.name)
 
-        // Insert new posts
-        postDao.insertPosts(posts.map { it.toEntity(now) })
+        // Insert new posts - Use inherent createdAt for sequence stability
+        postDao.insertPosts(posts.map { it.toEntity(cachedAt = it.createdAt) })
 
         // Update cache metadata
         val metadata = CacheMetadataEntity(
-            cacheKey = CacheMetadataEntity.Companion.postsKey(postLevel.name),
+            cacheKey = CacheMetadataEntity.postsKey(postLevel.name),
             lastFetchedAt = now
         )
         cacheMetadataDao.insertMetadata(metadata)
@@ -47,7 +47,7 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
     suspend fun appendPosts(postLevel: PostLevel, posts: List<Post>) {
         val now = Clock.System.now().toEpochMilliseconds()
 
-        postDao.insertPosts(posts.map { it.toEntity(now) })
+        postDao.insertPosts(posts.map { it.toEntity(cachedAt = it.createdAt) })
 
         // Mark cache as "updated" so the offline list reflects that it is fresh.
         val metadata = CacheMetadataEntity(
@@ -62,7 +62,7 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
      */
     suspend fun isPostsCacheStale(postLevel: PostLevel): Boolean {
         val metadata = cacheMetadataDao.getMetadata(
-            CacheMetadataEntity.Companion.postsKey(postLevel.name)
+            CacheMetadataEntity.postsKey(postLevel.name)
         )
         return metadata?.isStale() ?: true
     }

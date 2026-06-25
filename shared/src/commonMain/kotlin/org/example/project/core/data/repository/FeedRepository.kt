@@ -16,7 +16,7 @@ interface FeedRepository {
     /**
      * Get paged posts for a given post level (network PagingSource via Pager).
      */
-    fun getPagedPosts(postLevel: PostLevel, userLocation: UserLocation? = null, forceRefresh: Boolean = false): Flow<PagingData<Post>>
+    fun getPagedPosts(postLevel: PostLevel, userLocation: UserLocation = UserLocation(), forceRefresh: Boolean = false): Flow<PagingData<Post>>
 
     /**
      * Observe active issues count for a given post level (cached locally).
@@ -27,4 +27,16 @@ interface FeedRepository {
      * Get paged search results for a given query and post level.
      */
     fun getPagedSearchPosts(query: String, postLevel: PostLevel): Flow<PagingData<Post>>
+
+    fun observePosts(postLevel: PostLevel): Flow<List<Post>>
+
+    suspend fun refreshPosts(
+        postLevel: PostLevel,
+        userLocation: UserLocation = UserLocation()
+    ): DataState<List<Post>>
+
+    suspend fun searchPosts(query: String, postLevel: PostLevel): DataState<List<Post>>
+
+    suspend fun updateLikeStatus(postId: String, likesCount: Int, isLiked: Boolean)
+    suspend fun updateReportStatus(postId: String, isReported: Boolean)
 }

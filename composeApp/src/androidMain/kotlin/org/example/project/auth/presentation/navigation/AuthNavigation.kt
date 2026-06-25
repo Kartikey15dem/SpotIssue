@@ -5,13 +5,12 @@ import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
-import org.example.project.auth.presentation.screens.LocationFetchScreenWithPermissions
 import org.example.project.auth.presentation.screens.LoginScreen
 import org.example.project.auth.presentation.screens.NameCaptureScreen
 import org.example.project.auth.presentation.screens.OTPScreen
-import org.example.project.auth.presentation.viewmodel.AuthViewModel
-import org.example.project.auth.presentation.viewmodel.NameCaptureViewModel
 import org.example.project.core.navigation.Route
+import org.example.project.feature.auth.viewmodel.AuthViewModel
+import org.example.project.feature.auth.viewmodel.NameCaptureViewModel
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 

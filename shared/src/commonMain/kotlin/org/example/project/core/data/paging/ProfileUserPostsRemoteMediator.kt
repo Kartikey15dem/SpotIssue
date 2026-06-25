@@ -41,8 +41,9 @@ class ProfileUserPostsRemoteMediator(
             LoadType.PREPEND -> return MediatorResult.Success(endOfPaginationReached = true)
             LoadType.APPEND -> {
                 val remoteKeys = getRemoteKeyForLastItem(state)
-                val nextKey = remoteKeys?.nextKey
-                if (nextKey == null) return MediatorResult.Success(endOfPaginationReached = true)
+                val nextKey = remoteKeys?.nextKey ?: return MediatorResult.Success(
+                    endOfPaginationReached = true
+                )
                 nextKey
             }
         }

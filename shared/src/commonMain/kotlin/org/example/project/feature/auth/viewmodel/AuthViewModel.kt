@@ -2,11 +2,10 @@ package org.example.project.feature.auth.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -43,8 +42,8 @@ class AuthViewModel(
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    private val _effect = MutableSharedFlow<AuthEffect>()
-    val effect: SharedFlow<AuthEffect> = _effect.asSharedFlow()
+    private val _effect = Channel<AuthEffect>(Channel.BUFFERED)
+    val effect = _effect.receiveAsFlow()
 
     fun handleIntent(intent: AuthIntent) {
         when (intent) {
@@ -78,7 +77,7 @@ class AuthViewModel(
             when (val result = authRepository.requestOtp(email)) {
                 is DataState.Success -> {
                     hideLoading()
-                    _effect.emit(AuthEffect.NavigateToOtpScreen(email))
+                    _effect.send(AuthEffect.NavigateToOtpScreen(email))
                 }
                 is DataState.Error -> {
                     hideLoading()
@@ -106,7 +105,7 @@ class AuthViewModel(
             when (val result = authRepository.verifyOtp(email, otp)) {
                 is DataState.Success -> {
                     val isNewUser = result.data.isNewUser
-                    if(isNewUser) _effect.emit(AuthEffect.NavigateToNameCaptureScreen(email))
+                    if(isNewUser) _effect.send(AuthEffect.NavigateToNameCaptureScreen(email))
                     else {
                         when(val res = profileRepository.refreshProfile()){
                             is DataState.Error -> {
@@ -146,8 +145,7 @@ class AuthViewModel(
 
     private fun showError(message: String) {
         viewModelScope.launch {
-            _effect.emit(AuthEffect.ShowSnackbar(message))
+            _effect.send(AuthEffect.ShowSnackbar(message))
         }
     }
 }
-

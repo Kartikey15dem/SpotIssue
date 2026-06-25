@@ -5,6 +5,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.onStart
 import org.example.project.core.utils.NetworkMonitor
 import platform.Network.nw_path_get_status
 import platform.Network.nw_path_monitor_cancel
@@ -39,6 +40,6 @@ class DarwinNetworkMonitor : NetworkMonitor {
         awaitClose {
             nw_path_monitor_cancel(monitor)
         }
-    }.conflate()
+    }.onStart { emit(true) }.conflate()
 }
 

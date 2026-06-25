@@ -7,9 +7,9 @@ import kotlinx.serialization.Serializable
 data class PagedResponse<T>(
     @SerialName("items")
     val items: List<T>,
-    @SerialName("prevKey")
+    @SerialName("prev_key")
     val prevKey: Int?,
-    @SerialName("nextKey")
+    @SerialName("next_key")
     val nextKey: Int?,
     @SerialName("active_issues_count")
     val activeIssuesCount: Int? = null

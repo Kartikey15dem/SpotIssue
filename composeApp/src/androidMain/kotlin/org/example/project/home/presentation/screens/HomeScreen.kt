@@ -129,21 +129,9 @@ fun HomeContent(
 ) {
     val activeFlow = if (state.query.isNotBlank() && state.searchPostsFlow != null) state.searchPostsFlow else state.postsFlow
     val pagingItems = activeFlow?.collectAsLazyPagingItems()
-    var isManualRefreshing by remember { mutableStateOf(false) }
-
-    LaunchedEffect(pagingItems?.loadState?.refresh) {
-        if (pagingItems?.loadState?.refresh !is LoadState.Loading) {
-            isManualRefreshing = false
-        }
-    }
-    
-    val isRefreshing = isManualRefreshing
-
-
-
     val spacing = IssueSpotTheme.spacing
     PullToRefreshBox(
-        isRefreshing = isRefreshing,
+        isRefreshing = state.isRefreshing,
         onRefresh = { onIntent(HomeIntent.Refresh) },
         modifier = modifier
             .fillMaxSize()
@@ -152,8 +140,9 @@ fun HomeContent(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            if(state.expandedPost != null) {
-                val post = state.expandedPost
+            val expandedPost = state.expandedPost
+            if(expandedPost != null) {
+                val post = expandedPost
                 val override = state.postOverrides[post.id]
 
                 val isLiked = override?.isLiked ?: post.isLiked
@@ -164,7 +153,6 @@ fun HomeContent(
                 BackHandler {
                     onIntent(HomeIntent.DismissPost)
                 }
-
 
                     PostCard(
                         modifier = Modifier
@@ -200,8 +188,6 @@ fun HomeContent(
                         isDetailMode = true
 
                     )
-                    
-
 
             } else {
                     HomeHeader(
@@ -283,15 +269,25 @@ fun HomeContent(
 
                         if (refreshError != null && pagingItems.itemCount == 0) {
                             item {
-                                Box(
+                                Column(
                                     modifier = Modifier.fillMaxWidth().padding(spacing.medium),
-                                    contentAlignment = Alignment.Center
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Text(
                                         text = refreshError.error.message ?: "An error occurred",
                                         color = IssueSpotColors.OnBackground,
                                         style = IssueSpotTypography.bodyMedium
                                     )
+                                    Spacer(Modifier.height(spacing.small))
+                                    Button(
+                                        onClick = { onIntent(HomeIntent.Refresh) },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = IssueSpotColors.Primary,
+                                            contentColor = IssueSpotColors.OnPrimary
+                                        )
+                                    ) {
+                                        Text("Retry")
+                                    }
                                 }
                             }
                         } else if (pagingItems?.loadState?.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
@@ -303,15 +299,57 @@ fun HomeContent(
                                     CircularProgressIndicator(color = IssueSpotColors.Primary)
                                 }
                             }
+                        } else if (pagingItems?.loadState?.refresh is LoadState.NotLoading && pagingItems.itemCount == 0) {
+                            item {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("No posts found", style = IssueSpotTypography.bodyLarge, color = IssueSpotColors.OnBackground)
+                                }
+                            }
                         }
 
-                        if (appendError != null && pagingItems.itemCount > 0) {
+                        if ((appendError != null) && (pagingItems.itemCount > 0)) {
+                            item {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = appendError.error.message ?: "An error occurred",
+                                        color = IssueSpotColors.OnBackground,
+                                        style = IssueSpotTypography.bodyMedium
+                                    )
+                                    Spacer(Modifier.height(spacing.small))
+                                    Button(
+                                        onClick = { pagingItems?.retry() },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = IssueSpotColors.Primary,
+                                            contentColor = IssueSpotColors.OnPrimary
+                                        )
+                                    ) {
+                                        Text("Retry")
+                                    }
+                                }
+                            }
+                        } else if (pagingItems?.loadState?.append is LoadState.Loading) {
+                            item {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(color = IssueSpotColors.Primary)
+                                }
+                            }
+                        } else if (pagingItems?.loadState?.append is LoadState.NotLoading && pagingItems.loadState.append.endOfPaginationReached && pagingItems.itemCount > 0) {
                             item {
                                 Text(
                                     modifier = Modifier.fillMaxWidth().padding(spacing.medium),
-                                    text = appendError.error.message ?: "An error occurred",
+                                    text = "No more posts",
                                     color = IssueSpotColors.OnBackground,
-                                    style = IssueSpotTypography.bodyMedium
+                                    style = IssueSpotTypography.bodyMedium,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                 )
                             }
                         }
@@ -322,8 +360,8 @@ fun HomeContent(
         }
     }
 
-    if (state.showCommentsSheetForPostId != null) {
-        val activePostId = state.showCommentsSheetForPostId
+    val activePostId = state.showCommentsSheetForPostId
+    if (activePostId != null) {
         val activeOverride = state.postOverrides[activePostId]
         val commentsPagingItems = activeOverride?.commentsFlow?.collectAsLazyPagingItems()
 

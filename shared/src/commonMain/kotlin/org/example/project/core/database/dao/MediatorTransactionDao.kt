@@ -51,7 +51,6 @@ interface MediatorTransactionDao {
     ) {
         remoteKeysDao.insertAll(remoteKeys)
         postDao.insertPosts(posts)
-        postDao.trimPostsByLevel(level, maxCachedPosts)
     }
 
     @Transaction
@@ -79,7 +78,6 @@ interface MediatorTransactionDao {
     ) {
         remoteKeysDao.insertAll(remoteKeys)
         userPostDao.insertPosts(posts)
-        userPostDao.trimUserPosts(maxPosts = maxCachedPosts)
     }
 
     @Transaction
@@ -107,6 +105,5 @@ interface MediatorTransactionDao {
     ) {
         remoteKeysDao.insertAll(remoteKeys)
         likedPostDao.insertPosts(posts)
-        likedPostDao.trimLikedPosts(maxPosts = maxCachedPosts)
     }
 }

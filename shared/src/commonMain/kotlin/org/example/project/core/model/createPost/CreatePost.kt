@@ -6,5 +6,5 @@ import org.example.project.core.model.home.MediaType
 data class CreatePost(    val postText: String,
     val mediaType: MediaType?,
     val mediaFilePaths: List<String> = emptyList(),
-    val location: UserLocation? = null
+    val location: UserLocation = UserLocation(),
 )

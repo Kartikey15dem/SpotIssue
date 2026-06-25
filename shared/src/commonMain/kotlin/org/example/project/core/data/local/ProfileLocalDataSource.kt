@@ -34,5 +34,9 @@ class ProfileLocalDataSource(
         return profileDao.getProfileFlow()
     }
 
+    suspend fun clearProfile() {
+        profileDao.deleteProfile()
+    }
+
 
 }

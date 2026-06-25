@@ -56,11 +56,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
-import org.example.project.auth.presentation.viewmodel.LocationFetchEffect
-import org.example.project.auth.presentation.viewmodel.LocationFetchIntent
-import org.example.project.auth.presentation.viewmodel.LocationFetchStep
-import org.example.project.auth.presentation.viewmodel.LocationFetchUiState
-import org.example.project.auth.presentation.viewmodel.LocationFetchViewModel
+
 import org.example.project.utils.location.LocationPermissionHandler
 import org.koin.compose.koinInject
 import org.example.project.R
@@ -74,6 +70,11 @@ import org.example.project.theme.IssueSpotTheme
 import org.example.project.theme.IssueSpotTypography
 
 import androidx.compose.foundation.BorderStroke
+import org.example.project.feature.auth.viewmodel.LocationFetchViewModel
+import org.example.project.feature.auth.viewmodel.LocationFetchIntent
+import org.example.project.feature.auth.viewmodel.LocationFetchEffect
+import org.example.project.feature.auth.viewmodel.LocationFetchStep
+import org.example.project.feature.auth.viewmodel.LocationFetchUiState
 
 @Composable
 fun LocationFetchScreenWithPermissions(
@@ -180,6 +181,38 @@ private fun LocationFetchContent(
     val spacing = IssueSpotTheme.spacing
     val shapes = MaterialTheme.shapes
 
+    var showRationaleDialog by remember { mutableStateOf(false) }
+
+    if (showRationaleDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showRationaleDialog = false },
+            title = {
+                Text(
+                    text = "Why is Location Important?",
+                    style = IssueSpotTypography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Location is required for fetching posts around you and for creating new posts, which is the primary focus of this app.",
+                    style = IssueSpotTypography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showRationaleDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = IssueSpotColors.Primary)
+                ) {
+                    Text("Back", color = IssueSpotColors.OnPrimary)
+                }
+            },
+            containerColor = IssueSpotColors.Surface,
+            titleContentColor = IssueSpotColors.OnSurface,
+            textContentColor = IssueSpotColors.OnSurfaceVariant
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -224,6 +257,7 @@ private fun LocationFetchContent(
                 text = when (uiState.currentStep) {
                     LocationFetchStep.FETCHING -> "Fetching your location..."
                     LocationFetchStep.COMPLETED -> "Location fetched successfully!"
+                    else -> {"Something went wrong!"}
                 },
                 style = IssueSpotTypography.titleLarge,
                 color = IssueSpotColors.OnSurface,
@@ -232,17 +266,20 @@ private fun LocationFetchContent(
             Spacer(modifier = Modifier.height(spacing.small))
         }
 
-        if (uiState.currentStep == LocationFetchStep.COMPLETED && uiState.address != null) {
+        val address = uiState.address
+        val errorState = uiState.errorState
+
+        if (uiState.currentStep == LocationFetchStep.COMPLETED && address != null) {
             Text(
-                text = uiState.address,
+                text = address,
                 style = IssueSpotTypography.bodyMedium,
                 color = IssueSpotColors.OnSurfaceVariant,
                 textAlign = TextAlign.Center
             )
-        } else if (uiState.currentStep == LocationFetchStep.ERROR && uiState.errorState != null) {
+        } else if (uiState.currentStep == LocationFetchStep.ERROR && errorState != null) {
 
             Text(
-                text = uiState.errorState.message,
+                text = errorState.message,
                 style = IssueSpotTypography.bodyLarge,
                 color = IssueSpotColors.OnSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -257,14 +294,14 @@ private fun LocationFetchContent(
                 shape = shapes.medium
             ) {
                 Text(
-                    text = uiState.errorState.primaryButtonText,
+                    text = errorState.primaryButtonText,
                     style = IssueSpotTypography.labelLarge,
                     color = IssueSpotColors.OnPrimary,
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            if (uiState.errorState.showSecondaryRetry) {
+            if (errorState.showSecondaryRetry) {
                 Spacer(modifier = Modifier.height(spacing.smallMedium))
                 OutlinedButton(
                     onClick = { onIntent(LocationFetchIntent.RetryClicked) },
@@ -284,13 +321,13 @@ private fun LocationFetchContent(
             Spacer(modifier = Modifier.height(spacing.large))
 
             Text(
-                text = "Continue without location",
+                text = "See why location is required",
                 color = IssueSpotColors.Primary,
                 style = IssueSpotTypography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 textDecoration = TextDecoration.Underline,
                 modifier = Modifier
-                    .clickable { onIntent(LocationFetchIntent.ContinueWithoutLocation) }
+                    .clickable { showRationaleDialog = true }
                     .padding(spacing.small)
             )
         }

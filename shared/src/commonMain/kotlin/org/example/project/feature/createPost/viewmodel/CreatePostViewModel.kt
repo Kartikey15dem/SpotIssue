@@ -2,9 +2,9 @@ package org.example.project.feature.createPost.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -28,8 +28,8 @@ class CreatePostViewModel(
     private val _uiState = MutableStateFlow(CreatePostState())
     val uiState: StateFlow<CreatePostState> = _uiState.asStateFlow()
 
-    private val _sideEffects = MutableSharedFlow<CreatePostSideEffect>()
-    val sideEffects: SharedFlow<CreatePostSideEffect> = _sideEffects
+    private val _sideEffects = Channel<CreatePostSideEffect>(Channel.BUFFERED)
+    val sideEffects = _sideEffects.receiveAsFlow()
 
     init {
         observeUserData()
@@ -40,7 +40,7 @@ class CreatePostViewModel(
         viewModelScope.launch {
             prefRepository.userData.collect { userData ->
                 _uiState.update { it.copy(
-                    location = userData.userLocation?.address ?: "Current Location"
+                    location = userData.userLocation.address.ifEmpty { "Current Location" }
                 ) }
 
                 val draft = userData.uploadDraftState
@@ -50,7 +50,7 @@ class CreatePostViewModel(
                             description = draft.postText,
                             selectedMedia = draft.selectedMedia
                         ) }
-                        _sideEffects.emit(
+                        _sideEffects.send(
                             CreatePostSideEffect.ShowError(
                                 draft.errorMessage ?: "Upload failed. Draft restored."
                             )
@@ -60,7 +60,7 @@ class CreatePostViewModel(
                     }
                     UploadStatus.SUCCESS -> {
                         _uiState.update { it.copy(isLoading = false, description = "", selectedMedia = null) }
-                        _sideEffects.emit(CreatePostSideEffect.PostCreated("new_post"))
+                        _sideEffects.send(CreatePostSideEffect.PostCreated("new_post"))
                         prefRepository.updateUploadDraftState(UploadDraftState.DEFAULT)
                         // Wait, if they are still on this screen, close it
                         onNavigateBack()
@@ -102,8 +102,14 @@ class CreatePostViewModel(
             CreatePostIntent.RemoveMedia -> removeMedia()
             is CreatePostIntent.RemoveImage -> removeImage(intent.uri)
             CreatePostIntent.PostIssueClicked -> createPost()
+            is CreatePostIntent.VisualMediaAdded -> setVisualMedia(intent.mediaItems)
+            is CreatePostIntent.DocumentUrlAdded -> setDocumentUrl(intent.uri)
         }
     }
+
+    fun setDescription(description: String) = onIntent(CreatePostIntent.DescriptionChanged(description))
+    fun submitPost() = onIntent(CreatePostIntent.PostIssueClicked)
+    fun close() = onIntent(CreatePostIntent.CloseClicked)
 
     private fun changeDescription(description: String) {
         _uiState.value = _uiState.value.copy(description = description)
@@ -112,7 +118,7 @@ class CreatePostViewModel(
     private fun createPost() {
         viewModelScope.launch {
             if (_uiState.value.description.isBlank()) {
-                _sideEffects.emit(CreatePostSideEffect.ShowError("Please describe the issue"))
+                _sideEffects.send(CreatePostSideEffect.ShowError("Please describe the issue"))
                 return@launch
             }
 
@@ -131,7 +137,7 @@ class CreatePostViewModel(
                 when (val result = postRepository.createPost(createPostModel)) {
                     is DataState.Success -> {
                         _uiState.update { it.copy(isLoading = false, description = "", selectedMedia = null) }
-                        _sideEffects.emit(CreatePostSideEffect.PostCreated(result.data.id))
+                        _sideEffects.send(CreatePostSideEffect.PostCreated(result.data.id))
                         onNavigateBack()
                     }
                     is DataState.Error -> {
@@ -149,21 +155,21 @@ class CreatePostViewModel(
                 )
                 prefRepository.updateUploadDraftState(draft)
 
-                _sideEffects.emit(CreatePostSideEffect.StartBackgroundUpload)
+                _sideEffects.send(CreatePostSideEffect.StartBackgroundUpload)
             }
         }
     }
 
     private fun handleAddMedia() {
-        viewModelScope.launch { _sideEffects.emit(CreatePostSideEffect.ShowMediaPicker) }
+        viewModelScope.launch { _sideEffects.send(CreatePostSideEffect.ShowMediaPicker) }
     }
 
     private fun handleAddPdf() {
-        viewModelScope.launch { _sideEffects.emit(CreatePostSideEffect.ShowPdfPicker) }
+        viewModelScope.launch { _sideEffects.send(CreatePostSideEffect.ShowPdfPicker) }
     }
 
     private fun onNavigateBack() {
-        viewModelScope.launch { _sideEffects.emit(CreatePostSideEffect.NavigateBack) }
+        viewModelScope.launch { _sideEffects.send(CreatePostSideEffect.NavigateBack) }
     }
 
     fun setVisualMedia(mediaItems: List<Pair<String, String?>>) {
@@ -211,7 +217,7 @@ class CreatePostViewModel(
 
     private fun emitError(message: String) {
         viewModelScope.launch {
-            _sideEffects.emit(CreatePostSideEffect.ShowError(message))
+            _sideEffects.send(CreatePostSideEffect.ShowError(message))
         }
     }
 
@@ -242,6 +248,8 @@ sealed interface CreatePostIntent {
     data class RemoveImage(val uri: String) : CreatePostIntent
     data object CancelClicked : CreatePostIntent
     data object PostIssueClicked : CreatePostIntent
+    data class VisualMediaAdded(val mediaItems: List<Pair<String, String?>>) : CreatePostIntent
+    data class DocumentUrlAdded(val uri: String) : CreatePostIntent
 }
 
 data class CreatePostState(

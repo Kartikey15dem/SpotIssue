@@ -28,7 +28,7 @@ fun PostDetailScreen(
     viewModel: PostDetailViewModel = koinViewModel(parameters = { parametersOf(postId) })
 ) {
     val state by viewModel.uiState.collectAsState()
-    val comments = state.commentsFlow?.collectAsLazyPagingItems()
+    val comments = viewModel.commentsFlow.collectAsLazyPagingItems()
 
     Scaffold(
         topBar = {

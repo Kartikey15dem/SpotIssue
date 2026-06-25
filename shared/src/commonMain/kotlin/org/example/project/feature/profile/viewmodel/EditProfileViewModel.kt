@@ -2,11 +2,10 @@ package org.example.project.feature.profile.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -25,8 +24,8 @@ class EditProfileViewModel(
     private val _uiState = MutableStateFlow(EditProfileState())
     val uiState: StateFlow<EditProfileState> = _uiState.asStateFlow()
 
-    private val _sideEffects = MutableSharedFlow<EditProfileSideEffect>()
-    val sideEffects: SharedFlow<EditProfileSideEffect> = _sideEffects.asSharedFlow()
+    private val _sideEffects = Channel<EditProfileSideEffect>(Channel.BUFFERED)
+    val sideEffects = _sideEffects.receiveAsFlow()
 
     init {
         observeProfile()
@@ -43,7 +42,7 @@ class EditProfileViewModel(
             EditProfileIntent.SaveChangesClicked -> saveChanges()
             EditProfileIntent.ResetClicked -> resetToOriginal()
             EditProfileIntent.DismissImagePicker -> dismissImagePicker()
-            EditProfileIntent.BackPressed -> viewModelScope.launch { _sideEffects.emit(EditProfileSideEffect.BackPreseed) }
+            EditProfileIntent.BackPressed -> viewModelScope.launch { _sideEffects.send(EditProfileSideEffect.BackPreseed) }
             EditProfileIntent.ErrorShown -> clearError()
             EditProfileIntent.RequestEmailChangeClicked -> requestEmailChange()
             is EditProfileIntent.VerifyEmailChangeClicked -> verifyEmailChange(intent.otp)
@@ -57,12 +56,22 @@ class EditProfileViewModel(
         }
     }
 
+    fun setName(name: String) = onIntent(EditProfileIntent.NameChanged(name))
+    fun setImageUrl(url: String) = onIntent(EditProfileIntent.ImageUrlChanged(url))
+    fun setNewEmail(email: String) = onIntent(EditProfileIntent.NewEmailChanged(email))
+    fun save() = onIntent(EditProfileIntent.SaveChangesClicked)
+    fun submitEmailChangeRequest() = onIntent(EditProfileIntent.RequestEmailChangeClicked)
+    fun submitEmailChangeVerification(otp: String) = onIntent(EditProfileIntent.VerifyEmailChangeClicked(otp))
+    fun showEmailChange() = onIntent(EditProfileIntent.ShowEmailChangeDialogClicked)
+    fun dismissEmailChange() = onIntent(EditProfileIntent.DismissEmailChangeDialog)
+    fun logoutUser() = onIntent(EditProfileIntent.LogoutClicked)
+
     private fun logout() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             profileRepository.logOut()
             _uiState.update { it.copy(isLoading = false) }
-            _sideEffects.emit(EditProfileSideEffect.LogoutSuccess)
+            _sideEffects.send(EditProfileSideEffect.LogoutSuccess)
         }
     }
 
@@ -70,7 +79,7 @@ class EditProfileViewModel(
         viewModelScope.launch {
             val newEmail = _uiState.value.newEmail
             if (newEmail.isBlank() || !isValidEmail(newEmail)) {
-                _sideEffects.emit(EditProfileSideEffect.ShowError("Please enter a valid email"))
+                _sideEffects.send(EditProfileSideEffect.ShowError("Please enter a valid email"))
                 return@launch
             }
 
@@ -78,7 +87,7 @@ class EditProfileViewModel(
             when (val res = profileRepository.requestEmailChange(newEmail)) {
                 is DataState.Success -> {
                     _uiState.update { it.copy(isEmailUpdating = false, emailChangeStep = EmailChangeStep.Verify) }
-                    _sideEffects.emit(EditProfileSideEffect.ShowSnackbar("OTP sent to your new email"))
+                    _sideEffects.send(EditProfileSideEffect.ShowSnackbar("OTP sent to your new email"))
                 }
                 is DataState.Error -> {
                     handleError(res.exception)
@@ -92,7 +101,7 @@ class EditProfileViewModel(
     private fun verifyEmailChange(otp: String) {
         viewModelScope.launch {
             if (otp.length != 6) {
-                _sideEffects.emit(EditProfileSideEffect.ShowError("OTP must be 6 digits"))
+                _sideEffects.send(EditProfileSideEffect.ShowError("OTP must be 6 digits"))
                 return@launch
             }
 
@@ -107,8 +116,8 @@ class EditProfileViewModel(
                             newEmail = ""
                         ) 
                     }
-                    _sideEffects.emit(EditProfileSideEffect.ShowSnackbar("Email updated successfully"))
-                    _sideEffects.emit(EditProfileSideEffect.EmailChanged)
+                    _sideEffects.send(EditProfileSideEffect.ShowSnackbar("Email updated successfully"))
+                    _sideEffects.send(EditProfileSideEffect.EmailChanged)
                 }
                 is DataState.Error -> {
                     handleError(res.exception)
@@ -181,13 +190,13 @@ class EditProfileViewModel(
 
     private fun pickFromGallery() {
         viewModelScope.launch {
-            _sideEffects.emit(EditProfileSideEffect.ShowImagePicker)
+            _sideEffects.send(EditProfileSideEffect.ShowImagePicker)
         }
     }
 
     private fun captureFromCamera() {
         viewModelScope.launch {
-            _sideEffects.emit(EditProfileSideEffect.ShowCamera)
+            _sideEffects.send(EditProfileSideEffect.ShowCamera)
         }
     }
 
@@ -197,7 +206,7 @@ class EditProfileViewModel(
 
             // Validation
             if (currentState.name.isBlank()) {
-                _sideEffects.emit(EditProfileSideEffect.ShowError("Name cannot be empty"))
+                _sideEffects.send(EditProfileSideEffect.ShowError("Name cannot be empty"))
                 return@launch
             }
 
@@ -215,8 +224,8 @@ class EditProfileViewModel(
                 when (val res = profileRepository.updateProfile(updatedProfile, localImagePath)) {
                     is DataState.Success -> {
                         _uiState.update { it.copy(isSaving = false, originalProfile = updatedProfile) }
-                        _sideEffects.emit(EditProfileSideEffect.ProfileSaved)
-                        _sideEffects.emit(EditProfileSideEffect.ShowSnackbar("Profile updated successfully"))
+                        _sideEffects.send(EditProfileSideEffect.ProfileSaved)
+                        _sideEffects.send(EditProfileSideEffect.ShowSnackbar("Profile updated successfully"))
                     }
                     is DataState.Error -> {
                         handleError(res.exception)
@@ -258,7 +267,7 @@ class EditProfileViewModel(
     private suspend fun handleError(error: Throwable) {
         val message = error.message ?: "Something went wrong"
         _uiState.update { it.copy(error = message) }
-        _sideEffects.emit(EditProfileSideEffect.ShowError(message))
+        _sideEffects.send(EditProfileSideEffect.ShowError(message))
     }
 
 }

@@ -32,13 +32,13 @@ actual class LocationProvider actual constructor() {
             Manifest.permission.ACCESS_COARSE_LOCATION
         ]
     )
-    suspend fun getCurrentLocation(): UserLocation? =
+    actual suspend fun getCurrentLocation(): UserLocation =
         withContext(Dispatchers.IO) {
 
             val locationManager =
                 context.getSystemService(Context.LOCATION_SERVICE)
                         as? LocationManager
-                    ?: return@withContext null
+                    ?: throw Exception("LocationManager not found")
 
             val providers = locationManager.getProviders(true)
 
@@ -59,7 +59,7 @@ actual class LocationProvider actual constructor() {
             }
 
             val location = bestLocation
-                ?: return@withContext null
+                ?: throw Exception("No location found")
 
             reverseGeocode(
                 location.latitude,
@@ -171,10 +171,9 @@ actual class LocationProvider actual constructor() {
         val country =
             address.countryName
 
-        val locationPair = getConsistentLocation(state,district)
-
-        val newDistrict = locationPair?.second
-        val newState = locationPair?.first
+        val normalized = normalizeLocation(state, district)
+        val newDistrict = normalized.district
+        val newState = normalized.state
 
         val formattedAddress =
             listOf(
@@ -193,290 +192,10 @@ actual class LocationProvider actual constructor() {
             latitude = latitude,
             longitude = longitude,
 
-            locality = locality,
-            district = newDistrict,
-            state = newState,
-            country = country
+            locality = locality ?: "",
+            district = newDistrict ?: "",
+            state = newState ?: "",
+            country = country ?: ""
         )
     }
-}
-
-
-/**
- * Calculates the Levenshtein distance between two strings.
- * The lower the number, the closer the match.
- */
-fun calculateLevenshteinDistance(lhs: CharSequence, rhs: CharSequence): Int {
-    val lhsLength = lhs.length
-    val rhsLength = rhs.length
-
-    var cost: IntArray = IntArray(lhsLength + 1) { it }
-    var newCost: IntArray = IntArray(lhsLength + 1)
-
-    for (i in 1..rhsLength) {
-        newCost[0] = i
-        for (j in 1..lhsLength) {
-            val match = if (lhs[j - 1].equals(rhs[i - 1], ignoreCase = true)) 0 else 1
-            val costReplace = cost[j - 1] + match
-            val costInsert = cost[j] + 1
-            val costDelete = newCost[j - 1] + 1
-            newCost[j] = minOf(costInsert, costDelete, costReplace)
-        }
-        val swap = cost
-        cost = newCost
-        newCost = swap
-    }
-    return cost[lhsLength]
-}
-
-
-fun getConsistentLocation(
-    rawState: String,
-    rawDistrict: String
-): Pair<String, String>? {
-
-    // 1. MATCH THE STATE FIRST
-    // Find the state with the lowest Levenshtein distance (closest string match)
-    val matchedState = IndianLocations.statesAndDistricts.keys.minByOrNull { validState ->
-        calculateLevenshteinDistance(rawState, validState)
-    } ?: return null
-
-    // 2. FETCH DISTRICTS FOR THAT SPECIFIC STATE
-    val stateDistricts = IndianLocations.statesAndDistricts[matchedState] ?: return null
-
-    // 3. MATCH THE DISTRICT
-    // Find the district with the lowest Levenshtein distance within that state
-    val matchedDistrict = stateDistricts.minByOrNull { validDistrict ->
-        calculateLevenshteinDistance(rawDistrict, validDistrict)
-    } ?: return null
-
-    // Return the perfectly formatted values
-    return Pair(matchedState, matchedDistrict)
-}
-
-/**
- * Hardcoded, in-memory representation of Indian States and Districts.
- * This is faster and safer than parsing a local JSON file at runtime.
- */
-object IndianLocations {
-    val statesAndDistricts: Map<String, List<String>> = mapOf(
-        "Andhra Pradesh" to listOf(
-            "Anantapur", "Chittoor", "East Godavari", "Guntur", "Krishna",
-            "Kurnool", "Nellore", "Prakasam", "Srikakulam", "Visakhapatnam",
-            "Vizianagaram", "West Godavari", "YSR Kadapa"
-        ),
-        "Arunachal Pradesh" to listOf(
-            "Tawang", "West Kameng", "East Kameng", "Papum Pare", "Kurung Kumey",
-            "Kra Daadi", "Lower Subansiri", "Upper Subansiri", "West Siang",
-            "East Siang", "Siang", "Upper Siang", "Lower Siang", "Lower Dibang Valley",
-            "Dibang Valley", "Anjaw", "Lohit", "Namsai", "Changlang", "Tirap", "Longding"
-        ),
-        "Assam" to listOf(
-            "Baksa", "Barpeta", "Biswanath", "Bongaigaon", "Cachar", "Charaideo",
-            "Chirang", "Darrang", "Dhemaji", "Dhubri", "Dibrugarh", "Goalpara",
-            "Golaghat", "Hailakandi", "Hojai", "Jorhat", "Kamrup Metropolitan",
-            "Kamrup", "Karbi Anglong", "Karimganj", "Kokrajhar", "Lakhimpur",
-            "Majuli", "Morigaon", "Nagaon", "Nalbari", "Dima Hasao", "Sivasagar",
-            "Sonitpur", "South Salmara-Mankachar", "Tinsukia", "Udalguri", "West Karbi Anglong"
-        ),
-        "Bihar" to listOf(
-            "Araria", "Arwal", "Aurangabad", "Banka", "Begusarai", "Bhagalpur",
-            "Bhojpur", "Buxar", "Darbhanga", "East Champaran (Motihari)", "Gaya",
-            "Gopalganj", "Jamui", "Jehanabad", "Kaimur (Bhabua)", "Katihar",
-            "Khagaria", "Kishanganj", "Lakhisarai", "Madhepura", "Madhubani",
-            "Munger (Monghyr)", "Muzaffarpur", "Nalanda", "Nawada", "Patna",
-            "Purnia (Purnea)", "Rohtas", "Saharsa", "Samastipur", "Saran",
-            "Sheikhpura", "Sheohar", "Sitamarhi", "Siwan", "Supaul", "Vaishali", "West Champaran"
-        ),
-        "Chandigarh (UT)" to listOf(
-            "Chandigarh"
-        ),
-        "Chhattisgarh" to listOf(
-            "Balod", "Baloda Bazar", "Balrampur", "Bastar", "Bemetara", "Bijapur",
-            "Bilaspur", "Dantewada (South Bastar)", "Dhamtari", "Durg", "Gariyaband",
-            "Janjgir-Champa", "Jashpur", "Kabirdham (Kawardha)", "Kanker (North Bastar)",
-            "Kondagaon", "Korba", "Korea (Koriya)", "Mahasamund", "Mungeli",
-            "Narayanpur", "Raigarh", "Raipur", "Rajnandgaon", "Sukma", "Surajpur  ", "Surguja"
-        ),
-        "Dadra and Nagar Haveli (UT)" to listOf(
-            "Dadra & Nagar Haveli"
-        ),
-        "Daman and Diu (UT)" to listOf(
-            "Daman", "Diu"
-        ),
-        "Delhi (NCT)" to listOf(
-            "Central Delhi", "East Delhi", "New Delhi", "North Delhi", "North East  Delhi",
-            "North West  Delhi", "Shahdara", "South Delhi", "South East Delhi",
-            "South West  Delhi", "West Delhi"
-        ),
-        "Goa" to listOf(
-            "North Goa", "South Goa"
-        ),
-        "Gujarat" to listOf(
-            "Ahmedabad", "Amreli", "Anand", "Aravalli", "Banaskantha (Palanpur)",
-            "Bharuch", "Bhavnagar", "Botad", "Chhota Udepur", "Dahod", "Dangs (Ahwa)",
-            "Devbhoomi Dwarka", "Gandhinagar", "Gir Somnath", "Jamnagar", "Junagadh",
-            "Kachchh", "Kheda (Nadiad)", "Mahisagar", "Mehsana", "Morbi",
-            "Narmada (Rajpipla)", "Navsari", "Panchmahal (Godhra)", "Patan",
-            "Porbandar", "Rajkot", "Sabarkantha (Himmatnagar)", "Surat",
-            "Surendranagar", "Tapi (Vyara)", "Vadodara", "Valsad"
-        ),
-        "Haryana" to listOf(
-            "Ambala", "Bhiwani", "Charkhi Dadri", "Faridabad", "Fatehabad",
-            "Gurgaon", "Hisar", "Jhajjar", "Jind", "Kaithal", "Karnal", "Kurukshetra",
-            "Mahendragarh", "Mewat", "Palwal", "Panchkula", "Panipat", "Rewari",
-            "Rohtak", "Sirsa", "Sonipat", "Yamunanagar"
-        ),
-        "Himachal Pradesh" to listOf(
-            "Bilaspur", "Chamba", "Hamirpur", "Kangra", "Kinnaur", "Kullu",
-            "Lahaul &amp; Spiti", "Mandi", "Shimla", "Sirmaur (Sirmour)", "Solan", "Una"
-        ),
-        "Jammu and Kashmir" to listOf(
-            "Anantnag", "Bandipore", "Baramulla", "Budgam", "Doda", "Ganderbal",
-            "Jammu", "Kargil", "Kathua", "Kishtwar", "Kulgam", "Kupwara", "Leh",
-            "Poonch", "Pulwama", "Rajouri", "Ramban", "Reasi", "Samba", "Shopian",
-            "Srinagar", "Udhampur"
-        ),
-        "Jharkhand" to listOf(
-            "Bokaro", "Chatra", "Deoghar", "Dhanbad", "Dumka", "East Singhbhum",
-            "Garhwa", "Giridih", "Godda", "Gumla", "Hazaribag", "Jamtara", "Khunti",
-            "Koderma", "Latehar", "Lohardaga", "Pakur", "Palamu", "Ramgarh", "Ranchi",
-            "Sahibganj", "Seraikela-Kharsawan", "Simdega", "West Singhbhum"
-        ),
-        "Karnataka" to listOf(
-            "Bagalkot", "Ballari (Bellary)", "Belagavi (Belgaum)", "Bengaluru (Bangalore) Rural",
-            "Bengaluru (Bangalore) Urban", "Bidar", "Chamarajanagar", "Chikballapur",
-            "Chikkamagaluru (Chikmagalur)", "Chitradurga", "Dakshina Kannada", "Davangere",
-            "Dharwad", "Gadag", "Hassan", "Haveri", "Kalaburagi (Gulbarga)", "Kodagu",
-            "Kolar", "Koppal", "Mandya", "Mysuru (Mysore)", "Raichur", "Ramanagara",
-            "Shivamogga (Shimoga)", "Tumakuru (Tumkur)", "Udupi", "Uttara Kannada (Karwar)",
-            "Vijayapura (Bijapur)", "Yadgir"
-        ),
-        "Kerala" to listOf(
-            "Alappuzha", "Ernakulam", "Idukki", "Kannur", "Kasaragod", "Kollam",
-            "Kottayam", "Kozhikode", "Malappuram", "Palakkad", "Pathanamthitta",
-            "Thiruvananthapuram", "Thrissur", "Wayanad"
-        ),
-        "Lakshadweep (UT)" to listOf(
-            "Agatti", "Amini", "Androth", "Bithra", "Chethlath", "Kavaratti",
-            "Kadmath", "Kalpeni", "Kilthan", "Minicoy"
-        ),
-        "Madhya Pradesh" to listOf(
-            "Agar Malwa", "Alirajpur", "Anuppur", "Ashoknagar", "Balaghat", "Barwani",
-            "Betul", "Bhind", "Bhopal", "Burhanpur", "Chhatarpur", "Chhindwara",
-            "Damoh", "Datia", "Dewas", "Dhar", "Dindori", "Guna", "Gwalior", "Harda",
-            "Hoshangabad", "Indore", "Jabalpur", "Jhabua", "Katni", "Khandwa",
-            "Khargone", "Mandla", "Mandsaur", "Morena", "Narsinghpur", "Neemuch",
-            "Panna", "Raisen", "Rajgarh", "Ratlam", "Rewa", "Sagar", "Satna",
-            "Sehore", "Seoni", "Shahdol", "Shajapur", "Sheopur", "Shivpuri",
-            "Sidhi", "Singrauli", "Tikamgarh", "Ujjain", "Umaria", "Vidisha"
-        ),
-        "Maharashtra" to listOf(
-            "Ahmednagar", "Akola", "Amravati", "Aurangabad", "Beed", "Bhandara",
-            "Buldhana", "Chandrapur", "Dhule", "Gadchiroli", "Gondia", "Hingoli",
-            "Jalgaon", "Jalna", "Kolhapur", "Latur", "Mumbai City", "Mumbai Suburban",
-            "Nagpur", "Nanded", "Nandurbar", "Nashik", "Osmanabad", "Palghar",
-            "Parbhani", "Pune", "Raigad", "Ratnagiri", "Sangli", "Satara",
-            "Sindhudurg", "Solapur", "Thane", "Wardha", "Washim", "Yavatmal"
-        ),
-        "Manipur" to listOf(
-            "Bishnupur", "Chandel", "Churachandpur", "Imphal East", "Imphal West",
-            "Jiribam", "Kakching", "Kamjong", "Kangpokpi", "Noney", "Pherzawl",
-            "Senapati", "Tamenglong", "Tengnoupal", "Thoubal", "Ukhrul"
-        ),
-        "Meghalaya" to listOf(
-            "East Garo Hills", "East Jaintia Hills", "East Khasi Hills", "North Garo Hills",
-            "Ri Bhoi", "South Garo Hills", "South West Garo Hills ", "South West Khasi Hills",
-            "West Garo Hills", "West Jaintia Hills", "West Khasi Hills"
-        ),
-        "Mizoram" to listOf(
-            "Aizawl", "Champhai", "Kolasib", "Lawngtlai", "Lunglei", "Mamit",
-            "Saiha", "Serchhip"
-        ),
-        "Nagaland" to listOf(
-            "Dimapur", "Kiphire", "Kohima", "Longleng", "Mokokchung", "Mon",
-            "Peren", "Phek", "Tuensang", "Wokha", "Zunheboto"
-        ),
-        "Odisha" to listOf(
-            "Angul", "Balangir", "Balasore", "Bargarh", "Bhadrak", "Boudh",
-            "Cuttack", "Deogarh", "Dhenkanal", "Gajapati", "Ganjam", "Jagatsinghapur",
-            "Jajpur", "Jharsuguda", "Kalahandi", "Kandhamal", "Kendrapara",
-            "Kendujhar (Keonjhar)", "Khordha", "Koraput", "Malkangiri", "Mayurbhanj",
-            "Nabarangpur", "Nayagarh", "Nuapada", "Puri", "Rayagada", "Sambalpur",
-            "Sonepur", "Sundargarh"
-        ),
-        "Puducherry (UT)" to listOf(
-            "Karaikal", "Mahe", "Pondicherry", "Yanam"
-        ),
-        "Punjab" to listOf(
-            "Amritsar", "Barnala", "Bathinda", "Faridkot", "Fatehgarh Sahib",
-            "Fazilka", "Ferozepur", "Gurdaspur", "Hoshiarpur", "Jalandhar",
-            "Kapurthala", "Ludhiana", "Mansa", "Moga", "Muktsar",
-            "Nawanshahr (Shahid Bhagat Singh Nagar)", "Pathankot", "Patiala",
-            "Rupnagar", "Sahibzada Ajit Singh Nagar (Mohali)", "Sangrur", "Tarn Taran"
-        ),
-        "Rajasthan" to listOf(
-            "Ajmer", "Alwar", "Banswara", "Baran", "Barmer", "Bharatpur", "Bhilwara",
-            "Bikaner", "Bundi", "Chittorgarh", "Churu", "Dausa", "Dholpur",
-            "Dungarpur", "Hanumangarh", "Jaipur", "Jaisalmer", "Jalore", "Jhalawar",
-            "Jhunjhunu", "Jodhpur", "Karauli", "Kota", "Nagaur", "Pali", "Pratapgarh",
-            "Rajsamand", "Sawai Madhopur", "Sikar", "Sirohi", "Sri Ganganagar",
-            "Tonk", "Udaipur"
-        ),
-        "Sikkim" to listOf(
-            "East Sikkim", "North Sikkim", "South Sikkim", "West Sikkim"
-        ),
-        "Tamil Nadu" to listOf(
-            "Ariyalur", "Chennai", "Coimbatore", "Cuddalore", "Dharmapuri",
-            "Dindigul", "Erode", "Kanchipuram", "Kanyakumari", "Karur",
-            "Krishnagiri", "Madurai", "Nagapattinam", "Namakkal", "Nilgiris",
-            "Perambalur", "Pudukkottai", "Ramanathapuram", "Salem", "Sivaganga",
-            "Thanjavur", "Theni", "Thoothukudi (Tuticorin)", "Tiruchirappalli",
-            "Tirunelveli", "Tiruppur", "Tiruvallur", "Tiruvannamalai", "Tiruvarur",
-            "Vellore", "Viluppuram", "Virudhunagar"
-        ),
-        "Telangana" to listOf(
-            "Adilabad", "Bhadradri Kothagudem", "Hyderabad", "Jagtial", "Jangaon",
-            "Jayashankar Bhoopalpally", "Jogulamba Gadwal", "Kamareddy", "Karimnagar",
-            "Khammam", "Komaram Bheem Asifabad", "Mahabubabad", "Mahabubnagar",
-            "Mancherial", "Medak", "Medchal", "Nagarkurnool", "Nalgonda", "Nirmal",
-            "Nizamabad", "Peddapalli", "Rajanna Sircilla", "Rangareddy", "Sangareddy",
-            "Siddipet", "Suryapet", "Vikarabad", "Wanaparthy", "Warangal (Rural)",
-            "Warangal (Urban)", "Yadadri Bhuvanagiri"
-        ),
-        "Tripura" to listOf(
-            "Dhalai", "Gomati", "Khowai", "North Tripura", "Sepahijala",
-            "South Tripura", "Unakoti", "West Tripura"
-        ),
-        "Uttarakhand" to listOf(
-            "Almora", "Bageshwar", "Chamoli", "Champawat", "Dehradun", "Haridwar",
-            "Nainital", "Pauri Garhwal", "Pithoragarh", "Rudraprayag", "Tehri Garhwal",
-            "Udham Singh Nagar", "Uttarkashi"
-        ),
-        "Uttar Pradesh" to listOf(
-            "Agra", "Aligarh", "Allahabad", "Ambedkar Nagar", "Amethi (Chatrapati Sahuji Mahraj Nagar)",
-            "Amroha (J.P. Nagar)", "Auraiya", "Azamgarh", "Baghpat", "Bahraich",
-            "Ballia", "Balrampur", "Banda", "Barabanki", "Bareilly", "Basti",
-            "Bhadohi", "Bijnor", "Budaun", "Bulandshahr", "Chandauli", "Chitrakoot",
-            "Deoria", "Etah", "Etawah", "Faizabad", "Farrukhabad", "Fatehpur",
-            "Firozabad", "Gautam Buddha Nagar", "Ghaziabad", "Ghazipur", "Gonda",
-            "Gorakhpur", "Hamirpur", "Hapur (Panchsheel Nagar)", "Hardoi", "Hathras",
-            "Jalaun", "Jaunpur", "Jhansi", "Kannauj", "Kanpur Dehat", "Kanpur Nagar",
-            "Kanshiram Nagar (Kasganj)", "Kaushambi", "Kushinagar (Padrauna)",
-            "Lakhimpur - Kheri", "Lalitpur", "Lucknow", "Maharajganj", "Mahoba",
-            "Mainpuri", "Mathura", "Mau", "Meerut", "Mirzapur", "Moradabad",
-            "Muzaffarnagar", "Pilibhit", "Pratapgarh", "RaeBareli", "Rampur",
-            "Saharanpur", "Sambhal (Bhim Nagar)", "Sant Kabir Nagar", "Shahjahanpur",
-            "Shamali (Prabuddh Nagar)", "Shravasti", "Siddharth Nagar", "Sitapur",
-            "Sonbhadra", "Sultanpur", "Unnao", "Varanasi"
-        ),
-        "West Bengal" to listOf(
-            "Alipurduar", "Bankura", "Birbhum", "Burdwan (Bardhaman)", "Cooch Behar",
-            "Dakshin Dinajpur (South Dinajpur)", "Darjeeling", "Hooghly", "Howrah",
-            "Jalpaiguri", "Kalimpong", "Kolkata", "Malda", "Murshidabad", "Nadia",
-            "North 24 Parganas", "Paschim Medinipur (West Medinipur)",
-            "Purba Medinipur (East Medinipur)", "Purulia", "South 24 Parganas",
-            "Uttar Dinajpur (North Dinajpur)"
-        )
-    )
 }

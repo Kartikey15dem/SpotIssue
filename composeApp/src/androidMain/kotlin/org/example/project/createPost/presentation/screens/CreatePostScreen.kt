@@ -214,9 +214,10 @@ fun CreatePostScreenContent(
                             .background(IssueSpotColors.SurfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!state.userImageUrl.isNullOrBlank()) {
+                        val userImageUrl = state.userImageUrl
+                        if (!userImageUrl.isNullOrBlank()) {
                             AsyncImage(
-                                model = state.userImageUrl.toUri(),
+                                model = userImageUrl.toUri(),
                                 contentDescription = "avatar",
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -386,9 +387,10 @@ fun CreatePostScreenContent(
                             }
                         )
 
-                        if (state.selectedMedia != null) {
+                        val selectedMedia = state.selectedMedia
+                        if (selectedMedia != null) {
                             MediaPreviewContent(
-                                mediaItems = state.selectedMedia,
+                                mediaItems = selectedMedia,
                                 onRemove = { onIntent(CreatePostIntent.RemoveMedia) },
                                 onRemoveImage = { onIntent(CreatePostIntent.RemoveImage(it)) }
                             )

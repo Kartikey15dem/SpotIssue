@@ -4,12 +4,12 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class UserLocation(
-    val address: String,
-    val latitude: Double? = null,
-    val longitude: Double? = null,
+    val address: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
 
-    val locality: String? = null,
-    val district: String? = null,
-    val state: String? = null,
-    val country: String? = null
+    val locality: String = "",
+    val district: String = "",
+    val state: String = "",
+    val country: String = ""
 )

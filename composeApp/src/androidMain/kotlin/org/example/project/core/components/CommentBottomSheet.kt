@@ -102,6 +102,16 @@ fun CommentsBottomSheet(
                                     CircularProgressIndicator(color = IssueSpotColors.Primary)
                                 }
                             }
+                        } else if (comments.loadState.append is LoadState.NotLoading && comments.loadState.append.endOfPaginationReached && comments.itemCount > 0) {
+                            item {
+                                Text(
+                                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                    text = "No more comments",
+                                    color = IssueSpotColors.OnBackground,
+                                    style = IssueSpotTypography.bodyMedium,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }

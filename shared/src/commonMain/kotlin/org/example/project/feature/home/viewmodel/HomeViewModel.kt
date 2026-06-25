@@ -8,11 +8,10 @@ import androidx.paging.insertHeaderItem
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -56,11 +55,15 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow(HomeState())
     val uiState: StateFlow<HomeState> = _uiState.asStateFlow()
 
-    private val _sideEffects = MutableSharedFlow<HomeSideEffect>()
-    val sideEffects: SharedFlow<HomeSideEffect> = _sideEffects.asSharedFlow()
+    private val _sideEffects = Channel<HomeSideEffect>(Channel.BUFFERED)
+    val sideEffects = _sideEffects.receiveAsFlow()
 
     init {
         observeProfile()
+        fetchAndObservePosts()
+
+    }
+    private fun fetchAndObservePosts(){
         viewModelScope.launch {
             combine(
                 currentLevelManager.currentLevel,
@@ -69,17 +72,17 @@ class HomeViewModel(
                 level to userData.userLocation
             }.collect { (level, location) ->
                 val currentState = _uiState.value
-                val shouldRefresh = currentState.postLevel != level || 
-                                   (currentState.postsFlow == null && location != null)
-                
-                if (shouldRefresh || currentState.postsFlow == null) {
+                val shouldRefresh = currentState.postLevel != level ||
+                        (currentState.postsFlow == null)
+
+                if (shouldRefresh) {
                     updateState {
                         it.copy(
                             postLevel = level,
                             postsFlow = feedRepository.getPagedPosts(
                                 level,
                                 location,
-                                forceRefresh = false // Use cache if available
+                                forceRefresh = false
                             ).cachedIn(viewModelScope)
                         )
                     }
@@ -93,19 +96,37 @@ class HomeViewModel(
         viewModelScope.launch {
             profileRepository.observeProfile().collect { dataState ->
                 if (dataState is DataState.Success && dataState.data != null) {
-                    updateState { it.copy(currentUserImage = dataState.data?.imageUrl) }
+                    updateState { it.copy(currentUserImage = dataState.data.imageUrl) }
                 }
             }
         }
     }
 
     private var activeIssuesJob: Job? = null
+    private var postsListJob: Job? = null
 
     private fun observeActiveIssues(level: PostLevel) {
         activeIssuesJob?.cancel()
         activeIssuesJob = viewModelScope.launch {
             feedRepository.observeActiveIssuesCount(level).collect { count ->
                 updateState { it.copy(activeIssues = count) }
+            }
+        }
+    }
+
+
+
+    private fun refreshPostsList(level: PostLevel) {
+        val location = prefRepository.userData.value.userLocation
+        viewModelScope.launch {
+            updateState { it.copy(isRefreshing = true) }
+            when (val result = feedRepository.refreshPosts(level, location)) {
+                is DataState.Success -> updateState { it.copy(isRefreshing = false, isLocalLoading = false) }
+                is DataState.Error -> {
+                    updateState { it.copy(isRefreshing = false) }
+                    handleError(result.exception)
+                }
+                DataState.Loading -> Unit
             }
         }
     }
@@ -123,10 +144,19 @@ class HomeViewModel(
             is HomeIntent.CommentSubmitted -> comment(intent.postId, intent.commentText, intent.currentCommentCount)
             is HomeIntent.ShareClicked -> share(intent.post)
             is HomeIntent.PostClicked -> showPostDetail(intent.post)
-            is HomeIntent.DismissPost -> closePostDetial()
+            HomeIntent.DismissPost -> closePostDetial()
             HomeIntent.ErrorShown -> clearError()
+            is HomeIntent.ChangeLevel -> changeLevel(intent.level)
         }
     }
+
+    private fun changeLevel(level: PostLevel) {
+        viewModelScope.launch {
+            currentLevelManager.updateLevel(level)
+        }
+    }
+
+
 
     private fun updateState(update: (HomeState) -> HomeState) {
         _uiState.update(update)
@@ -134,19 +164,8 @@ class HomeViewModel(
 
     private fun refresh() {
         val currentLevel = _uiState.value.postLevel
-        val currentLocation = prefRepository.userData.value.userLocation
         viewModelScope.launch {
-            updateState { it.copy(isRefreshing = true) }
-            updateState {
-                it.copy(
-                    postsFlow = feedRepository.getPagedPosts(
-                        currentLevel,
-                        currentLocation,
-                        forceRefresh = true
-                    ).cachedIn(viewModelScope),
-                )
-            }
-            updateState { it.copy(isRefreshing = false) }
+            refreshPostsList(currentLevel)
         }
     }
 
@@ -168,11 +187,11 @@ class HomeViewModel(
     }
 
     private fun navigateToCreatePost() {
-        viewModelScope.launch { _sideEffects.emit(HomeSideEffect.NavigateToCreatePost) }
+        viewModelScope.launch { _sideEffects.send(HomeSideEffect.NavigateToCreatePost) }
     }
 
     private fun navigateToProfile() {
-        viewModelScope.launch { _sideEffects.emit(HomeSideEffect.NavigateToProfile) }
+        viewModelScope.launch { _sideEffects.send(HomeSideEffect.NavigateToProfile) }
     }
 
     private fun like(postId: String, currentIsLiked: Boolean, currentLikesCount: Int) {
@@ -183,6 +202,7 @@ class HomeViewModel(
         viewModelScope.launch {
             when (val result = postRepository.likePost(postId)) {
                 is DataState.Error -> {
+                    // Revert override on error
                     updateOverride(postId, isLiked = currentIsLiked, likesCount = currentLikesCount)
                     handleError(result.exception)
                 }
@@ -221,17 +241,17 @@ class HomeViewModel(
 
     private fun comment(postId: String, comment: String, currentCommentCount: Int) {
         updateOverride(postId, commentsCount = currentCommentCount + 1)
+        val optimisticComment = Comment(
+            id = "temp_${Clock.System.now()}",
+            postId = postId,
+            text = comment,
+            timeAgo = "Just now",
+            userName = "You",
+            userImageUrl = _uiState.value.currentUserImage
+        )
         
         val currentFlow = _uiState.value.postOverrides[postId]?.commentsFlow
         if (currentFlow != null) {
-            val optimisticComment = Comment(
-                id = "temp_${Clock.System.now()}",
-                postId = postId,
-                text = comment,
-                timeAgo = "Just now",
-                userName = "You",
-                userImageUrl = _uiState.value.currentUserImage
-            )
             val updatedFlow = currentFlow.map { pagingData ->
                 pagingData.insertHeaderItem(item = optimisticComment)
             }
@@ -256,7 +276,7 @@ class HomeViewModel(
         viewModelScope.launch {
             val postUrl = "https://www.issuespot.com/post/${post.id}"
             val shareText = "${post.userName} posted an issue: ${post.postText}\n\nView it here: $postUrl"
-            _sideEffects.emit(HomeSideEffect.SharePost(shareText))
+            _sideEffects.send(HomeSideEffect.SharePost(shareText))
         }
     }
 
@@ -267,7 +287,7 @@ class HomeViewModel(
     private suspend fun handleError(error: Throwable) {
         val message = error.message ?: "Something went wrong"
         updateState { it.copy(error = message) }
-        _sideEffects.emit(HomeSideEffect.ShowError(message))
+        _sideEffects.send(HomeSideEffect.ShowError(message))
     }
 
     private fun showPostDetail(post : Post) {
@@ -315,12 +335,14 @@ sealed interface HomeIntent {
     data class PostClicked(val post: Post) : HomeIntent
     data object DismissPost : HomeIntent
     data object ErrorShown : HomeIntent
+    data class ChangeLevel(val level: PostLevel) : HomeIntent
 }
 
 data class HomeState(
     val postLevel: PostLevel = PostLevel.LOCALITY,
     val activeIssues: Int = 0,
     val isRefreshing: Boolean = false,
+    val isLocalLoading: Boolean = true,
     val postsFlow: Flow<PagingData<Post>>? = null,
     val searchPostsFlow: Flow<PagingData<Post>>? = null,
     val query: String = "",

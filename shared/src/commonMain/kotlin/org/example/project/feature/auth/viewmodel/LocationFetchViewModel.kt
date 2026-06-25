@@ -2,13 +2,11 @@ package org.example.project.feature.auth.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -20,6 +18,7 @@ class LocationFetchViewModel(
     private val locationProvider: LocationProvider,
     private val prefRepository: UserPreferencesRepository
 ) : ViewModel() {
+
 
     /* ===================================================================================
      * SECTION: LOCATION FETCHING STATE MACHINE
@@ -37,11 +36,8 @@ class LocationFetchViewModel(
     private val _uiState = MutableStateFlow(LocationFetchUiState())
     val uiState: StateFlow<LocationFetchUiState> = _uiState.asStateFlow()
 
-    private val _effect = MutableSharedFlow<LocationFetchEffect>(
-        extraBufferCapacity = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-    val effect: SharedFlow<LocationFetchEffect> = _effect.asSharedFlow()
+    private val _effect = Channel<LocationFetchEffect>(Channel.BUFFERED)
+    val effect = _effect.receiveAsFlow()
 
     fun handleIntent(intent: LocationFetchIntent) {
         when (intent) {
@@ -51,7 +47,6 @@ class LocationFetchViewModel(
             is LocationFetchIntent.GpsDisabled -> showError(LocationErrorState.GPS_DISABLED)
             is LocationFetchIntent.ActionClicked -> handleActionClicked()
             is LocationFetchIntent.RetryClicked -> startFetching()
-            is LocationFetchIntent.ContinueWithoutLocation -> handleContinueWithoutLocation()
         }
     }
 
@@ -65,20 +60,20 @@ class LocationFetchViewModel(
 
         viewModelScope.launch {
             try {
-                var userLocation: UserLocation? = null
+                var userLocation: UserLocation
                 var attempts = 0
-
-                while (userLocation == null && attempts < 3) {
-                    userLocation = locationProvider.getCurrentLocation()
-                    if (userLocation == null) {
-                        delay(1000)
+                while (true) {
+                    try {
+                        userLocation = locationProvider.getCurrentLocation()
+                        break
+                    } catch (e: Exception) {
                         attempts++
+                        if (attempts >= 3) {
+                            showError(LocationErrorState.FETCH_FAILED)
+                            return@launch
+                        }
+                        delay(1000)
                     }
-                }
-
-                if (userLocation == null) {
-                    showError(LocationErrorState.FETCH_FAILED)
-                    return@launch
                 }
 
 
@@ -93,7 +88,7 @@ class LocationFetchViewModel(
                         isCompleted = true
                     )
                 }
-                _effect.emit(LocationFetchEffect.NavigateToNextScreen)
+                _effect.send(LocationFetchEffect.NavigateToNextScreen)
 
 
             } catch (e: Exception) {
@@ -106,9 +101,9 @@ class LocationFetchViewModel(
         viewModelScope.launch {
             when (_uiState.value.errorState) {
                 LocationErrorState.RATIONALE, LocationErrorState.PERMISSION_DENIED ->
-                    _effect.emit(LocationFetchEffect.OpenAppSettings)
+                    _effect.send(LocationFetchEffect.OpenAppSettings)
                 LocationErrorState.GPS_DISABLED ->
-                    _effect.emit(LocationFetchEffect.PromptGpsSettings)
+                    _effect.send(LocationFetchEffect.PromptGpsSettings)
                 LocationErrorState.FETCH_FAILED, LocationErrorState.SAVE_FAILED ->
                     startFetching()
                 null -> {}
@@ -116,11 +111,7 @@ class LocationFetchViewModel(
         }
     }
 
-    private fun handleContinueWithoutLocation() {
-        viewModelScope.launch {
-            _effect.emit(LocationFetchEffect.NavigateToNextScreen)
-        }
-    }
+
 
     private fun showError(errorState: LocationErrorState) {
         _uiState.update {
@@ -139,7 +130,6 @@ sealed class LocationFetchIntent {
     data object GpsDisabled : LocationFetchIntent()
     data object ActionClicked : LocationFetchIntent()
     data object RetryClicked : LocationFetchIntent()
-    data object ContinueWithoutLocation : LocationFetchIntent()
 }
 
 sealed class LocationFetchEffect {
@@ -152,7 +142,6 @@ enum class LocationFetchStep {
     FETCHING, COMPLETED, ERROR
 }
 
-// Configured specifically to your edge cases!
 enum class LocationErrorState(val message: String, val primaryButtonText: String, val showSecondaryRetry: Boolean) {
     RATIONALE("Location access helps us find your address automatically.", "Open Settings", false),
     PERMISSION_DENIED("Location permission is disabled. Please enable it in settings.", "Open Settings", false),

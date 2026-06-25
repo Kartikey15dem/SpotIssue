@@ -2,11 +2,10 @@ package org.example.project.feature.auth.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -17,6 +16,7 @@ import org.example.project.core.utils.DataState
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import org.example.project.core.utils.FileSystem
 
 sealed class NameCaptureEffect {
     data class ShowSnackbar(val message: String) : NameCaptureEffect()
@@ -48,8 +48,8 @@ class NameCaptureViewModel(
     private val _uiState = MutableStateFlow(NameCaptureUiState())
     val uiState: StateFlow<NameCaptureUiState> = _uiState.asStateFlow()
 
-    private val _effect = MutableSharedFlow<NameCaptureEffect>()
-    val effect: SharedFlow<NameCaptureEffect> = _effect.asSharedFlow()
+    private val _effect = Channel<NameCaptureEffect>(Channel.BUFFERED)
+    val effect = _effect.receiveAsFlow()
 
     fun handleIntent(intent: NameCaptureIntent) {
         when (intent) {
@@ -71,13 +71,13 @@ class NameCaptureViewModel(
 
     private fun pickFromGallery() {
         viewModelScope.launch {
-            _effect.emit(NameCaptureEffect.ShowImagePicker)
+            _effect.send(NameCaptureEffect.ShowImagePicker)
         }
     }
 
     private fun captureFromCamera() {
         viewModelScope.launch {
-            _effect.emit(NameCaptureEffect.ShowCamera)
+            _effect.send(NameCaptureEffect.ShowCamera)
         }
     }
 
@@ -109,26 +109,29 @@ class NameCaptureViewModel(
 
             when (val result = profileRepository.updateProfile(profile, localImagePath)) {
                 is DataState.Success -> {
+                    localImagePath?.let { path ->
+                        withContext(Dispatchers.IO) {
+                            FileSystem.deleteFile(path)
+                        }
+                    }
                     prefRepository.setLoggedIn(true)
                 }
                 is DataState.Error -> {
                     _uiState.update { it.copy(isLoading = false) }
                     showError(result.exception.message ?: "Failed to update profile")
                 }
-                DataState.Loading -> {}
-            }
-
-            localImagePath?.let { path ->
-                withContext(Dispatchers.IO) {
-//                    java.io.File(path).delete()
+                DataState.Loading -> {
+                    _uiState.update { it.copy(isLoading = true) }
                 }
             }
+
+
         }
     }
 
     private fun showError(message: String) {
         viewModelScope.launch {
-            _effect.emit(NameCaptureEffect.ShowSnackbar(message))
+            _effect.send(NameCaptureEffect.ShowSnackbar(message))
         }
     }
 }

@@ -22,6 +22,14 @@ interface ProfileRepository {
      */
     fun getPagedLikedPosts(sort: String = "LATEST"): Flow<PagingData<Post>>
 
+    fun observeUserPosts(sort: String = "LATEST"): Flow<List<Post>>
+
+    fun observeLikedPosts(sort: String = "LATEST"): Flow<List<Post>>
+
+    suspend fun refreshUserPosts(sort: String = "LATEST"): DataState<List<Post>>
+
+    suspend fun refreshLikedPosts(sort: String = "LATEST"): DataState<List<Post>>
+
     /**
      * Observe user profile (Room-backed)
      */

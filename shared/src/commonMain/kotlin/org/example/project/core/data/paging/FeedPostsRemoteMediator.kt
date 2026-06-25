@@ -39,7 +39,7 @@ import org.example.project.core.utils.safeApiCall
  */
 class FeedPostsRemoteMediator(
     private val postLevel: PostLevel,
-    private val userLocation: UserLocation?,
+    private val userLocation: UserLocation,
     private val homeService: HomeService,
     private val database: IssueSpotDatabase,
     private val localDataSource: FeedLocalDataSource,
@@ -81,12 +81,12 @@ class FeedPostsRemoteMediator(
         return when (val result = safeApiCall(networkMonitor) {
             homeService.getPosts(
                 level = postLevel.name,
-                locality = userLocation?.locality,
-                district = userLocation?.district,
-                state = userLocation?.state,
-                country = userLocation?.country,
-                lat = userLocation?.latitude,
-                lon = userLocation?.longitude,
+                locality = userLocation.locality,
+                district = userLocation.district,
+                state = userLocation.state,
+                country = userLocation.country,
+                lat = userLocation.latitude,
+                lon = userLocation.longitude,
                 page = page,
                 limit = state.config.pageSize,
             )
@@ -95,7 +95,11 @@ class FeedPostsRemoteMediator(
                 val response = result.data
                 val posts = response.items.map { dto ->
                     val post = dto.toPost()
-                    post.toEntity(cachedAt = parseIsoEpochMillis(dto.createdAt))
+                    // Use a stable local timestamp for sorting. 
+                    // We base it on network createdAt but store it in a field that isn't updated by 'like' actions.
+                    // 10000000000000L is a far-future timestamp (Year 2286) to ensure descending sort works.
+                    val networkTime = parseIsoEpochMillis(dto.createdAt)
+                    post.toEntity(cachedAt = networkTime)
                 }
 
                 val endOfPaginationReached = response.nextKey == null || posts.isEmpty()

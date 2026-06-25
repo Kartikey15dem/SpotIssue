@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
 import androidx.paging.PagingSource
+import kotlinx.coroutines.flow.Flow
 import org.example.project.core.database.entities.UserPostEntity
 
 @Dao
@@ -28,6 +29,15 @@ interface UserPostDao {
 
     @Query("SELECT * FROM user_posts ORDER BY createdAt DESC")
     suspend fun getUserPosts(): List<UserPostEntity>
+
+    @Query("SELECT * FROM user_posts ORDER BY createdAt DESC")
+    fun observeUserPosts(): Flow<List<UserPostEntity>>
+
+    @Query("SELECT * FROM user_posts ORDER BY createdAt ASC")
+    fun observeUserPostsOldest(): Flow<List<UserPostEntity>>
+
+    @Query("SELECT * FROM user_posts ORDER BY (likes + comments) DESC")
+    fun observeUserPostsPopular(): Flow<List<UserPostEntity>>
 
     @Query("SELECT * FROM user_posts ORDER BY createdAt ASC")
     suspend fun getUserPostsOldest(): List<UserPostEntity>

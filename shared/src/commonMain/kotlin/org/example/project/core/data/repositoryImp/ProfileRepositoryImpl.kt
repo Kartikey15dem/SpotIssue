@@ -21,6 +21,8 @@ import org.example.project.core.utils.asDataStateFlow
 import org.example.project.core.utils.safeApiCall
 import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.mappers.toEntity
+import org.example.project.core.data.mappers.toLikedPostEntity
+import org.example.project.core.data.mappers.toUserPostEntity
 import org.example.project.core.network.dto.UpsertProfileRequest
 import org.example.project.core.data.paging.ProfileLikedPostsRemoteMediator
 import org.example.project.core.data.paging.ProfileUserPostsRemoteMediator
@@ -103,12 +105,49 @@ class ProfileRepositoryImpl(
         }
     }
 
+    override fun observeUserPosts(sort: String): Flow<List<Post>> {
+        val flow = when (sort.uppercase()) {
+            "OLDEST" -> database.userPostDao().observeUserPostsOldest()
+            "POPULAR" -> database.userPostDao().observeUserPostsPopular()
+            else -> database.userPostDao().observeUserPosts()
+        }
+        return flow.map { posts -> posts.map { it.toPost() } }
+    }
+
+    override fun observeLikedPosts(sort: String): Flow<List<Post>> {
+        val flow = when (sort.uppercase()) {
+            "OLDEST" -> database.likedPostDao().observeLikedPostsOldest()
+            "POPULAR" -> database.likedPostDao().observeLikedPostsPopular()
+            else -> database.likedPostDao().observeLikedPosts()
+        }
+        return flow.map { posts -> posts.map { it.toPost() } }
+    }
+
+    override suspend fun refreshUserPosts(sort: String): DataState<List<Post>> =
+        safeApiCall(networkMonitor) {
+            val posts = profileService.getMyPosts(page = 1, limit = 100, sort = sort)
+                .items
+                .map { it.toPost() }
+            database.userPostDao().insertPosts(posts.map { it.toUserPostEntity() })
+            posts
+        }
+
+    override suspend fun refreshLikedPosts(sort: String): DataState<List<Post>> =
+        safeApiCall(networkMonitor) {
+            val posts = profileService.getMyLikedPosts(page = 1, limit = 100, sort = sort)
+                .items
+                .map { it.toPost() }
+            database.likedPostDao().insertPosts(posts.map { it.toLikedPostEntity() })
+            posts
+        }
+
+
     override fun observeProfile(): Flow<DataState<Profile?>> = combine(
         localDataSource.getProfileFlow(),
         prefRepository.userData
     ) { entity, userData ->
         entity?.toProfile()?.copy(
-            location = userData.userLocation?.address ?: "No location set"
+            location = userData.userLocation.address.ifEmpty { "No location set" }
         )
     }.asDataStateFlow()
 
@@ -175,12 +214,15 @@ class ProfileRepositoryImpl(
         localDataSource.saveProfile(entity)
         database.userPostDao().updateUserInfo(ownerId = entity.userId, name = entity.name, avatar = entity.imageUrl)
         database.likedPostDao().updateUserInfo(ownerId = entity.userId, name = entity.name, avatar = entity.imageUrl)
+        Unit
     }
 
     override suspend fun logOut() {
         prefRepository.logOut()
-//        withContext(Dispatchers.IO) {
-//            database.clearAllTables()
-//        }
+        withContext(Dispatchers.IO) {
+            database.userPostDao().deleteAllUserPosts()
+            database.likedPostDao().deleteAllLikedPosts()
+            localDataSource.clearProfile()
+        }
     }
 }

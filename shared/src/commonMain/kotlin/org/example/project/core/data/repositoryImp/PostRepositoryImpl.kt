@@ -13,6 +13,11 @@ import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.content.PartData
 import io.ktor.utils.io.ByteReadChannel
+import kotlin.time.Clock
+import kotlinx.datetime.Instant
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.serialization.json.Json
 import okio.FileSystem
 import okio.Path.Companion.toPath
@@ -35,6 +40,7 @@ import org.example.project.core.data.mappers.toUserPostEntity
 import org.example.project.core.utils.NetworkMonitor
 
 import org.example.project.core.data.paging.CommentPagingSource
+import org.example.project.core.model.home.toComment
 
 class PostRepositoryImpl(
     private val postService: PostService,
@@ -71,7 +77,9 @@ class PostRepositoryImpl(
             // Sync with fresh data from API
             safeApiCall(networkMonitor) { postService.getPost(postId) }.let { freshResult ->
                 if (freshResult is DataState.Success) {
-                    val entity = freshResult.data.toPost().toEntity()
+                    val existingCachedAt = database.postDao().getPostById(postId)?.cachedAt 
+                        ?: Clock.System.now().toEpochMilliseconds()
+                    val entity = freshResult.data.toPost().toEntity(cachedAt = existingCachedAt)
                     database.postDao().insertPosts(listOf(entity))
                 }
             }
@@ -114,6 +122,14 @@ class PostRepositoryImpl(
         ).flow
     }
 
+    override suspend fun getCommentsList(postId: String): DataState<List<Comment>> {
+        return when (val result = getComments(postId, page = 1, limit = 100)) {
+            is DataState.Success -> DataState.Success(result.data.items.map { it.toComment() })
+            is DataState.Error -> DataState.Error(result.exception)
+            DataState.Loading -> DataState.Loading
+        }
+    }
+
     override suspend fun addComment(postId: String, comment: String): DataState<Unit> {
         logger.d { "Adding comment to post: $postId" }
         val result = safeApiCall(networkMonitor) {
@@ -133,7 +149,9 @@ class PostRepositoryImpl(
             
             safeApiCall(networkMonitor) { postService.getPost(postId) }.let { freshResult ->
                 if (freshResult is DataState.Success) {
-                    database.postDao().insertPosts(listOf(freshResult.data.toPost().toEntity()))
+                    val existingCachedAt = database.postDao().getPostById(postId)?.cachedAt 
+                        ?: Clock.System.now().toEpochMilliseconds()
+                    database.postDao().insertPosts(listOf(freshResult.data.toPost().toEntity(cachedAt = existingCachedAt)))
                 }
             }
         } else {
@@ -147,15 +165,11 @@ class PostRepositoryImpl(
         val request = CreatePostRequestDto(
             postText = post.postText,
             mediaType = post.mediaType?.name,
-            locality = post.location?.locality,
-            district = post.location?.district,
-            state = post.location?.state,
-            country = post.location?.country,
-            coordinates = post.location?.latitude?.let { lat ->
-                post.location?.longitude?.let { lon ->
-                    CoordinatesDto(lat, lon)
-                }
-            }
+            locality = post.location.locality,
+            district = post.location.district,
+            state = post.location.state,
+            country = post.location.country,
+            coordinates = CoordinatesDto(post.location.latitude, post.location.longitude)
         )
         
         val multipartParts = mutableListOf<PartData>()

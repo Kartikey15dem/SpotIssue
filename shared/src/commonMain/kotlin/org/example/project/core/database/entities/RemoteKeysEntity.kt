@@ -3,9 +3,11 @@ package org.example.project.core.database.entities
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "remote_keys")
+@Entity(
+    tableName = "remote_keys",
+    primaryKeys = ["id", "type"]
+)
 data class RemoteKeysEntity(
-    @PrimaryKey
     val id: String,
     val prevKey: Int?,
     val nextKey: Int?,

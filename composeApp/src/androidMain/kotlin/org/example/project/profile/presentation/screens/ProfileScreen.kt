@@ -201,15 +201,18 @@ fun ProfileScreenContent(
             }
         }
     } else {
-        Box(modifier = modifier.fillMaxSize().background(IssueSpotColors.Background)) {
-            if (state.expandedPost != null) {
-                val post = state.expandedPost
-                val override = state.postOverrides[post.id]
+        val profile = state.profile
+        if (profile != null) {
+            Box(modifier = modifier.fillMaxSize().background(IssueSpotColors.Background)) {
+                val expandedPost = state.expandedPost
+                if (expandedPost != null) {
+                    val post = expandedPost
+                    val override = state.postOverrides[post.id]
 
-                val isLiked = override?.isLiked ?: post.isLiked
-                val resolvedLikes = override?.likesCount ?: post.likes
-                val resolvedComments = override?.commentsCount ?: post.comments
-                val isReported = override?.isReported ?: post.isReported
+                    val isLiked = override?.isLiked ?: post.isLiked
+                    val resolvedLikes = override?.likesCount ?: post.likes
+                    val resolvedComments = override?.commentsCount ?: post.comments
+                    val isReported = override?.isReported ?: post.isReported
 
                 BackHandler {
                     onIntent(ProfileIntent.DismissPost)
@@ -249,7 +252,7 @@ fun ProfileScreenContent(
                     item { Spacer(Modifier.height(spacing.small)) }
 
                     item {
-                        ProfileHeader(state.profile, onIntent)
+                        ProfileHeader(profile, onIntent)
                     }
 
                     item {
@@ -262,7 +265,7 @@ fun ProfileScreenContent(
                             Spacer(modifier = Modifier.height(spacing.extraSmall))
                             PostLevel.entries.forEachIndexed { i, entry ->
                                 PostByAreaBar(
-                                    postByArea = state.profile.postByArea.getOrElse(i) { 0 },
+                                    postByArea = profile.postByArea.getOrElse(i) { 0 },
                                     postLevel = entry
                                 )
                             }
@@ -297,17 +300,27 @@ fun ProfileScreenContent(
 
                         if (refreshError != null && pagingItems.itemCount == 0) {
                             item {
-                                Box(
+                                Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(spacing.huge),
-                                    contentAlignment = Alignment.Center
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Text(
                                         text = refreshError.error.message ?: "An error occurred",
                                         color = IssueSpotColors.OnBackground,
                                         style = IssueSpotTypography.bodyMedium
                                     )
+                                    Spacer(Modifier.height(spacing.small))
+                                    Button(
+                                        onClick = { pagingItems.refresh() },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = IssueSpotColors.Primary,
+                                            contentColor = IssueSpotColors.OnPrimary
+                                        )
+                                    ) {
+                                        Text("Retry")
+                                    }
                                 }
                             }
                         } else if (pagingItems.loadState.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
@@ -386,11 +399,35 @@ fun ProfileScreenContent(
 
                         if (appendError != null && pagingItems.itemCount > 0) {
                             item {
-                                Text(
+                                Column(
                                     modifier = Modifier.fillMaxWidth().padding(spacing.medium),
-                                    text = appendError.error.message ?: "An error occurred",
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = appendError.error.message ?: "An error occurred",
+                                        color = IssueSpotColors.OnBackground,
+                                        style = IssueSpotTypography.bodyMedium
+                                    )
+                                    Spacer(Modifier.height(spacing.small))
+                                    Button(
+                                        onClick = { pagingItems.retry() },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = IssueSpotColors.Primary,
+                                            contentColor = IssueSpotColors.OnPrimary
+                                        )
+                                    ) {
+                                        Text("Retry")
+                                    }
+                                }
+                            }
+                        } else if (pagingItems.loadState.append is LoadState.NotLoading && pagingItems.loadState.append.endOfPaginationReached && pagingItems.itemCount > 0) {
+                            item {
+                                androidx.compose.material3.Text(
+                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
+                                    text = "No more posts",
                                     color = IssueSpotColors.OnBackground,
-                                    style = IssueSpotTypography.bodyMedium
+                                    style = IssueSpotTypography.bodyMedium,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                 )
                             }
                         }
@@ -399,6 +436,7 @@ fun ProfileScreenContent(
                     item { Spacer(Modifier.height(spacing.medium)) }
                 }
             }
+        }
         }
     }
 
@@ -424,8 +462,8 @@ fun ProfileScreenContent(
         )
     }
 
-    if (state.showCommentsSheetForPostId != null) {
-        val activePostId = state.showCommentsSheetForPostId
+    val activePostId = state.showCommentsSheetForPostId
+    if (activePostId != null) {
         val activeOverride = state.postOverrides[activePostId]
         val commentsPagingItems = activeOverride?.commentsFlow?.collectAsLazyPagingItems()
 

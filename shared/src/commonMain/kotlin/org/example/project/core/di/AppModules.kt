@@ -6,6 +6,9 @@ import org.example.project.core.data.di.RepositoryModule
 import org.example.project.core.database.di.DaoModule
 import org.example.project.core.datastore.di.preferencesModule
 import org.example.project.feature.profile.di.profileModule
+import org.example.project.feature.auth.di.authModule
+import org.example.project.feature.createPost.di.createPostModule
+import org.example.project.feature.home.di.homeModule
 import org.koin.core.module.Module
 
 
@@ -30,8 +33,10 @@ val appModules = listOf(
     RepositoryModule,
     preferencesModule,
     DaoModule,
-    profileModule
+    authModule,
+    homeModule,
+    profileModule,
+    createPostModule
     // useCaseModule // Commenting out as it seems to be missing or will be removed
 )
-
 

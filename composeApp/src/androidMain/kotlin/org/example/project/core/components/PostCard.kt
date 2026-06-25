@@ -35,7 +35,7 @@ import org.example.project.core.model.home.MediaType
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
 import org.example.project.theme.IssueSpotTheme
-import org.example.project.feature.home.getColor
+import org.example.project.utils.getColor
 
 @Composable
 fun PostCard(

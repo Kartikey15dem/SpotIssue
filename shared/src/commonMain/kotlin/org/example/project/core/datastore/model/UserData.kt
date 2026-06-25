@@ -7,7 +7,7 @@ import org.example.project.core.model.auth.UserLocation
 data class UserData(
     val token: String = "",
     val isLoggedIn: Boolean = false,
-    val userLocation : UserLocation? = null,
+    val userLocation : UserLocation = UserLocation(),
     val uploadDraftState: UploadDraftState = UploadDraftState.DEFAULT
 ) {
     companion object {

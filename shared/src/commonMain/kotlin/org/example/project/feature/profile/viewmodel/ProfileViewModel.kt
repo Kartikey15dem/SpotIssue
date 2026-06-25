@@ -6,15 +6,15 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.insertHeaderItem
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import org.example.project.core.data.repository.PostRepository
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.data.mappers.Sort
@@ -46,11 +46,13 @@ class ProfileViewModel(
     private val _uiState = MutableStateFlow(ProfileState())
     val uiState: StateFlow<ProfileState> = _uiState.asStateFlow()
 
-    private val _sideEffects = MutableSharedFlow<ProfileSideEffect>()
-    val sideEffects: SharedFlow<ProfileSideEffect> = _sideEffects.asSharedFlow()
+    private val _sideEffects = Channel<ProfileSideEffect>(Channel.BUFFERED)
+    val sideEffects = _sideEffects.receiveAsFlow()
 
     private val userPostsCache = mutableMapOf<Sort, Flow<PagingData<Post>>>()
     private val likedPostsCache = mutableMapOf<Sort, Flow<PagingData<Post>>>()
+    private var userPostsListJob: Job? = null
+    private var likedPostsListJob: Job? = null
 
     init {
         observeProfile()
@@ -108,6 +110,30 @@ class ProfileViewModel(
 
     private fun changeSort(sort: Sort) {
         updateState { it.copy(sort = sort, userPostsFlow = getPostFlow(sort), likedPostsFlow = getLikedFlow(sort)) }
+    }
+
+
+
+    private fun refreshPostLists(sort: Sort) {
+        viewModelScope.launch {
+            updateState { it.copy(isNetworkLoading = true) }
+            when (val result = profileRepository.refreshUserPosts(sort.name)) {
+                is DataState.Success -> updateState { it.copy(isNetworkLoading = false, isLocalLoading = false) }
+                is DataState.Error -> {
+                    updateState { it.copy(isNetworkLoading = false) }
+                    handleError(result.exception)
+                }
+                DataState.Loading -> Unit
+            }
+            when (val result = profileRepository.refreshLikedPosts(sort.name)) {
+                is DataState.Success -> updateState { it.copy(isNetworkLoading = false, isLocalLoading = false) }
+                is DataState.Error -> {
+                    updateState { it.copy(isNetworkLoading = false) }
+                    handleError(result.exception)
+                }
+                DataState.Loading -> Unit
+            }
+        }
     }
 
     private fun deletePost(postId: String) {
@@ -170,17 +196,17 @@ class ProfileViewModel(
 
     private fun comment(postId: String, comment: String, currentCommentCount: Int) {
         updateOverride(postId, commentsCount = currentCommentCount + 1)
+        val optimisticComment = Comment(
+            id = "temp_${Clock.System.now()}",
+            postId = postId,
+            text = comment,
+            timeAgo = "Just now",
+            userName = "You",
+            userImageUrl = _uiState.value.profile?.imageUrl
+        )
         
         val currentFlow = _uiState.value.postOverrides[postId]?.commentsFlow
         if (currentFlow != null) {
-            val optimisticComment = Comment(
-                id = "temp_${Clock.System.now()}",
-                postId = postId,
-                text = comment,
-                timeAgo = "Just now",
-                userName = "You",
-                userImageUrl = _uiState.value.profile?.imageUrl
-            )
             val updatedFlow = currentFlow.map { pagingData ->
                 pagingData.insertHeaderItem(item = optimisticComment)
             }
@@ -205,7 +231,7 @@ class ProfileViewModel(
         viewModelScope.launch {
             val postUrl = "https://www.issuespot.com/post/${post.id}"
             val shareText = "${post.userName} posted an issue: ${post.postText}\\n\\nView it here: $postUrl"
-            _sideEffects.emit(ProfileSideEffect.SharePost(shareText))
+            _sideEffects.send(ProfileSideEffect.SharePost(shareText))
         }
     }
 
@@ -232,19 +258,19 @@ class ProfileViewModel(
 
     private fun navigateToCreatePost() {
         viewModelScope.launch {
-            _sideEffects.emit(ProfileSideEffect.NavigateToCreatePost)
+            _sideEffects.send(ProfileSideEffect.NavigateToCreatePost)
         }
     }
 
     private fun navigateToEditProfile() {
         viewModelScope.launch {
-            _sideEffects.emit(ProfileSideEffect.NavigateToEditProfile)
+            _sideEffects.send(ProfileSideEffect.NavigateToEditProfile)
         }
     }
 
     private fun navigateToPost(postId: String) {
         viewModelScope.launch {
-            _sideEffects.emit(ProfileSideEffect.NavigateToPost(postId))
+            _sideEffects.send(ProfileSideEffect.NavigateToPost(postId))
         }
     }
 
@@ -277,6 +303,19 @@ class ProfileViewModel(
         }
     }
 
+    fun selectMine(isMine: Boolean) = onIntent(ProfileIntent.TabChanged(isMine))
+    fun selectSort(sort: Sort) = onIntent(ProfileIntent.SortChanged(sort))
+    fun openCreatePost() = onIntent(ProfileIntent.CreatePostClicked)
+    fun openEditProfile() = onIntent(ProfileIntent.EditProfileClicked)
+    fun openPost(post: Post) = onIntent(ProfileIntent.PostClicked(post))
+    fun closePost() = onIntent(ProfileIntent.DismissPost)
+    fun likePost(post: Post) = onIntent(ProfileIntent.LikeClicked(post.id, post.isLiked, post.likes))
+    fun openComments(post: Post) = onIntent(ProfileIntent.CommentsIconClicked(post.id, post.comments))
+    fun closeComments() = onIntent(ProfileIntent.DismissCommentsSheet)
+    fun submitComment(postId: String, text: String, currentCount: Int) =
+        onIntent(ProfileIntent.CommentSubmitted(postId, text, currentCount))
+    fun sharePost(post: Post) = onIntent(ProfileIntent.ShareClicked(post))
+
     private fun changeTab(isMine: Boolean) {
         updateState { it.copy(isMine = isMine) }
     }
@@ -292,7 +331,7 @@ class ProfileViewModel(
     private suspend fun handleError(error: Throwable) {
         val message = error.message ?: "Something went wrong"
         updateState { it.copy(error = message) }
-        _sideEffects.emit(ProfileSideEffect.ShowError(message))
+        _sideEffects.send(ProfileSideEffect.ShowError(message))
     }
 }
 
@@ -329,6 +368,8 @@ data class ProfileState(
     val likedPostsFlow: Flow<PagingData<Post>>? = null,
     val isMine: Boolean = true,
     val sort: Sort = Sort.LATEST,
+    val isLocalLoading: Boolean = true,
+    val isNetworkLoading: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
     val profileError: String? = null,

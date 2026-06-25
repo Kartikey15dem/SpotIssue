@@ -30,7 +30,7 @@ import org.example.project.core.database.entities.RemoteKeysEntity
         LikedPostEntity::class,
         RemoteKeysEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
     autoMigrations = [],
 )

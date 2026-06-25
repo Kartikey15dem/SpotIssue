@@ -3,13 +3,15 @@ package org.example.project.feature.home.di
 
 import org.example.project.feature.home.CurrentLevelManager
 import org.example.project.feature.home.viewmodel.HomeViewModel
+import org.example.project.feature.home.viewmodel.PostDetailViewModel
 import org.koin.dsl.module
 
 val homeModule = module {
-
+    single { CurrentLevelManager() }
     single {
-        HomeViewModel(get(), get(), get(), get(), CurrentLevelManager())
+        HomeViewModel(get(), get(), get(), get(), get())
     }
-
-
+    factory { (postId: String) ->
+        PostDetailViewModel(postId, get())
+    }
 }
