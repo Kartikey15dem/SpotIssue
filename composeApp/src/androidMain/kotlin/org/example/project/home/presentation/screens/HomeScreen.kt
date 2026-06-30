@@ -4,9 +4,7 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,52 +15,49 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.paging.LoadState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.Stable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.paging.compose.itemKey
 import kotlinx.coroutines.flow.collectLatest
 import org.example.project.R
-import org.example.project.core.model.home.getText
+import org.example.project.core.components.CommentsBottomSheet
 import org.example.project.core.components.PostCard
 import org.example.project.core.components.PostLevelChip
+import org.example.project.core.model.home.Post
+import org.example.project.core.model.home.getText
 import org.example.project.feature.home.viewmodel.HomeIntent
 import org.example.project.feature.home.viewmodel.HomeSideEffect
 import org.example.project.feature.home.viewmodel.HomeState
 import org.example.project.feature.home.viewmodel.HomeViewModel
 import org.example.project.theme.IssueSpotColors
-import org.example.project.theme.IssueSpotTypography
-import org.example.project.core.components.CommentsBottomSheet
 import org.example.project.theme.IssueSpotTheme
+import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
-import androidx.compose.material3.Snackbar
 
 @Composable
 fun HomeScreen(
@@ -71,7 +66,11 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit = {},
     viewModel: HomeViewModel = koinViewModel()
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val activeIssues by viewModel.activeIssues.collectAsStateWithLifecycle()
+    val expandedPost by viewModel.expandedPost.collectAsStateWithLifecycle()
+    val pagingItems = viewModel.pagedPosts.collectAsLazyPagingItems()
+    
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -100,7 +99,7 @@ fun HomeScreen(
     }
 
     Scaffold(
-        snackbarHost = { 
+        snackbarHost = {
             SnackbarHost(snackbarHostState) { data ->
                 Snackbar(
                     snackbarData = data,
@@ -115,266 +114,207 @@ fun HomeScreen(
         HomeContent(
             modifier = modifier.padding(padding),
             state = state,
+            activeIssues = activeIssues,
+            expandedPost = expandedPost,
+            pagingItems = pagingItems,
             onIntent = viewModel::onIntent,
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Stable
+data class PagingPresentationState(
+    val isInitialLoading: Boolean,
+    val isRefreshing: Boolean,
+    val isAppending: Boolean,
+    val refreshError: Throwable?,
+    val appendError: Throwable?,
+    val endReached: Boolean
+)
+
+@Composable
+fun rememberPagingPresentationState(
+    pagingItems: LazyPagingItems<Post>
+): PagingPresentationState {
+    val refreshState = pagingItems.loadState.refresh
+    val mediatorRefreshState = pagingItems.loadState.mediator?.refresh
+
+    val appendState = pagingItems.loadState.append
+    val mediatorAppendState = pagingItems.loadState.mediator?.append
+
+    val isRefreshing = refreshState is LoadState.Loading || mediatorRefreshState is LoadState.Loading
+    val isAppending = appendState is LoadState.Loading || mediatorAppendState is LoadState.Loading
+    
+    val refreshError = (refreshState as? LoadState.Error)?.error ?: (mediatorRefreshState as? LoadState.Error)?.error
+    val appendError = (appendState as? LoadState.Error)?.error ?: (mediatorAppendState as? LoadState.Error)?.error
+
+    val endReached = (appendState is LoadState.NotLoading && appendState.endOfPaginationReached) ||
+            (mediatorAppendState is LoadState.NotLoading && mediatorAppendState.endOfPaginationReached)
+
+    val isInitialLoading = pagingItems.itemCount == 0 && isRefreshing
+
+    return remember(
+        isInitialLoading, isRefreshing, isAppending, refreshError, appendError, endReached
+    ) {
+        PagingPresentationState(
+            isInitialLoading = isInitialLoading,
+            isRefreshing = isRefreshing,
+            isAppending = isAppending,
+            refreshError = refreshError,
+            appendError = appendError,
+            endReached = endReached
+        )
+    }
+}
+
+@Stable
+data class FeedUiState(
+    val showInitialLoading: Boolean,
+    val showFeed: Boolean,
+    val showEmptyFeed: Boolean,
+    val showInitialError: Boolean,
+    val footerState: FooterState,
+    val refreshError: Throwable?,
+    val isPullRefreshing: Boolean
+)
+
+@Composable
+fun rememberFeedUiState(
+    pagingState: PagingPresentationState,
+    itemCount: Int
+): FeedUiState {
+    val showInitialLoading = pagingState.isInitialLoading
+    val showInitialError = itemCount == 0 && pagingState.refreshError != null && !pagingState.isRefreshing
+    val showEmptyFeed = itemCount == 0 && !pagingState.isRefreshing && pagingState.refreshError == null
+    val showFeed = itemCount > 0
+    
+    val isPullRefreshing = pagingState.isRefreshing && itemCount > 0
+
+    val shouldShowFooter = itemCount > 0 && !showInitialLoading && !pagingState.isRefreshing
+    val showNoMorePosts = shouldShowFooter && pagingState.endReached && pagingState.appendError == null && !pagingState.isAppending
+
+    val footerState = when {
+        !shouldShowFooter -> FooterState.Hidden
+        pagingState.isAppending -> FooterState.Loading
+        pagingState.appendError != null -> FooterState.Error(pagingState.appendError)
+        showNoMorePosts -> FooterState.EndReached
+        else -> FooterState.Hidden
+    }
+
+    return remember(
+        showInitialLoading, showFeed, showEmptyFeed, showInitialError,
+        footerState, pagingState.refreshError, isPullRefreshing
+    ) {
+        FeedUiState(
+            showInitialLoading = showInitialLoading,
+            showFeed = showFeed,
+            showEmptyFeed = showEmptyFeed,
+            showInitialError = showInitialError,
+            footerState = footerState,
+            refreshError = pagingState.refreshError,
+            isPullRefreshing = isPullRefreshing
+        )
+    }
+}
+
 @Composable
 fun HomeContent(
     modifier: Modifier = Modifier,
     state: HomeState,
+    activeIssues: Int,
+    expandedPost: Post?,
+    pagingItems: LazyPagingItems<Post>,
     onIntent: (HomeIntent) -> Unit,
 ) {
-    val activeFlow = if (state.query.isNotBlank() && state.searchPostsFlow != null) state.searchPostsFlow else state.postsFlow
-    val pagingItems = activeFlow?.collectAsLazyPagingItems()
-    val spacing = IssueSpotTheme.spacing
-    PullToRefreshBox(
-        isRefreshing = state.isRefreshing,
-        onRefresh = { onIntent(HomeIntent.Refresh) },
+    val localityState = rememberLazyListState()
+    val districtState = rememberLazyListState()
+    val stateState = rememberLazyListState()
+    val nationalState = rememberLazyListState()
+
+    val listState = when (state.postLevel) {
+        org.example.project.core.model.home.PostLevel.LOCALITY -> localityState
+        org.example.project.core.model.home.PostLevel.DISTRICT -> districtState
+        org.example.project.core.model.home.PostLevel.STATE -> stateState
+        org.example.project.core.model.home.PostLevel.NATIONAL -> nationalState
+    }
+    
+    val pagingState = rememberPagingPresentationState(pagingItems)
+    val feedUiState = rememberFeedUiState(pagingState, pagingItems.itemCount)
+
+    LaunchedEffect(feedUiState.refreshError) {
+        if (feedUiState.refreshError != null && pagingItems.itemCount > 0) {
+            onIntent(HomeIntent.ShowRefreshErrorSnackbar(feedUiState.refreshError.message ?: "An error occurred"))
+        }
+    }
+
+    HomePullRefresh(
+        isRefreshing = feedUiState.isPullRefreshing,
+        onRefresh = { pagingItems.refresh() },
         modifier = modifier
-            .fillMaxSize()
-            .background(IssueSpotColors.Background)
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            val expandedPost = state.expandedPost
-            if(expandedPost != null) {
-                val post = expandedPost
-                val override = state.postOverrides[post.id]
-
-                val isLiked = override?.isLiked ?: post.isLiked
-                val resolvedLikes = override?.likesCount ?: post.likes
-                val resolvedComments = override?.commentsCount ?: post.comments
-                val isReported = override?.isReported ?: post.isReported
-
+            if (expandedPost != null) {
                 BackHandler {
                     onIntent(HomeIntent.DismissPost)
                 }
 
-                    PostCard(
-                        modifier = Modifier
-                            .fillMaxSize(),
-                        post = post,
-                        isLiked = isLiked,
-                        likesCount = resolvedLikes,
-                        commentsCount = resolvedComments,
-                        isReported = isReported,
-
-                        onLikeClick = {
-                            onIntent(
-                                HomeIntent.LikeClicked(
-                                    post.id,
-                                    isLiked,
-                                    resolvedLikes
-                                )
-                            )
-                        },
-                        onCommentIconClick = {
-                            onIntent(
-                                HomeIntent.CommentsIconClicked(
-                                    post.id,
-                                    resolvedComments
-                                )
-                            )
-                        },
-                        onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
-                        onReportClick = { reason ->
-                            onIntent(HomeIntent.ReportClicked(post.id, reason))
-                        },
-                        onCollapseClick = { onIntent(HomeIntent.DismissPost) },
-                        isDetailMode = true
-
-                    )
+                PostCard(
+                    modifier = Modifier.fillMaxSize(),
+                    post = expandedPost,
+                    isLiked = expandedPost.isLiked,
+                    likesCount = expandedPost.likes,
+                    commentsCount = expandedPost.comments,
+                    isReported = expandedPost.isReported,
+                    onLikeClick = {
+                        onIntent(HomeIntent.LikeClicked(expandedPost.id))
+                    },
+                    onCommentIconClick = {
+                        onIntent(HomeIntent.CommentsIconClicked(expandedPost.id))
+                    },
+                    onShareClick = { onIntent(HomeIntent.ShareClicked(expandedPost)) },
+                    onReportClick = { reason ->
+                        onIntent(HomeIntent.ReportClicked(expandedPost.id, reason))
+                    },
+                    onCollapseClick = { onIntent(HomeIntent.DismissPost) },
+                    isDetailMode = true
+                )
 
             } else {
-                    HomeHeader(
-                        modifier = Modifier.fillMaxWidth(),
-                        state = state,
-                        onIntent = onIntent
-                    )
-
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(spacing.smallMedium)
-                    ) {
-                        item { Spacer(Modifier.height(spacing.small)) }
-
-                        if (pagingItems != null) {
-                            items(
-                                count = pagingItems.itemCount,
-                                key = pagingItems.itemKey { it.id }
-                            ) { index ->
-                                val post = pagingItems[index]
-                                if (post != null) {
-                                    val override = state.postOverrides[post.id]
-
-                                    val isLiked = override?.isLiked ?: post.isLiked
-                                    val resolvedLikes = override?.likesCount ?: post.likes
-                                    val resolvedComments = override?.commentsCount ?: post.comments
-                                    val isReported = override?.isReported ?: post.isReported
-
-                                    PostCard(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = spacing.smallMedium),
-                                        post = post,
-                                        isLiked = isLiked,
-                                        likesCount = resolvedLikes,
-                                        commentsCount = resolvedComments,
-                                        isReported = isReported,
-
-                                        onLikeClick = {
-                                            onIntent(
-                                                HomeIntent.LikeClicked(
-                                                    post.id,
-                                                    isLiked,
-                                                    resolvedLikes
-                                                )
-                                            )
-                                        },
-                                        onCommentIconClick = {
-                                            onIntent(
-                                                HomeIntent.CommentsIconClicked(
-                                                    post.id,
-                                                    resolvedComments
-                                                )
-                                            )
-                                        },
-                                        onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
-                                        onReportClick = { reason ->
-                                            onIntent(HomeIntent.ReportClicked(post.id, reason))
-                                        },
-                                        onPostClick = { onIntent(HomeIntent.PostClicked(post)) }
-                                    )
-                                }
-                            }
-                        } else {
-                            item {
-                                Box(
-                                    modifier = Modifier.fillParentMaxSize(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator(color = IssueSpotColors.Primary)
-                                }
-                            }
-                        }
-
-                        item { Spacer(Modifier.height(spacing.medium)) }
-
-                        val refreshError = pagingItems?.loadState?.refresh as? LoadState.Error
-                        val appendError = pagingItems?.loadState?.append as? LoadState.Error
-
-                        if (refreshError != null && pagingItems.itemCount == 0) {
-                            item {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = refreshError.error.message ?: "An error occurred",
-                                        color = IssueSpotColors.OnBackground,
-                                        style = IssueSpotTypography.bodyMedium
-                                    )
-                                    Spacer(Modifier.height(spacing.small))
-                                    Button(
-                                        onClick = { onIntent(HomeIntent.Refresh) },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = IssueSpotColors.Primary,
-                                            contentColor = IssueSpotColors.OnPrimary
-                                        )
-                                    ) {
-                                        Text("Retry")
-                                    }
-                                }
-                            }
-                        } else if (pagingItems?.loadState?.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
-                            item {
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator(color = IssueSpotColors.Primary)
-                                }
-                            }
-                        } else if (pagingItems?.loadState?.refresh is LoadState.NotLoading && pagingItems.itemCount == 0) {
-                            item {
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("No posts found", style = IssueSpotTypography.bodyLarge, color = IssueSpotColors.OnBackground)
-                                }
-                            }
-                        }
-
-                        if ((appendError != null) && (pagingItems.itemCount > 0)) {
-                            item {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = appendError.error.message ?: "An error occurred",
-                                        color = IssueSpotColors.OnBackground,
-                                        style = IssueSpotTypography.bodyMedium
-                                    )
-                                    Spacer(Modifier.height(spacing.small))
-                                    Button(
-                                        onClick = { pagingItems?.retry() },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = IssueSpotColors.Primary,
-                                            contentColor = IssueSpotColors.OnPrimary
-                                        )
-                                    ) {
-                                        Text("Retry")
-                                    }
-                                }
-                            }
-                        } else if (pagingItems?.loadState?.append is LoadState.Loading) {
-                            item {
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator(color = IssueSpotColors.Primary)
-                                }
-                            }
-                        } else if (pagingItems?.loadState?.append is LoadState.NotLoading && pagingItems.loadState.append.endOfPaginationReached && pagingItems.itemCount > 0) {
-                            item {
-                                Text(
-                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
-                                    text = "No more posts",
-                                    color = IssueSpotColors.OnBackground,
-                                    style = IssueSpotTypography.bodyMedium,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                )
-                            }
-                        }
+                HomeFeed(
+                    listState = listState,
+                    pagingItems = pagingItems,
+                    pagingState = pagingState,
+                    state = state,
+                    onIntent = onIntent,
+                    feedUiState = feedUiState,
+                    modifier = Modifier.fillMaxSize(),
+                    header = {
+                        HomeHeader(
+                            modifier = Modifier.fillMaxWidth(),
+                            state = state,
+                            activeIssues = activeIssues,
+                            onIntent = onIntent
+                        )
                     }
-                }
-
-
+                )
+            }
         }
     }
 
     val activePostId = state.showCommentsSheetForPostId
     if (activePostId != null) {
-        val activeOverride = state.postOverrides[activePostId]
-        val commentsPagingItems = activeOverride?.commentsFlow?.collectAsLazyPagingItems()
+        val commentsPagingItems = state.commentFlows[activePostId]?.collectAsLazyPagingItems()
 
         CommentsBottomSheet(
             comments = commentsPagingItems,
             onDismiss = { onIntent(HomeIntent.DismissCommentsSheet) },
             onSubmit = { text ->
-                val fallbackCount = pagingItems?.itemSnapshotList?.items?.find { it.id == activePostId }?.comments ?: 0
                 onIntent(
                     HomeIntent.CommentSubmitted(
                         postId = activePostId,
-                        commentText = text,
-                        currentCommentCount = activeOverride?.commentsCount ?: fallbackCount
+                        commentText = text
                     )
                 )
             },
@@ -384,13 +324,15 @@ fun HomeContent(
 }
 
 @Composable
-private fun HomeHeader(
+fun HomeHeader(
     modifier: Modifier = Modifier,
     state: HomeState,
+    activeIssues: Int,
     onIntent: (HomeIntent) -> Unit,
 ) {
     val spacing = IssueSpotTheme.spacing
     val shapes = MaterialTheme.shapes
+
     Column(
         modifier = modifier
             .background(IssueSpotColors.Surface)
@@ -468,15 +410,12 @@ private fun HomeHeader(
             Spacer(Modifier.height(spacing.smallMedium))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-
                 PostLevelChip(postLevel = state.postLevel)
 
                 Spacer(Modifier.width(spacing.small))
 
-
-
                 Text(
-                    text = "${state.activeIssues} active issues",
+                    text = "$activeIssues active issues",
                     style = IssueSpotTypography.bodyLarge,
                     color = IssueSpotColors.OnSurfaceVariant
                 )

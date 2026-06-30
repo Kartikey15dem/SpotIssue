@@ -11,7 +11,6 @@ import org.example.project.core.database.entities.RemoteKeysEntity
 import org.example.project.core.database.entities.toEntity
 import org.example.project.core.network.services.HomeService
 import org.example.project.core.utils.parseIsoEpochMillis
-import kotlin.time.Clock
 import org.example.project.core.data.local.FeedLocalDataSource
 import org.example.project.core.data.mappers.toPost
 import org.example.project.core.model.auth.UserLocation
@@ -53,10 +52,9 @@ class FeedPostsRemoteMediator(
 
     private val keyType = "FEED_${postLevel.name}"
     private val maxCachedPosts = 100
-
     override suspend fun initialize(): InitializeAction {
-        if (forceRefresh) return InitializeAction.LAUNCH_INITIAL_REFRESH
-        return if (localDataSource.isPostsCacheStale(postLevel)) {
+        val isStale = localDataSource.isPostsCacheStale(postLevel)
+        return if (forceRefresh || isStale) {
             InitializeAction.LAUNCH_INITIAL_REFRESH
         } else {
             InitializeAction.SKIP_INITIAL_REFRESH
@@ -129,6 +127,7 @@ class FeedPostsRemoteMediator(
                         posts = posts,
                         remoteKeys = keys,
                         level = postLevel.name,
+                        keyType = keyType,
                         maxCachedPosts = maxCachedPosts
                     )
                 }
@@ -137,7 +136,7 @@ class FeedPostsRemoteMediator(
                     localDataSource.cacheActiveIssues(postLevel, count)
                 }
 
-                val now = Clock.System.now().toEpochMilliseconds()
+                val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
                 cacheMetadataDao.insertMetadata(
                     CacheMetadataEntity(
                         cacheKey = CacheMetadataEntity.postsKey(postLevel.name),
@@ -145,9 +144,12 @@ class FeedPostsRemoteMediator(
                     ),
                 )
 
+
                 MediatorResult.Success(endOfPaginationReached = endOfPaginationReached)
             }
-            is DataState.Error -> MediatorResult.Error(result.exception)
+            is DataState.Error -> {
+                MediatorResult.Error(result.exception)
+            }
             DataState.Loading -> MediatorResult.Error(IllegalStateException("Unexpected paging loading state"))
         }
     }

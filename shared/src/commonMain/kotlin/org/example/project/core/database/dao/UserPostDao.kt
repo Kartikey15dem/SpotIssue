@@ -18,14 +18,14 @@ interface UserPostDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<UserPostEntity>)
 
-    @Query("SELECT * FROM user_posts ORDER BY createdAt DESC")
-    fun pagingSource(): PagingSource<Int, UserPostEntity>
+    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY createdAt DESC")
+    fun pagingSource(sort: String): PagingSource<Int, UserPostEntity>
 
-    @Query("SELECT * FROM user_posts ORDER BY createdAt ASC")
-    fun pagingSourceOldest(): PagingSource<Int, UserPostEntity>
+    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY createdAt ASC")
+    fun pagingSourceOldest(sort: String): PagingSource<Int, UserPostEntity>
 
-    @Query("SELECT * FROM user_posts ORDER BY (likes + comments) DESC")
-    fun pagingSourcePopular(): PagingSource<Int, UserPostEntity>
+    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY likes DESC, createdAt DESC")
+    fun pagingSourcePopular(sort: String): PagingSource<Int, UserPostEntity>
 
     @Query("SELECT * FROM user_posts ORDER BY createdAt DESC")
     suspend fun getUserPosts(): List<UserPostEntity>
@@ -36,14 +36,14 @@ interface UserPostDao {
     @Query("SELECT * FROM user_posts ORDER BY createdAt ASC")
     fun observeUserPostsOldest(): Flow<List<UserPostEntity>>
 
-    @Query("SELECT * FROM user_posts ORDER BY (likes + comments) DESC")
-    fun observeUserPostsPopular(): Flow<List<UserPostEntity>>
+    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY likes DESC, createdAt DESC")
+    fun observeUserPostsPopular(sort: String): Flow<List<UserPostEntity>>
 
     @Query("SELECT * FROM user_posts ORDER BY createdAt ASC")
     suspend fun getUserPostsOldest(): List<UserPostEntity>
 
-    @Query("SELECT * FROM user_posts ORDER BY (likes + comments) DESC")
-    suspend fun getUserPostsPopular(): List<UserPostEntity>
+    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY likes DESC, createdAt DESC")
+    suspend fun getUserPostsPopular(sort: String): List<UserPostEntity>
 
     @Query("SELECT * FROM user_posts WHERE id = :postId")
     suspend fun getPostById(postId: String): UserPostEntity?
@@ -51,11 +51,14 @@ interface UserPostDao {
     @Query("DELETE FROM user_posts WHERE id = :postId")
     suspend fun deletePost(postId: String)
 
-    @Query("DELETE FROM user_posts")
-    suspend fun deleteAllUserPosts()
+    @Query("DELETE FROM user_posts WHERE sort = :sort")
+    suspend fun deleteAllUserPosts(sort: String)
 
-    @Query("DELETE FROM user_posts WHERE id NOT IN (SELECT id FROM user_posts ORDER BY createdAt DESC LIMIT :maxPosts)")
-    suspend fun trimUserPosts(maxPosts: Int)
+    @Query("DELETE FROM user_posts")
+    suspend fun clearAll()
+
+    @Query("DELETE FROM user_posts WHERE sort = :sort AND id NOT IN (SELECT id FROM user_posts WHERE sort = :sort ORDER BY createdAt DESC LIMIT :maxPosts)")
+    suspend fun trimUserPosts(maxPosts: Int, sort: String)
 
     @Query("UPDATE user_posts SET likes = :likes, isLiked = :isLiked WHERE id = :postId")
     suspend fun updatePostLikeStatus(postId: String, likes: Int, isLiked: Boolean)
@@ -69,6 +72,6 @@ interface UserPostDao {
     @Query("UPDATE user_posts SET userName = :name, userAvatar = :avatar WHERE userId = :ownerId")
     suspend fun updateUserInfo(ownerId: String, name: String, avatar: String?)
 
-    @Query("SELECT COUNT(*) FROM user_posts")
-    suspend fun getUserPostCount(): Int
+    @Query("SELECT COUNT(*) FROM user_posts WHERE sort = :sort")
+    suspend fun getUserPostCount(sort: String): Int
 }

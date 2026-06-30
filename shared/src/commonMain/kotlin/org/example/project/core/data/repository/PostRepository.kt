@@ -20,4 +20,5 @@ interface PostRepository {
     suspend fun createPost(post : CreatePost): DataState<Post>
     suspend fun deletePost(postId: String):DataState<Unit>
     suspend fun getPost(postId: String): DataState<Post>
+    fun observePost(postId: String): Flow<Post?>
 }

@@ -16,4 +16,5 @@ interface RemoteKeysDao {
 
     @Query("DELETE FROM remote_keys WHERE type = :type")
     suspend fun clearRemoteKeys(type: String)
+
 }

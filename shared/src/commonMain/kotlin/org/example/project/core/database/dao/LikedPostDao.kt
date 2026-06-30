@@ -18,14 +18,14 @@ interface LikedPostDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<LikedPostEntity>)
 
-    @Query("SELECT * FROM liked_posts ORDER BY createdAt DESC")
-    fun pagingSource(): PagingSource<Int, LikedPostEntity>
+    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY createdAt DESC")
+    fun pagingSource(sort: String): PagingSource<Int, LikedPostEntity>
 
-    @Query("SELECT * FROM liked_posts ORDER BY createdAt ASC")
-    fun pagingSourceOldest(): PagingSource<Int, LikedPostEntity>
+    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY createdAt ASC")
+    fun pagingSourceOldest(sort: String): PagingSource<Int, LikedPostEntity>
 
-    @Query("SELECT * FROM liked_posts ORDER BY (likes + comments) DESC")
-    fun pagingSourcePopular(): PagingSource<Int, LikedPostEntity>
+    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY likes DESC, createdAt DESC")
+    fun pagingSourcePopular(sort: String): PagingSource<Int, LikedPostEntity>
 
     @Query("SELECT * FROM liked_posts ORDER BY createdAt DESC")
     suspend fun getLikedPosts(): List<LikedPostEntity>
@@ -36,14 +36,14 @@ interface LikedPostDao {
     @Query("SELECT * FROM liked_posts ORDER BY likedAt ASC")
     fun observeLikedPostsOldest(): Flow<List<LikedPostEntity>>
 
-    @Query("SELECT * FROM liked_posts ORDER BY (likes + comments) DESC")
-    fun observeLikedPostsPopular(): Flow<List<LikedPostEntity>>
+    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY likes DESC, createdAt DESC")
+    fun observeLikedPostsPopular(sort: String): Flow<List<LikedPostEntity>>
 
     @Query("SELECT * FROM liked_posts ORDER BY likedAt ASC")
     suspend fun getLikedPostsOldest(): List<LikedPostEntity>
 
-    @Query("SELECT * FROM liked_posts ORDER BY (likes + comments) DESC")
-    suspend fun getLikedPostsPopular(): List<LikedPostEntity>
+    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY likes DESC, createdAt DESC")
+    suspend fun getLikedPostsPopular(sort: String): List<LikedPostEntity>
 
     @Query("SELECT * FROM liked_posts WHERE id = :postId")
     suspend fun getLikedPostById(postId: String): LikedPostEntity?
@@ -51,11 +51,14 @@ interface LikedPostDao {
     @Query("DELETE FROM liked_posts WHERE id = :postId")
     suspend fun deleteLikedPost(postId: String)
 
-    @Query("DELETE FROM liked_posts")
-    suspend fun deleteAllLikedPosts()
+    @Query("DELETE FROM liked_posts WHERE sort = :sort")
+    suspend fun deleteAllLikedPosts(sort: String)
 
-    @Query("DELETE FROM liked_posts WHERE id NOT IN (SELECT id FROM liked_posts ORDER BY createdAt DESC LIMIT :maxPosts)")
-    suspend fun trimLikedPosts(maxPosts: Int)
+    @Query("DELETE FROM liked_posts")
+    suspend fun clearAll()
+
+    @Query("DELETE FROM liked_posts WHERE sort = :sort AND id NOT IN (SELECT id FROM liked_posts WHERE sort = :sort ORDER BY createdAt DESC LIMIT :maxPosts)")
+    suspend fun trimLikedPosts(maxPosts: Int, sort: String)
 
     @Query("UPDATE liked_posts SET likes = :likes, isLiked = :isLiked WHERE id = :postId")
     suspend fun updatePostLikeStatus(postId: String, likes: Int, isLiked: Boolean)
@@ -69,6 +72,6 @@ interface LikedPostDao {
     @Query("UPDATE liked_posts SET userName = :name, userAvatar = :avatar WHERE userId = :ownerId")
     suspend fun updateUserInfo(ownerId: String, name: String, avatar: String?)
 
-    @Query("SELECT COUNT(*) FROM liked_posts")
-    suspend fun getLikedPostCount(): Int
+    @Query("SELECT COUNT(*) FROM liked_posts WHERE sort = :sort")
+    suspend fun getLikedPostCount(sort: String): Int
 }

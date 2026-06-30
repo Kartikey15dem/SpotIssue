@@ -6,15 +6,19 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.insertHeaderItem
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
 import org.example.project.core.data.repository.PostRepository
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.data.mappers.Sort
@@ -29,30 +33,13 @@ class ProfileViewModel(
     private val postRepository: PostRepository
 ) : ViewModel() {
 
-    /* ===================================================================================
-     * SECTION: PROFILE & SMART SORTING ARCHITECTURE
-     * ===================================================================================
-     * Manages the complex intersection of user profile analytics and their personal feed.
-     * 
-     * Optimistic UI (PostOverrides):
-     * Implements a local override map (`postOverrides`) to instantly reflect likes and
-     * comments in the UI without waiting for an expensive Paging3 invalidation/network call.
-     * 
-     * Smart Sorting:
-     * Listens to tab changes (My Posts vs Liked Posts) and Sorting parameters (Latest, 
-     * Oldest, Popular) and swaps the underlying PagingData Flow dynamically.
-     */
-
     private val _uiState = MutableStateFlow(ProfileState())
     val uiState: StateFlow<ProfileState> = _uiState.asStateFlow()
 
-    private val _sideEffects = Channel<ProfileSideEffect>(Channel.BUFFERED)
-    val sideEffects = _sideEffects.receiveAsFlow()
+    private val _sideEffects = MutableSharedFlow<ProfileSideEffect>()
+    val sideEffects: SharedFlow<ProfileSideEffect> = _sideEffects.asSharedFlow()
 
-    private val userPostsCache = mutableMapOf<Sort, Flow<PagingData<Post>>>()
-    private val likedPostsCache = mutableMapOf<Sort, Flow<PagingData<Post>>>()
-    private var userPostsListJob: Job? = null
-    private var likedPostsListJob: Job? = null
+    private val optimisticCommentsFlows = mutableMapOf<String, MutableStateFlow<List<Comment>>>()
 
     init {
         observeProfile()
@@ -89,58 +76,38 @@ class ProfileViewModel(
         }
     }
 
-    private fun getPostFlow(sort: Sort): Flow<PagingData<Post>> {
-        return userPostsCache.getOrPut(sort) {
-            profileRepository.getPagedUserPosts(sort.name).cachedIn(viewModelScope)
-        }
-    }
-
-    private fun getLikedFlow(sort: Sort): Flow<PagingData<Post>> {
-        return likedPostsCache.getOrPut(sort) {
-            profileRepository.getPagedLikedPosts(sort.name).cachedIn(viewModelScope)
-        }
-    }
-
+    @OptIn(ExperimentalCoroutinesApi::class)
     private fun initPostFlows() {
-        updateState { it.copy(
-            userPostsFlow = getPostFlow(Sort.LATEST),
-            likedPostsFlow = getLikedFlow(Sort.LATEST)
-        ) }
+        val activeFlow = _uiState
+            .map { Pair(it.isMine, it.sort) }
+            .distinctUntilChanged()
+            .flatMapLatest { (isMine, sort) ->
+                if (isMine) profileRepository.getPagedUserPosts(sort.name)
+                else profileRepository.getPagedLikedPosts(sort.name)
+            }
+            .cachedIn(viewModelScope)
+            
+        updateState { it.copy(activePostsFlow = activeFlow) }
     }
 
     private fun changeSort(sort: Sort) {
-        updateState { it.copy(sort = sort, userPostsFlow = getPostFlow(sort), likedPostsFlow = getLikedFlow(sort)) }
-    }
-
-
-
-    private fun refreshPostLists(sort: Sort) {
-        viewModelScope.launch {
-            updateState { it.copy(isNetworkLoading = true) }
-            when (val result = profileRepository.refreshUserPosts(sort.name)) {
-                is DataState.Success -> updateState { it.copy(isNetworkLoading = false, isLocalLoading = false) }
-                is DataState.Error -> {
-                    updateState { it.copy(isNetworkLoading = false) }
-                    handleError(result.exception)
-                }
-                DataState.Loading -> Unit
-            }
-            when (val result = profileRepository.refreshLikedPosts(sort.name)) {
-                is DataState.Success -> updateState { it.copy(isNetworkLoading = false, isLocalLoading = false) }
-                is DataState.Error -> {
-                    updateState { it.copy(isNetworkLoading = false) }
-                    handleError(result.exception)
-                }
-                DataState.Loading -> Unit
-            }
-        }
+        if (_uiState.value.sort == sort) return
+        updateState { it.copy(sort = sort) }
     }
 
     private fun deletePost(postId: String) {
         viewModelScope.launch {
             when (val result = postRepository.deletePost(postId)) {
                 is DataState.Success -> {
-                    // Do nothing
+                    // Close expanded post if it was deleted
+                    if (_uiState.value.expandedPost?.id == postId) {
+                        updateState { it.copy(expandedPost = null) }
+                    }
+                    // Remove optimistic overrides
+                    updateState { state -> 
+                        state.copy(postOverrides = state.postOverrides.toMutableMap().apply { remove(postId) }) 
+                    }
+                    optimisticCommentsFlows.remove(postId)
                 }
                 is DataState.Error -> {
                     handleError(result.exception)
@@ -184,8 +151,17 @@ class ProfileViewModel(
     private fun openComments(postId: String, currentCommentsCount: Int) {
         val existingOverride = _uiState.value.postOverrides[postId]
         if (existingOverride?.commentsFlow == null) {
-            val flow = postRepository.getPagedComments(postId).cachedIn(viewModelScope)
-            updateOverride(postId, commentsFlow = flow, commentsCount = existingOverride?.commentsCount ?: currentCommentsCount)
+            val baseFlow = postRepository.getPagedComments(postId).cachedIn(viewModelScope)
+            val optimisticsFlow = optimisticCommentsFlows.getOrPut(postId) { MutableStateFlow(emptyList()) }
+            
+            val combinedFlow = baseFlow.combine(optimisticsFlow) { pagingData, optimistics ->
+                var data = pagingData
+                // Reverse to keep latest at top
+                optimistics.reversed().forEach { data = data.insertHeaderItem(item = it) }
+                data
+            }.cachedIn(viewModelScope)
+
+            updateOverride(postId, commentsFlow = combinedFlow, commentsCount = existingOverride?.commentsCount ?: currentCommentsCount)
         }
         updateState { it.copy(showCommentsSheetForPostId = postId) }
     }
@@ -196,8 +172,9 @@ class ProfileViewModel(
 
     private fun comment(postId: String, comment: String, currentCommentCount: Int) {
         updateOverride(postId, commentsCount = currentCommentCount + 1)
+        
         val optimisticComment = Comment(
-            id = "temp_${Clock.System.now()}",
+            id = "temp_${Clock.System.now().toEpochMilliseconds()}",
             postId = postId,
             text = comment,
             timeAgo = "Just now",
@@ -205,13 +182,8 @@ class ProfileViewModel(
             userImageUrl = _uiState.value.profile?.imageUrl
         )
         
-        val currentFlow = _uiState.value.postOverrides[postId]?.commentsFlow
-        if (currentFlow != null) {
-            val updatedFlow = currentFlow.map { pagingData ->
-                pagingData.insertHeaderItem(item = optimisticComment)
-            }
-            updateOverride(postId, commentsFlow = updatedFlow)
-        }
+        val optimisticsFlow = optimisticCommentsFlows.getOrPut(postId) { MutableStateFlow(emptyList()) }
+        optimisticsFlow.update { it + optimisticComment }
 
         viewModelScope.launch {
             when (val result = postRepository.addComment(postId, comment)) {
@@ -230,8 +202,8 @@ class ProfileViewModel(
     private fun share(post: Post) {
         viewModelScope.launch {
             val postUrl = "https://www.issuespot.com/post/${post.id}"
-            val shareText = "${post.userName} posted an issue: ${post.postText}\\n\\nView it here: $postUrl"
-            _sideEffects.send(ProfileSideEffect.SharePost(shareText))
+            val shareText = "${post.userName} posted an issue: ${post.postText}\n\nView it here: $postUrl"
+            _sideEffects.emit(ProfileSideEffect.SharePost(shareText))
         }
     }
 
@@ -258,19 +230,19 @@ class ProfileViewModel(
 
     private fun navigateToCreatePost() {
         viewModelScope.launch {
-            _sideEffects.send(ProfileSideEffect.NavigateToCreatePost)
+            _sideEffects.emit(ProfileSideEffect.NavigateToCreatePost)
         }
     }
 
     private fun navigateToEditProfile() {
         viewModelScope.launch {
-            _sideEffects.send(ProfileSideEffect.NavigateToEditProfile)
+            _sideEffects.emit(ProfileSideEffect.NavigateToEditProfile)
         }
     }
 
     private fun navigateToPost(postId: String) {
         viewModelScope.launch {
-            _sideEffects.send(ProfileSideEffect.NavigateToPost(postId))
+            _sideEffects.emit(ProfileSideEffect.NavigateToPost(postId))
         }
     }
 
@@ -300,7 +272,13 @@ class ProfileViewModel(
             is ProfileIntent.ReportClicked -> report(intent.postId, intent.reason)
             ProfileIntent.ErrorShown -> clearError()
             ProfileIntent.RetryProfileClicked -> fetchProfile()
+            is ProfileIntent.ShowRefreshErrorSnackbar -> {}
         }
+    }
+
+    private fun changeTab(isMine: Boolean) {
+        if (_uiState.value.isMine == isMine) return
+        updateState { it.copy(isMine = isMine) }
     }
 
     fun selectMine(isMine: Boolean) = onIntent(ProfileIntent.TabChanged(isMine))
@@ -316,10 +294,6 @@ class ProfileViewModel(
         onIntent(ProfileIntent.CommentSubmitted(postId, text, currentCount))
     fun sharePost(post: Post) = onIntent(ProfileIntent.ShareClicked(post))
 
-    private fun changeTab(isMine: Boolean) {
-        updateState { it.copy(isMine = isMine) }
-    }
-
     private fun clearError() {
         updateState { it.copy(error = null) }
     }
@@ -331,7 +305,7 @@ class ProfileViewModel(
     private suspend fun handleError(error: Throwable) {
         val message = error.message ?: "Something went wrong"
         updateState { it.copy(error = message) }
-        _sideEffects.send(ProfileSideEffect.ShowError(message))
+        _sideEffects.emit(ProfileSideEffect.ShowError(message))
     }
 }
 
@@ -351,6 +325,7 @@ sealed interface ProfileIntent {
     data object DismissPost : ProfileIntent
     data object ErrorShown : ProfileIntent
     data object RetryProfileClicked : ProfileIntent
+    data class ShowRefreshErrorSnackbar(val message: String) : ProfileIntent
 }
 
 data class PostOverride(
@@ -364,22 +339,15 @@ data class PostOverride(
 data class ProfileState(
     val profile: Profile? = null,
     val isProfileLoading: Boolean = true,
-    val userPostsFlow: Flow<PagingData<Post>>? = null,
-    val likedPostsFlow: Flow<PagingData<Post>>? = null,
+    val activePostsFlow: Flow<PagingData<Post>>? = null,
     val isMine: Boolean = true,
     val sort: Sort = Sort.LATEST,
-    val isLocalLoading: Boolean = true,
-    val isNetworkLoading: Boolean = false,
-    val isLoading: Boolean = false,
     val error: String? = null,
     val profileError: String? = null,
     val postOverrides: Map<String, PostOverride> = emptyMap(),
     val showCommentsSheetForPostId: String? = null,
     val expandedPost: Post? = null
-) {
-    val activePostsFlow: Flow<PagingData<Post>>? 
-        get() = if (isMine) userPostsFlow else likedPostsFlow
-}
+)
 
 sealed interface ProfileSideEffect {
     data object NavigateToCreatePost : ProfileSideEffect

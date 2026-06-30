@@ -7,6 +7,7 @@ import org.example.project.core.database.entities.LikedPostEntity
 import org.example.project.core.database.entities.UserPostEntity
 import org.example.project.core.database.entities.RemoteKeysEntity
 
+
 @Dao
 /**
  * ===================================================================================
@@ -37,6 +38,7 @@ interface MediatorTransactionDao {
         postDao.deletePostsByLevel(level)
         
         remoteKeysDao.insertAll(remoteKeys)
+        
         postDao.insertPosts(posts)
     }
 
@@ -47,6 +49,7 @@ interface MediatorTransactionDao {
         posts: List<PostEntity>,
         remoteKeys: List<RemoteKeysEntity>,
         level: String,
+        keyType: String,
         maxCachedPosts: Int
     ) {
         remoteKeysDao.insertAll(remoteKeys)
@@ -58,11 +61,12 @@ interface MediatorTransactionDao {
         userPostDao: UserPostDao,
         remoteKeysDao: RemoteKeysDao,
         keyType: String,
+        sort: String,
         posts: List<UserPostEntity>,
         remoteKeys: List<RemoteKeysEntity>
     ) {
         remoteKeysDao.clearRemoteKeys(keyType)
-        userPostDao.deleteAllUserPosts()
+        userPostDao.deleteAllUserPosts(sort)
         
         remoteKeysDao.insertAll(remoteKeys)
         userPostDao.insertPosts(posts)
@@ -85,11 +89,12 @@ interface MediatorTransactionDao {
         likedPostDao: LikedPostDao,
         remoteKeysDao: RemoteKeysDao,
         keyType: String,
+        sort: String,
         posts: List<LikedPostEntity>,
         remoteKeys: List<RemoteKeysEntity>
     ) {
         remoteKeysDao.clearRemoteKeys(keyType)
-        likedPostDao.deleteAllLikedPosts()
+        likedPostDao.deleteAllLikedPosts(sort)
         
         remoteKeysDao.insertAll(remoteKeys)
         likedPostDao.insertPosts(posts)

@@ -420,18 +420,14 @@ fun PostMediaPreview(
     modifier: Modifier = Modifier
 ) {
     val overlayController = LocalOverlayController.current
-    var aspectRatio by remember { mutableFloatStateOf(1f) }
-    
     val mediaUrls = post.mediaUrls ?: return
 
     Column(
-        modifier = modifier
-            .fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(aspectRatio)
                 .clip(RoundedCornerShape(8.dp))
         ) {
             when (post.mediaType) {
@@ -449,7 +445,9 @@ fun PostMediaPreview(
                 }
                 MediaType.VIDEO -> {
                     Box(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         VideoPreviewPlayer(
@@ -461,8 +459,8 @@ fun PostMediaPreview(
                                     urls = mediaUrls,
                                 )
                             },
-                            onAspectRatioAvailable = { newRatio ->
-                                aspectRatio = newRatio
+                            onAspectRatioAvailable = { _ ->
+                                // Ignored to keep layout height stable
                             }
                         )
                     }
@@ -492,20 +490,11 @@ fun PostImageGrid(
     Box(modifier = Modifier.fillMaxWidth()) {
         when (count) {
             1 -> {
-                var singleAspectRatio by remember { mutableFloatStateOf(1f) }
                 PostGridImageItem(
                     uri = images[0],
                     onClick = { onImageClick(0) },
-                    modifier = Modifier.fillMaxWidth().aspectRatio(singleAspectRatio),
-                    contentScale = ContentScale.Fit,
-                    onSuccess = { state ->
-                        val width = state.painter.intrinsicSize.width
-                        val height = state.painter.intrinsicSize.height
-                        if (height != 0f) {
-                            singleAspectRatio = width / height
-                            if (singleAspectRatio < 1f) singleAspectRatio = 1f
-                        }
-                    }
+                    modifier = Modifier.fillMaxWidth().height(gridHeight),
+                    contentScale = ContentScale.Crop
                 )
             }
             2 -> {

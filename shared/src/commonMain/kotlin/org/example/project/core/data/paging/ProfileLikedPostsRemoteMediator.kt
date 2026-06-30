@@ -28,11 +28,16 @@ class ProfileLikedPostsRemoteMediator(
     private val likedPostDao = database.likedPostDao()
 
     private val targetUserId = "current_user"
-    private val keyType = "LIKED_POSTS_$targetUserId"
+    private val keyType = "LIKED_POSTS_${targetUserId}_${sort.uppercase()}"
     private val maxCachedPosts = 100
 
     override suspend fun initialize(): InitializeAction {
-        return InitializeAction.LAUNCH_INITIAL_REFRESH
+        val cacheCount = likedPostDao.getLikedPostCount(sort)
+        return if (cacheCount > 0) {
+            InitializeAction.SKIP_INITIAL_REFRESH
+        } else {
+            InitializeAction.LAUNCH_INITIAL_REFRESH
+        }
     }
 
     override suspend fun load(loadType: LoadType, state: PagingState<Int, LikedPostEntity>): MediatorResult {
@@ -59,7 +64,7 @@ class ProfileLikedPostsRemoteMediator(
 
             val entities = response.items.map { dto ->
                 val post = dto.toPost()
-                post.toLikedPostEntity()
+                post.toLikedPostEntity(sort = sort)
             }
 
             val endOfPaginationReached = response.nextKey == null || entities.isEmpty()
@@ -78,6 +83,7 @@ class ProfileLikedPostsRemoteMediator(
                     likedPostDao = likedPostDao,
                     remoteKeysDao = remoteKeysDao,
                     keyType = keyType,
+                    sort = sort,
                     posts = entities,
                     remoteKeys = remoteKeys
                 )

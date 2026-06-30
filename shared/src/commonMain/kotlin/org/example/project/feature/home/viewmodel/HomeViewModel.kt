@@ -4,30 +4,33 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import androidx.paging.insertHeaderItem
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.example.project.core.data.repository.FeedRepository
 import org.example.project.core.data.repository.PostRepository
+import org.example.project.core.data.repository.ProfileRepository
+import org.example.project.core.datastore.UserPreferencesRepository
+import org.example.project.core.model.home.Comment
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
-import org.example.project.core.model.home.Comment
 import org.example.project.core.utils.DataState
-import org.example.project.core.datastore.UserPreferencesRepository
-import kotlinx.coroutines.flow.combine
-
-import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.feature.home.CurrentLevelManager
-import kotlin.time.Clock
 
 class HomeViewModel(
     private val feedRepository: FeedRepository,
@@ -37,57 +40,55 @@ class HomeViewModel(
     private val currentLevelManager: CurrentLevelManager
 ) : ViewModel() {
 
-    /* ===================================================================================
-     * SECTION: HYBRID LOCAL/REMOTE FEED ORCHESTRATION
-     * ===================================================================================
-     * Acts as the central hub connecting the offline-first repository with the UI.
-     * 
-     * Key Mechanisms:
-     * 1. Dual-Observation: Combines the globally selected `PostLevel` with the user's 
-     *    `UserLocation` (from DataStore) to dynamically switch the Paging flow.
-     * 2. Optimistic UI (`updateOverride`): Instantly injects newly authored comments 
-     *    (using the locally observed profile avatar) and toggles likes natively before 
-     *    the backend responds.
-     * 3. Cache-First Loading: Inits Paging requests with `forceRefresh = false` to 
-     *    instantly display cached Room data while the RemoteMediator syncs silently.
-     */
-
     private val _uiState = MutableStateFlow(HomeState())
     val uiState: StateFlow<HomeState> = _uiState.asStateFlow()
 
     private val _sideEffects = Channel<HomeSideEffect>(Channel.BUFFERED)
     val sideEffects = _sideEffects.receiveAsFlow()
 
+    @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
+    val pagedPosts: Flow<PagingData<Post>> = combine(
+        currentLevelManager.currentLevel,
+        _uiState.map { it.query }.debounce(300).distinctUntilChanged(),
+        prefRepository.userData.map { it.userLocation }.distinctUntilChanged()
+    ) { level, query, location ->
+        Triple(level, query, location)
+    }.flatMapLatest { (level, query, location) ->
+        if (query.isBlank()) {
+            feedRepository.getPagedPosts(level, location, forceRefresh = false)
+        } else {
+            feedRepository.getPagedSearchPosts(query, level)
+        }
+    }.cachedIn(viewModelScope)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val activeIssues: StateFlow<Int> = currentLevelManager.currentLevel
+        .flatMapLatest { level -> feedRepository.observeActiveIssuesCount(level) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val expandedPost: StateFlow<Post?> = _uiState
+        .map { it.expandedPostId }
+        .distinctUntilChanged()
+        .flatMapLatest { postId ->
+            if (postId == null) flowOf(null)
+            else postRepository.observePost(postId)
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
+
     init {
         observeProfile()
-        fetchAndObservePosts()
-
-    }
-    private fun fetchAndObservePosts(){
         viewModelScope.launch {
-            combine(
-                currentLevelManager.currentLevel,
-                prefRepository.userData
-            ) { level, userData ->
-                level to userData.userLocation
-            }.collect { (level, location) ->
-                val currentState = _uiState.value
-                val shouldRefresh = currentState.postLevel != level ||
-                        (currentState.postsFlow == null)
-
-                if (shouldRefresh) {
-                    updateState {
-                        it.copy(
-                            postLevel = level,
-                            postsFlow = feedRepository.getPagedPosts(
-                                level,
-                                location,
-                                forceRefresh = false
-                            ).cachedIn(viewModelScope)
-                        )
-                    }
-                    observeActiveIssues(level)
-                }
+            currentLevelManager.currentLevel.collect { level ->
+                updateState { it.copy(postLevel = level) }
             }
         }
     }
@@ -102,51 +103,24 @@ class HomeViewModel(
         }
     }
 
-    private var activeIssuesJob: Job? = null
-    private var postsListJob: Job? = null
-
-    private fun observeActiveIssues(level: PostLevel) {
-        activeIssuesJob?.cancel()
-        activeIssuesJob = viewModelScope.launch {
-            feedRepository.observeActiveIssuesCount(level).collect { count ->
-                updateState { it.copy(activeIssues = count) }
-            }
-        }
-    }
-
-
-
-    private fun refreshPostsList(level: PostLevel) {
-        val location = prefRepository.userData.value.userLocation
-        viewModelScope.launch {
-            updateState { it.copy(isRefreshing = true) }
-            when (val result = feedRepository.refreshPosts(level, location)) {
-                is DataState.Success -> updateState { it.copy(isRefreshing = false, isLocalLoading = false) }
-                is DataState.Error -> {
-                    updateState { it.copy(isRefreshing = false) }
-                    handleError(result.exception)
-                }
-                DataState.Loading -> Unit
-            }
-        }
-    }
-
     fun onIntent(intent: HomeIntent) {
         when (intent) {
-            is HomeIntent.Refresh -> refresh()
-            is HomeIntent.SearchQueryChanged -> updateSearchQuery(intent.query)
+            is HomeIntent.SearchQueryChanged -> updateState { it.copy(query = intent.query) }
             HomeIntent.CreatePostClicked -> navigateToCreatePost()
             HomeIntent.ProfileClicked -> navigateToProfile()
             is HomeIntent.ReportClicked -> report(intent.postId, intent.reason)
-            is HomeIntent.CommentsIconClicked -> openComments(intent.postId, intent.currentCommentsCount)
+            is HomeIntent.CommentsIconClicked -> openComments(intent.postId)
             HomeIntent.DismissCommentsSheet -> dismissComments()
-            is HomeIntent.LikeClicked -> like(intent.postId, intent.currentIsLiked, intent.currentLikesCount)
-            is HomeIntent.CommentSubmitted -> comment(intent.postId, intent.commentText, intent.currentCommentCount)
+            is HomeIntent.LikeClicked -> like(intent.postId)
+            is HomeIntent.CommentSubmitted -> comment(intent.postId, intent.commentText)
             is HomeIntent.ShareClicked -> share(intent.post)
-            is HomeIntent.PostClicked -> showPostDetail(intent.post)
-            HomeIntent.DismissPost -> closePostDetial()
+            is HomeIntent.PostClicked -> showPostDetail(intent.postId)
+            HomeIntent.DismissPost -> closePostDetail()
             HomeIntent.ErrorShown -> clearError()
             is HomeIntent.ChangeLevel -> changeLevel(intent.level)
+            is HomeIntent.ShowRefreshErrorSnackbar -> {
+                viewModelScope.launch { _sideEffects.send(HomeSideEffect.ShowSnackbar(intent.message)) }
+            }
         }
     }
 
@@ -156,34 +130,8 @@ class HomeViewModel(
         }
     }
 
-
-
     private fun updateState(update: (HomeState) -> HomeState) {
         _uiState.update(update)
-    }
-
-    private fun refresh() {
-        val currentLevel = _uiState.value.postLevel
-        viewModelScope.launch {
-            refreshPostsList(currentLevel)
-        }
-    }
-
-    private var searchJob: Job? = null
-
-    private fun updateSearchQuery(query: String) {
-        updateState { it.copy(query = query) }
-        searchJob?.cancel()
-        if (query.isBlank()) {
-            updateState { it.copy(searchPostsFlow = null) }
-            return
-        }
-        val currentLevel = _uiState.value.postLevel
-        searchJob = viewModelScope.launch {
-            delay(300)
-            val flow = feedRepository.getPagedSearchPosts(query, currentLevel).cachedIn(viewModelScope)
-            updateState { it.copy(searchPostsFlow = flow) }
-        }
     }
 
     private fun navigateToCreatePost() {
@@ -194,80 +142,52 @@ class HomeViewModel(
         viewModelScope.launch { _sideEffects.send(HomeSideEffect.NavigateToProfile) }
     }
 
-    private fun like(postId: String, currentIsLiked: Boolean, currentLikesCount: Int) {
-        val targetIsLiked = !currentIsLiked
-        val targetLikesCount = if (targetIsLiked) currentLikesCount + 1 else (currentLikesCount - 1).coerceAtLeast(0)
-        updateOverride(postId, isLiked = targetIsLiked, likesCount = targetLikesCount)
-
+    private fun like(postId: String) {
         viewModelScope.launch {
             when (val result = postRepository.likePost(postId)) {
-                is DataState.Error -> {
-                    // Revert override on error
-                    updateOverride(postId, isLiked = currentIsLiked, likesCount = currentLikesCount)
-                    handleError(result.exception)
-                }
+                is DataState.Error -> handleError(result.exception)
                 else -> Unit
             }
         }
     }
 
     private fun report(postId: String, reason: String?) {
-        val currentIsReported = _uiState.value.postOverrides[postId]?.isReported ?: false
-        updateOverride(postId, isReported = true)
         viewModelScope.launch {
             when (val result = postRepository.reportPost(postId, reason)) {
-                is DataState.Success -> {}
-                is DataState.Error -> {
-                    updateOverride(postId, isReported = currentIsReported)
-                    handleError(result.exception)
-                }
+                is DataState.Error -> handleError(result.exception)
                 else -> Unit
             }
         }
     }
 
-    private fun openComments(postId: String, currentCommentsCount: Int) {
-        val existingOverride = _uiState.value.postOverrides[postId]
-        if (existingOverride?.commentsFlow == null) {
+    private fun openComments(postId: String) {
+        val existingFlow = _uiState.value.commentFlows[postId]
+        if (existingFlow == null) {
             val flow = postRepository.getPagedComments(postId).cachedIn(viewModelScope)
-            updateOverride(postId, commentsFlow = flow, commentsCount = existingOverride?.commentsCount ?: currentCommentsCount)
+            updateState { 
+                it.copy(
+                    commentFlows = it.commentFlows + (postId to flow),
+                    showCommentsSheetForPostId = postId
+                ) 
+            }
+        } else {
+            updateState { it.copy(showCommentsSheetForPostId = postId) }
         }
-        updateState { it.copy(showCommentsSheetForPostId = postId) }
     }
 
     private fun dismissComments() {
         updateState { it.copy(showCommentsSheetForPostId = null) }
     }
 
-    private fun comment(postId: String, comment: String, currentCommentCount: Int) {
-        updateOverride(postId, commentsCount = currentCommentCount + 1)
-        val optimisticComment = Comment(
-            id = "temp_${Clock.System.now()}",
-            postId = postId,
-            text = comment,
-            timeAgo = "Just now",
-            userName = "You",
-            userImageUrl = _uiState.value.currentUserImage
-        )
-        
-        val currentFlow = _uiState.value.postOverrides[postId]?.commentsFlow
-        if (currentFlow != null) {
-            val updatedFlow = currentFlow.map { pagingData ->
-                pagingData.insertHeaderItem(item = optimisticComment)
-            }
-            updateOverride(postId, commentsFlow = updatedFlow)
-        }
-
+    private fun comment(postId: String, comment: String) {
         viewModelScope.launch {
             when (val result = postRepository.addComment(postId, comment)) {
-                is DataState.Success -> {
-                    // Do nothing
+                is DataState.Error -> handleError(result.exception)
+                else -> {
+                    // When comment is successfully added to backend, we could optionally trigger a local reload 
+                    // of the comment paging flow if needed, but since it's an optimistic update on post's 
+                    // comment count, the count will increment anyway.
                 }
-                is DataState.Error -> {
-                    updateOverride(postId, commentsCount = currentCommentCount)
-                    handleError(result.exception)
-                }
-                else -> Unit
             }
         }
     }
@@ -290,49 +210,28 @@ class HomeViewModel(
         _sideEffects.send(HomeSideEffect.ShowError(message))
     }
 
-    private fun showPostDetail(post : Post) {
-        updateState { it.copy(expandedPost = post) }
+    private fun showPostDetail(postId: String) {
+        updateState { it.copy(expandedPostId = postId) }
     }
 
-    private fun closePostDetial(){
-        updateState { it.copy(expandedPost = null) }
-    }
-
-    private fun updateOverride(
-        postId: String,
-        isLiked: Boolean? = null,
-        likesCount: Int? = null,
-        commentsCount: Int? = null,
-        isReported: Boolean? = null,
-        commentsFlow: Flow<PagingData<Comment>>? = null
-    ) {
-        updateState { currentState ->
-            val existingOverride = currentState.postOverrides[postId]
-            val newOverride = PostOverride(
-                isLiked = isLiked ?: existingOverride?.isLiked,
-                likesCount = likesCount ?: existingOverride?.likesCount,
-                commentsCount = commentsCount ?: existingOverride?.commentsCount,
-                isReported = isReported ?: existingOverride?.isReported,
-                commentsFlow = commentsFlow ?: existingOverride?.commentsFlow
-            )
-            currentState.copy(postOverrides = currentState.postOverrides + (postId to newOverride))
-        }
+    private fun closePostDetail() {
+        updateState { it.copy(expandedPostId = null) }
     }
 }
 
 sealed interface HomeIntent {
-    data object Refresh : HomeIntent
+    data class ShowRefreshErrorSnackbar(val message: String) : HomeIntent
     data class SearchQueryChanged(val query: String) : HomeIntent
     data object CreatePostClicked : HomeIntent
     data object ProfileClicked : HomeIntent
     data class ReportClicked(val postId: String, val reason: String) : HomeIntent
-    data class CommentsIconClicked(val postId: String, val currentCommentsCount: Int) : HomeIntent
+    data class CommentsIconClicked(val postId: String) : HomeIntent
     data object DismissCommentsSheet : HomeIntent
 
-    data class LikeClicked(val postId: String, val currentIsLiked: Boolean, val currentLikesCount: Int) : HomeIntent
-    data class CommentSubmitted(val postId: String, val commentText: String, val currentCommentCount: Int) : HomeIntent
+    data class LikeClicked(val postId: String) : HomeIntent
+    data class CommentSubmitted(val postId: String, val commentText: String) : HomeIntent
     data class ShareClicked(val post: Post) : HomeIntent
-    data class PostClicked(val post: Post) : HomeIntent
+    data class PostClicked(val postId: String) : HomeIntent
     data object DismissPost : HomeIntent
     data object ErrorShown : HomeIntent
     data class ChangeLevel(val level: PostLevel) : HomeIntent
@@ -340,16 +239,11 @@ sealed interface HomeIntent {
 
 data class HomeState(
     val postLevel: PostLevel = PostLevel.LOCALITY,
-    val activeIssues: Int = 0,
-    val isRefreshing: Boolean = false,
-    val isLocalLoading: Boolean = true,
-    val postsFlow: Flow<PagingData<Post>>? = null,
-    val searchPostsFlow: Flow<PagingData<Post>>? = null,
     val query: String = "",
     val error: String? = null,
-    val postOverrides: Map<String, PostOverride> = emptyMap(),
+    val commentFlows: Map<String, Flow<PagingData<Comment>>> = emptyMap(),
     val showCommentsSheetForPostId: String? = null,
-    val expandedPost : Post? = null,
+    val expandedPostId: String? = null,
     val currentUserImage: String? = null
 )
 
@@ -360,11 +254,3 @@ sealed interface HomeSideEffect {
     data class ShowSnackbar(val message: String) : HomeSideEffect
     data class SharePost(val text: String) : HomeSideEffect
 }
-
-data class PostOverride(
-    val isLiked: Boolean? = null,
-    val likesCount: Int? = null,
-    val commentsCount: Int? = null,
-    val isReported: Boolean? = null,
-    val commentsFlow: Flow<PagingData<Comment>>? = null
-)

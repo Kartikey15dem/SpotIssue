@@ -35,6 +35,12 @@ interface PostDao {
     suspend fun getPostById(postId: String): PostEntity?
 
     /**
+     * Observe post by ID
+     */
+    @Query("SELECT * FROM posts WHERE id = :postId")
+    fun observePost(postId: String): Flow<PostEntity?>
+
+    /**
      * Insert posts (replace if conflict)
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)

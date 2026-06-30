@@ -1,6 +1,6 @@
 package org.example.project.core.data.repositoryImp
 
-import co.touchlab.kermit.Logger
+
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
@@ -24,18 +24,17 @@ import org.example.project.core.utils.DataState
 import org.example.project.core.utils.safeApiCall
 import org.example.project.core.data.mappers.toPost
 
+
 class FeedRepositoryImpl(
     private val homeService: HomeService,
     private val database: IssueSpotDatabase,
     private val localDataSource: FeedLocalDataSource,
     private val networkMonitor: NetworkMonitor,
 ) : FeedRepository {
-    private val logger = Logger.withTag("FeedRepository")
-
     @OptIn(ExperimentalPagingApi::class)
     override fun getPagedPosts(postLevel: PostLevel, userLocation: UserLocation, forceRefresh: Boolean): Flow<PagingData<Post>> {
         return Pager(
-            config = PagingConfig(pageSize = 5),
+            config = PagingConfig(pageSize = 10, initialLoadSize = 10, prefetchDistance = 5, enablePlaceholders = false),
             remoteMediator = FeedPostsRemoteMediator(
                 postLevel = postLevel,
                 userLocation = userLocation,
@@ -45,7 +44,9 @@ class FeedRepositoryImpl(
                 forceRefresh = forceRefresh,
                 networkMonitor = networkMonitor,
             ),
-            pagingSourceFactory = { database.postDao().pagingSourceByLevel(postLevel.name) },
+            pagingSourceFactory = {
+                database.postDao().pagingSourceByLevel(postLevel.name)
+            },
         ).flow.map { pagingData ->
             pagingData.map { entity -> entity.toPost() }
         }
@@ -58,7 +59,7 @@ class FeedRepositoryImpl(
 
     override fun getPagedSearchPosts(query: String, postLevel: PostLevel): Flow<PagingData<Post>> {
         return Pager(
-            config = PagingConfig(pageSize = 10),
+            config = PagingConfig(pageSize = 10, initialLoadSize = 10, prefetchDistance = 5, enablePlaceholders = false),
             pagingSourceFactory = { SearchPostsPagingSource(homeService, query, postLevel, networkMonitor) }
         ).flow
     }

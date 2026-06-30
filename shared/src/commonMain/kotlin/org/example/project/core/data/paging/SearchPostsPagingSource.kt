@@ -25,7 +25,7 @@ class SearchPostsPagingSource(
     }
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Post> {
-        val page = params.key ?: 1
+        val page = params.key ?: 0
         val limit = params.loadSize
 
         return when (val result = safeApiCall(networkMonitor) {
@@ -43,7 +43,7 @@ class SearchPostsPagingSource(
 
             LoadResult.Page(
                 data = posts,
-                prevKey = if (page == 1) null else page - 1,
+                prevKey = if (page == 0) null else page - 1,
                 nextKey = if (endReached) null else page + 1,
             )
             }

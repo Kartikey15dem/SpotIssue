@@ -62,7 +62,7 @@ class ProfileRepositoryImpl(
     @OptIn(ExperimentalPagingApi::class, ExperimentalCoroutinesApi::class)
     override fun getPagedUserPosts(sort: String): Flow<PagingData<Post>> {
         return Pager(
-            config = PagingConfig(pageSize = 20),
+            config = PagingConfig(pageSize = 10, initialLoadSize = 10, prefetchDistance = 5, enablePlaceholders = false),
             remoteMediator = ProfileUserPostsRemoteMediator(
                 profileService = profileService,
                 database = database,
@@ -72,9 +72,9 @@ class ProfileRepositoryImpl(
             ),
             pagingSourceFactory = { 
                 when (sort.uppercase()) {
-                    "OLDEST" -> database.userPostDao().pagingSourceOldest()
-                    "POPULAR" -> database.userPostDao().pagingSourcePopular()
-                    else -> database.userPostDao().pagingSource()
+                    "OLDEST" -> database.userPostDao().pagingSourceOldest(sort)
+                    "POPULAR" -> database.userPostDao().pagingSourcePopular(sort)
+                    else -> database.userPostDao().pagingSource(sort)
                 }
             },
         ).flow.map { pagingData ->
@@ -85,7 +85,7 @@ class ProfileRepositoryImpl(
     @OptIn(ExperimentalPagingApi::class, ExperimentalCoroutinesApi::class)
     override fun getPagedLikedPosts(sort: String): Flow<PagingData<Post>> {
         return Pager(
-            config = PagingConfig(pageSize = 20),
+            config = PagingConfig(pageSize = 10, initialLoadSize = 10, prefetchDistance = 5, enablePlaceholders = false),
             remoteMediator = ProfileLikedPostsRemoteMediator(
                 profileService = profileService,
                 database = database,
@@ -95,9 +95,9 @@ class ProfileRepositoryImpl(
             ),
             pagingSourceFactory = { 
                 when (sort.uppercase()) {
-                    "OLDEST" -> database.likedPostDao().pagingSourceOldest()
-                    "POPULAR" -> database.likedPostDao().pagingSourcePopular()
-                    else -> database.likedPostDao().pagingSource()
+                    "OLDEST" -> database.likedPostDao().pagingSourceOldest(sort)
+                    "POPULAR" -> database.likedPostDao().pagingSourcePopular(sort)
+                    else -> database.likedPostDao().pagingSource(sort)
                 }
             },
         ).flow.map { pagingData ->
@@ -108,7 +108,7 @@ class ProfileRepositoryImpl(
     override fun observeUserPosts(sort: String): Flow<List<Post>> {
         val flow = when (sort.uppercase()) {
             "OLDEST" -> database.userPostDao().observeUserPostsOldest()
-            "POPULAR" -> database.userPostDao().observeUserPostsPopular()
+            "POPULAR" -> database.userPostDao().observeUserPostsPopular(sort)
             else -> database.userPostDao().observeUserPosts()
         }
         return flow.map { posts -> posts.map { it.toPost() } }
@@ -117,7 +117,7 @@ class ProfileRepositoryImpl(
     override fun observeLikedPosts(sort: String): Flow<List<Post>> {
         val flow = when (sort.uppercase()) {
             "OLDEST" -> database.likedPostDao().observeLikedPostsOldest()
-            "POPULAR" -> database.likedPostDao().observeLikedPostsPopular()
+            "POPULAR" -> database.likedPostDao().observeLikedPostsPopular(sort)
             else -> database.likedPostDao().observeLikedPosts()
         }
         return flow.map { posts -> posts.map { it.toPost() } }
@@ -128,7 +128,7 @@ class ProfileRepositoryImpl(
             val posts = profileService.getMyPosts(page = 1, limit = 100, sort = sort)
                 .items
                 .map { it.toPost() }
-            database.userPostDao().insertPosts(posts.map { it.toUserPostEntity() })
+            database.userPostDao().insertPosts(posts.map { it.toUserPostEntity(sort = sort) })
             posts
         }
 
@@ -137,7 +137,7 @@ class ProfileRepositoryImpl(
             val posts = profileService.getMyLikedPosts(page = 1, limit = 100, sort = sort)
                 .items
                 .map { it.toPost() }
-            database.likedPostDao().insertPosts(posts.map { it.toLikedPostEntity() })
+            database.likedPostDao().insertPosts(posts.map { it.toLikedPostEntity(sort = sort) })
             posts
         }
 
@@ -220,8 +220,8 @@ class ProfileRepositoryImpl(
     override suspend fun logOut() {
         prefRepository.logOut()
         withContext(Dispatchers.IO) {
-            database.userPostDao().deleteAllUserPosts()
-            database.likedPostDao().deleteAllLikedPosts()
+            database.userPostDao().clearAll()
+            database.likedPostDao().clearAll()
             localDataSource.clearProfile()
         }
     }

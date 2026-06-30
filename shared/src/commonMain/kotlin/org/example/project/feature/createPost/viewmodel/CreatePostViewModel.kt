@@ -107,9 +107,6 @@ class CreatePostViewModel(
         }
     }
 
-    fun setDescription(description: String) = onIntent(CreatePostIntent.DescriptionChanged(description))
-    fun submitPost() = onIntent(CreatePostIntent.PostIssueClicked)
-    fun close() = onIntent(CreatePostIntent.CloseClicked)
 
     private fun changeDescription(description: String) {
         _uiState.value = _uiState.value.copy(description = description)

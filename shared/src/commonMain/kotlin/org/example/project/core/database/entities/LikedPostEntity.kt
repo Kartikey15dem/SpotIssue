@@ -6,10 +6,10 @@ import androidx.room.PrimaryKey
 /**
  * Room entity for storing user's liked posts locally
  */
-@Entity(tableName = "liked_posts")
+@Entity(tableName = "liked_posts", primaryKeys = ["id", "sort"])
 data class LikedPostEntity(
-    @PrimaryKey
     val id: String,
+    val sort: String,
     val userId: String,
     val userName: String,
     val userAvatar: String? = null,

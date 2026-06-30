@@ -112,32 +112,64 @@ fun OTPContent(
 
         Spacer(modifier = Modifier.height(spacing.huge))
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(spacing.smallMedium),
-            modifier = Modifier.padding(horizontal = spacing.medium)
-        ) {
-            repeat(6) { index ->
-                val digit = otpDigits.getOrNull(index) ?: ""
-                OTPDigitField(
-                    value = digit,
-                    onValueChange = { newValue ->
-                        val list = MutableList(6) { i -> otpDigits.getOrNull(i) ?: "" }
-                        list[index] = newValue
-                        val combined = list.joinToString(separator = "") { it }
-                        onAction(AuthIntent.OtpChanged(combined))
-                    },
-                    onNext = {
-                        focusRequesters.getOrNull(index + 1)?.requestFocus() ?: focusManager.clearFocus()
-                    },
-                    onPrevious = {
-                        focusRequesters.getOrNull(index - 1)?.requestFocus()
-                    },
-                    focusRequester = focusRequesters.getOrNull(index) ?: FocusRequester(),
-                    modifier = Modifier.weight(1f),
-                    enabled = !isLoading
-                )
+        BasicTextField(
+            value = otpString,
+            onValueChange = { newValue ->
+                if (newValue.length <= 6) {
+                    onAction(AuthIntent.OtpChanged(newValue))
+                }
+            },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.NumberPassword,
+                imeAction = ImeAction.Done
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = spacing.medium),
+            enabled = !isLoading,
+            decorationBox = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(spacing.smallMedium),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    repeat(6) { index ->
+                        val char = when {
+                            index >= otpString.length -> ""
+                            else -> otpString[index].toString()
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp)
+                                .border(
+                                    width = 1.dp,
+                                    color = if (char.isEmpty()) IssueSpotColors.Outline else IssueSpotColors.Primary,
+                                    shape = MaterialTheme.shapes.small
+                                )
+                                .background(IssueSpotColors.Surface),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (char.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .background(IssueSpotColors.Outline, CircleShape)
+                                )
+                            } else {
+                                Text(
+                                    text = char,
+                                    style = IssueSpotTypography.bodyLarge.copy(
+                                        textAlign = TextAlign.Center,
+                                        fontWeight = FontWeight.Bold,
+                                        color = IssueSpotColors.OnSurface
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
             }
-        }
+        )
 
         Spacer(modifier = Modifier.height(spacing.extraLarge))
 
@@ -182,105 +214,6 @@ fun OTPContent(
 
         Spacer(modifier = Modifier.weight(1f))
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun OTPDigitField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    onNext: () -> Unit = {},
-    onPrevious: () -> Unit = {},
-    modifier: Modifier = Modifier,
-    focusRequester: FocusRequester = remember { FocusRequester() },
-    enabled: Boolean = true
-) {
-    var textFieldValue by remember(value) {
-        mutableStateOf(
-            TextFieldValue(
-                text = value,
-                selection = TextRange(value.length)
-            )
-        )
-    }
-
-    var previousText by remember { mutableStateOf(value) }
-
-    LaunchedEffect(value) {
-        if (textFieldValue.text != value) {
-            textFieldValue = TextFieldValue(
-                text = value,
-                selection = TextRange(value.length)
-            )
-        }
-        previousText = value
-    }
-
-    BasicTextField(
-        value = textFieldValue,
-        onValueChange = { newTextFieldValue ->
-            val newText = newTextFieldValue.text.filter { it.isDigit() }
-
-            when {
-                newText.length == 1 -> {
-                    textFieldValue = TextFieldValue(text = newText, selection = TextRange(1))
-                    onValueChange(newText)
-                    onNext()
-                }
-                newText.length > 1 -> {
-                    val firstDigit = newText.first().toString()
-                    textFieldValue = TextFieldValue(text = firstDigit, selection = TextRange(1))
-                    onValueChange(firstDigit)
-                    onNext()
-                }
-                newText.isEmpty() && previousText.isNotEmpty() -> {
-                    textFieldValue = TextFieldValue(text = "", selection = TextRange(0))
-                    onValueChange("")
-                    onPrevious()
-                }
-                else -> {
-                    textFieldValue = TextFieldValue(text = newText, selection = TextRange(newText.length))
-                }
-            }
-
-            previousText = newText
-        },
-        modifier = modifier
-            .height(56.dp)
-            .border(
-                width = 1.dp,
-                color = if (value.isEmpty()) IssueSpotColors.Outline else IssueSpotColors.Primary,
-                shape = MaterialTheme.shapes.small
-            )
-            .background(IssueSpotColors.Surface)
-            .focusRequester(focusRequester),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Next
-        ),
-        singleLine = true,
-        enabled = enabled,
-        textStyle = IssueSpotTypography.bodyLarge.copy(
-            textAlign = TextAlign.Center,
-            fontWeight = FontWeight.Bold,
-            color = IssueSpotColors.OnSurface
-        ),
-        decorationBox = { innerTextField ->
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                if (value.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(IssueSpotColors.Outline, CircleShape)
-                    )
-                }
-                innerTextField()
-            }
-        }
-    )
 }
 
 @Preview

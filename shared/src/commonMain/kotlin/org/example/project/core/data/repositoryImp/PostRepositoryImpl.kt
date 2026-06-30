@@ -27,6 +27,7 @@ import androidx.paging.PagingData
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import okio.SYSTEM
 import org.example.project.core.network.dto.CommentDto
 import org.example.project.core.model.home.Comment
@@ -35,6 +36,7 @@ import org.example.project.core.utils.safeApiCall
 import org.example.project.core.database.IssueSpotDatabase
 import co.touchlab.kermit.Logger
 import org.example.project.core.database.entities.toEntity
+import org.example.project.core.database.entities.toPost
 import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.mappers.toUserPostEntity
 import org.example.project.core.utils.NetworkMonitor
@@ -52,55 +54,61 @@ class PostRepositoryImpl(
 
     override suspend fun likePost(postId: String): DataState<Unit> {
         logger.d { "Liking post: $postId" }
+        
+        val postEntity = database.postDao().getPostById(postId)
+        val userPostEntity = database.userPostDao().getPostById(postId)
+        val likedPostEntity = database.likedPostDao().getLikedPostById(postId)
+        
+        val isLikedCurrent = postEntity?.isLiked ?: userPostEntity?.isLiked ?: likedPostEntity?.isLiked ?: false
+        val likesCountCurrent = postEntity?.likes ?: userPostEntity?.likes ?: likedPostEntity?.likes ?: 0
+        
+        val newIsLiked = !isLikedCurrent
+        val newLikesCount = if (newIsLiked) likesCountCurrent + 1 else (likesCountCurrent - 1).coerceAtLeast(0)
+        
+        // Optimistic Update
+        database.postDao().updateLikeStatus(postId, newLikesCount, newIsLiked)
+        database.userPostDao().updatePostLikeStatus(postId, newLikesCount, newIsLiked)
+        database.likedPostDao().updatePostLikeStatus(postId, newLikesCount, newIsLiked)
+        
         val result = safeApiCall(networkMonitor) {
             postService.likePost(postId)
         }
-        if (result is DataState.Success) {
-            // Update local DB instantly
-            val isLikedCurrent = database.postDao().getPostById(postId)?.isLiked
-                ?: database.userPostDao().getPostById(postId)?.isLiked
-                ?: database.likedPostDao().getLikedPostById(postId)?.isLiked
-                ?: false
-                
-            val likesCountCurrent = database.postDao().getPostById(postId)?.likes
-                ?: database.userPostDao().getPostById(postId)?.likes
-                ?: database.likedPostDao().getLikedPostById(postId)?.likes
-                ?: 0
-
-            val newIsLiked = !isLikedCurrent
-            val newLikesCount = if (newIsLiked) likesCountCurrent + 1 else (likesCountCurrent - 1).coerceAtLeast(0)
-            
-            database.postDao().updateLikeStatus(postId, newLikesCount, newIsLiked)
-            database.userPostDao().updatePostLikeStatus(postId, newLikesCount, newIsLiked)
-            database.likedPostDao().updatePostLikeStatus(postId, newLikesCount, newIsLiked)
-            
-            // Sync with fresh data from API
-            safeApiCall(networkMonitor) { postService.getPost(postId) }.let { freshResult ->
-                if (freshResult is DataState.Success) {
-                    val existingCachedAt = database.postDao().getPostById(postId)?.cachedAt 
-                        ?: Clock.System.now().toEpochMilliseconds()
-                    val entity = freshResult.data.toPost().toEntity(cachedAt = existingCachedAt)
-                    database.postDao().insertPosts(listOf(entity))
-                }
-            }
-        } else {
-            logger.e { "Failed to like post: $postId" }
+        
+        if (result is DataState.Error) {
+            logger.e { "Failed to like post: $postId. Rolling back." }
+            database.postDao().updateLikeStatus(postId, likesCountCurrent, isLikedCurrent)
+            database.userPostDao().updatePostLikeStatus(postId, likesCountCurrent, isLikedCurrent)
+            database.likedPostDao().updatePostLikeStatus(postId, likesCountCurrent, isLikedCurrent)
         }
+        
         return result
     }
 
     override suspend fun reportPost(postId: String, reason: String?): DataState<Unit> {
         logger.d { "Reporting post: $postId, reason: $reason" }
+        
+        val postEntity = database.postDao().getPostById(postId)
+        val userPostEntity = database.userPostDao().getPostById(postId)
+        val likedPostEntity = database.likedPostDao().getLikedPostById(postId)
+        
+        val isReportedCurrent = postEntity?.isReported ?: userPostEntity?.isReported ?: likedPostEntity?.isReported ?: false
+        
+        // Optimistic Update
+        database.postDao().updateReportStatus(postId, true)
+        database.userPostDao().updateReportStatus(postId, true)
+        database.likedPostDao().updateReportStatus(postId, true)
+        
         val result = safeApiCall(networkMonitor) {
             postService.reportPost(postId, ReportPostRequestDto(reason))
         }
-        if (result is DataState.Success) {
-            database.postDao().updateReportStatus(postId, true)
-            database.userPostDao().updateReportStatus(postId, true)
-            database.likedPostDao().updateReportStatus(postId, true)
-        } else {
-            logger.e { "Failed to report post: $postId" }
+        
+        if (result is DataState.Error) {
+            logger.e { "Failed to report post: $postId. Rolling back." }
+            database.postDao().updateReportStatus(postId, isReportedCurrent)
+            database.userPostDao().updateReportStatus(postId, isReportedCurrent)
+            database.likedPostDao().updateReportStatus(postId, isReportedCurrent)
         }
+        
         return result
     }
 
@@ -117,7 +125,7 @@ class PostRepositoryImpl(
 
     override fun getPagedComments(postId: String): Flow<PagingData<Comment>> {
         return Pager(
-            config = PagingConfig(pageSize = 20),
+            config = PagingConfig(pageSize = 20, enablePlaceholders = false),
             pagingSourceFactory = { CommentPagingSource(postService, postId, networkMonitor) }
         ).flow
     }
@@ -132,31 +140,30 @@ class PostRepositoryImpl(
 
     override suspend fun addComment(postId: String, comment: String): DataState<Unit> {
         logger.d { "Adding comment to post: $postId" }
+        
+        val postEntity = database.postDao().getPostById(postId)
+        val userPostEntity = database.userPostDao().getPostById(postId)
+        val likedPostEntity = database.likedPostDao().getLikedPostById(postId)
+        
+        val commentsCountCurrent = postEntity?.comments ?: userPostEntity?.comments ?: likedPostEntity?.comments ?: 0
+        val newCommentsCount = commentsCountCurrent + 1
+        
+        // Optimistic Update
+        database.postDao().updateCommentsCount(postId, newCommentsCount)
+        database.userPostDao().updateCommentsCount(postId, newCommentsCount)
+        database.likedPostDao().updateCommentsCount(postId, newCommentsCount)
+        
         val result = safeApiCall(networkMonitor) {
             postService.addComment(postId, AddCommentRequestDto(comment))
         }
-        if (result is DataState.Success) {
-            val commentsCountCurrent = database.postDao().getPostById(postId)?.comments
-                ?: database.userPostDao().getPostById(postId)?.comments
-                ?: database.likedPostDao().getLikedPostById(postId)?.comments
-                ?: 0
-
-            val newCommentsCount = commentsCountCurrent + 1
-            database.postDao().updateCommentsCount(postId, newCommentsCount)
-            database.userPostDao().updateCommentsCount(postId, newCommentsCount)
-            database.likedPostDao().updateCommentsCount(postId, newCommentsCount)
-            
-            
-            safeApiCall(networkMonitor) { postService.getPost(postId) }.let { freshResult ->
-                if (freshResult is DataState.Success) {
-                    val existingCachedAt = database.postDao().getPostById(postId)?.cachedAt 
-                        ?: Clock.System.now().toEpochMilliseconds()
-                    database.postDao().insertPosts(listOf(freshResult.data.toPost().toEntity(cachedAt = existingCachedAt)))
-                }
-            }
-        } else {
-            logger.e { "Failed to add comment to post: $postId" }
+        
+        if (result is DataState.Error) {
+            logger.e { "Failed to add comment to post: $postId. Rolling back." }
+            database.postDao().updateCommentsCount(postId, commentsCountCurrent)
+            database.userPostDao().updateCommentsCount(postId, commentsCountCurrent)
+            database.likedPostDao().updateCommentsCount(postId, commentsCountCurrent)
         }
+        
         return result
     }
 
@@ -165,6 +172,7 @@ class PostRepositoryImpl(
         val request = CreatePostRequestDto(
             postText = post.postText,
             mediaType = post.mediaType?.name,
+            postLevel = post.postLevel,
             locality = post.location.locality,
             district = post.location.district,
             state = post.location.state,
@@ -189,14 +197,6 @@ class PostRepositoryImpl(
             val path = filePath.toPath()
             val fileName = path.name
             
-            /* WHY WE USE SYSTEM SOURCE & BYTE READ CHANNEL:
-             * In KMP (Kotlin Multiplatform), we cannot rely on `java.io.File`. 
-             * We use Okio's `FileSystem.SYSTEM.source` for cross-platform file reading.
-             * Then, because Ktor's `PartData.FileItem` requires an `Input` provider, 
-             * we wrap the raw byte array in a Ktor `ByteReadChannel`. This allows 
-             * efficient, non-blocking streaming of large files (like videos or PDFs)
-             * to the backend without loading everything into memory at once during the HTTP call.
-             */
             val bytes = FileSystem.SYSTEM.source(path).buffer().readByteArray()
             
             multipartParts.add(
@@ -218,16 +218,14 @@ class PostRepositoryImpl(
 
         if (result is DataState.Success) {
             val createdPost = result.data
-            // 1. Add to user posts for instant visibility
-            database.userPostDao().insertPosts(listOf(createdPost.toUserPostEntity()))
+            database.userPostDao().insertPosts(listOf(createdPost.toUserPostEntity(sort = "LATEST")))
             
-            // 2. Update profile stats locally
             val profile = database.profileDao().getProfile()
             if (profile != null) {
                 val newTotalPosts = profile.totalPosts + 1
                 val postByArea = profile.postByAreaStr?.split(",")?.map { it.toIntOrNull() ?: 0 }?.toMutableList() ?: mutableListOf(0, 0, 0, 0)
                 if (postByArea.size >= 4) {
-                    postByArea[0] = postByArea[0] + 1 // Add to LOCALITY level
+                    postByArea[0] = postByArea[0] + 1
                 }
                 val newPostByAreaStr = postByArea.joinToString(",")
                 
@@ -243,16 +241,24 @@ class PostRepositoryImpl(
 
     override suspend fun deletePost(postId: String): DataState<Unit> {
         logger.d { "Deleting post: $postId" }
-        // Delete locally first for instant UI feedback
+        
+        val postEntity = database.postDao().getPostById(postId)
+        val userPostEntity = database.userPostDao().getPostById(postId)
+        val likedPostEntity = database.likedPostDao().getLikedPostById(postId)
+        
         database.postDao().deletePostById(postId)
-        database.userPostDao().deletePost(postId)
-        database.likedPostDao().deleteLikedPost(postId)
+        if (userPostEntity != null) database.userPostDao().deletePost(postId)
+        if (likedPostEntity != null) database.likedPostDao().deleteLikedPost(postId)
         
         val result = safeApiCall(networkMonitor) {
             postService.deletePost(postId)
         }
-        if (result !is DataState.Success) {
-            logger.e { "Failed to delete post: $postId" }
+        
+        if (result is DataState.Error) {
+            logger.e { "Failed to delete post: $postId. Rolling back." }
+            if (postEntity != null) database.postDao().insertPosts(listOf(postEntity))
+            if (userPostEntity != null) database.userPostDao().insertPosts(listOf(userPostEntity))
+            if (likedPostEntity != null) database.likedPostDao().insertPosts(listOf(likedPostEntity))
         }
         return result
     }
@@ -260,5 +266,9 @@ class PostRepositoryImpl(
     override suspend fun getPost(postId: String): DataState<Post> = safeApiCall(networkMonitor) {
         val dto = postService.getPost(postId)
         dto.toPost()
+    }
+
+    override fun observePost(postId: String): Flow<Post?> {
+        return database.postDao().observePost(postId).map { it?.toPost() }
     }
 }

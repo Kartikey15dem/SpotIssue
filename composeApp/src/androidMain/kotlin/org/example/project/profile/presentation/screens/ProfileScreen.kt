@@ -43,6 +43,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import org.example.project.core.components.CommentsBottomSheet
 import android.content.Intent
+import androidx.compose.runtime.key
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Snackbar
@@ -176,6 +177,31 @@ fun ProfileScreenContent(
     var postToDelete by remember { mutableStateOf<String?>(null) }
     val spacing = IssueSpotTheme.spacing
 
+    val refreshState = pagingItems?.loadState?.refresh
+    val mediatorState = pagingItems?.loadState?.mediator?.refresh
+
+    val isRefreshLoading = refreshState is LoadState.Loading
+    val isMediatorRefreshLoading = mediatorState is LoadState.Loading
+    val isRefreshIdle = refreshState is LoadState.NotLoading
+    val isMediatorIdle = mediatorState is LoadState.NotLoading
+    val refreshError = (refreshState as? LoadState.Error) ?: (mediatorState as? LoadState.Error)
+
+    val appendState = pagingItems?.loadState?.append
+    val mediatorAppendState = pagingItems?.loadState?.mediator?.append
+
+    val isAppendLoading = appendState is LoadState.Loading || mediatorAppendState is LoadState.Loading
+    val isAppendFinished = appendState is LoadState.NotLoading
+    val isMediatorAppendFinished = mediatorAppendState is LoadState.NotLoading
+    val appendError = (appendState as? LoadState.Error) ?: (mediatorAppendState as? LoadState.Error)
+    
+    val isAppendEndOfPagination = isAppendFinished && isMediatorAppendFinished && mediatorAppendState?.endOfPaginationReached == true
+
+    LaunchedEffect(refreshError) {
+        if (refreshError != null && (pagingItems?.itemCount ?: 0) > 0) {
+            onIntent(ProfileIntent.ShowRefreshErrorSnackbar(refreshError.error.message ?: "An error occurred"))
+        }
+    }
+
     if (state.profile == null) {
         Box(
             modifier = modifier.fillMaxSize(),
@@ -246,8 +272,7 @@ fun ProfileScreenContent(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = spacing.medium),
-                    verticalArrangement = Arrangement.spacedBy(spacing.smallMedium)
+                        .padding(horizontal = spacing.medium)
                 ) {
                     item { Spacer(Modifier.height(spacing.small)) }
 
@@ -294,141 +319,159 @@ fun ProfileScreenContent(
                         ProfilePostTabsHeader(state, onIntent)
                     }
 
-                    if (pagingItems != null) {
-                        val refreshError = pagingItems.loadState.refresh as? LoadState.Error
-                        val appendError = pagingItems.loadState.append as? LoadState.Error
-
-                        if (refreshError != null && pagingItems.itemCount == 0) {
-                            item {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(spacing.huge),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = refreshError.error.message ?: "An error occurred",
-                                        color = IssueSpotColors.OnBackground,
-                                        style = IssueSpotTypography.bodyMedium
-                                    )
-                                    Spacer(Modifier.height(spacing.small))
-                                    Button(
-                                        onClick = { pagingItems.refresh() },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = IssueSpotColors.Primary,
-                                            contentColor = IssueSpotColors.OnPrimary
-                                        )
-                                    ) {
-                                        Text("Retry")
-                                    }
-                                }
-                            }
-                        } else if (pagingItems.loadState.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(200.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator(color = IssueSpotColors.Primary)
-                                }
-                            }
-                        } else if (pagingItems.loadState.refresh is LoadState.NotLoading && pagingItems.itemCount == 0) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(spacing.huge),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "No posts found",
-                                        color = IssueSpotColors.OnBackground,
-                                        style = IssueSpotTypography.bodyLarge
-                                    )
-                                }
-                            }
-                        } else {
-                            items(
-                                count = pagingItems.itemCount,
-                                key = pagingItems.itemKey { it.id }
-                            ) { index ->
-                                val post = pagingItems[index]
-                                if (post != null) {
-                                    val override = state.postOverrides[post.id]
-
-                                    val isLiked = override?.isLiked ?: post.isLiked
-                                    val resolvedLikes = override?.likesCount ?: post.likes
-                                    val resolvedComments = override?.commentsCount ?: post.comments
-                                    val isReported = override?.isReported ?: post.isReported
-
-                                    PostCard(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        post = post,
-                                        isLiked = isLiked,
-                                        likesCount = resolvedLikes,
-                                        commentsCount = resolvedComments,
-                                        isReported = isReported,
-                                        canDelete = state.isMine,
-                                        canReport = !state.isMine,
-                                        onDeleteClick = { postToDelete = post.id },
-                                        onLikeClick = {
-                                            onIntent(ProfileIntent.LikeClicked(post.id, isLiked, resolvedLikes))
-                                        },
-                                        onCommentIconClick = {
-                                            onIntent(ProfileIntent.CommentsIconClicked(post.id, resolvedComments))
-                                        },
-                                        onShareClick = { onIntent(ProfileIntent.ShareClicked(post)) },
-                                        onReportClick = { reason -> 
-                                            onIntent(ProfileIntent.ReportClicked(post.id, reason)) 
-                                        },
-                                        onPostClick = { onIntent(ProfileIntent.PostClicked(post)) }
-                                    )
-                                }
+                    if (state.activePostsFlow == null) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().height(300.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = IssueSpotColors.Primary)
                             }
                         }
-
-                        if (pagingItems.loadState.append is LoadState.Loading) {
-                            item {
-                                Box(modifier = Modifier.fillMaxWidth().padding(spacing.medium), contentAlignment = Alignment.Center) {
-                                    CircularProgressIndicator(color = IssueSpotColors.Primary)
-                                }
+                    } else if ((pagingItems?.itemCount ?: 0) == 0 && (isRefreshLoading || isMediatorRefreshLoading)) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().height(300.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = IssueSpotColors.Primary)
                             }
                         }
-
-                        if (appendError != null && pagingItems.itemCount > 0) {
-                            item {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = appendError.error.message ?: "An error occurred",
-                                        color = IssueSpotColors.OnBackground,
-                                        style = IssueSpotTypography.bodyMedium
-                                    )
-                                    Spacer(Modifier.height(spacing.small))
-                                    Button(
-                                        onClick = { pagingItems.retry() },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = IssueSpotColors.Primary,
-                                            contentColor = IssueSpotColors.OnPrimary
-                                        )
-                                    ) {
-                                        Text("Retry")
-                                    }
-                                }
-                            }
-                        } else if (pagingItems.loadState.append is LoadState.NotLoading && pagingItems.loadState.append.endOfPaginationReached && pagingItems.itemCount > 0) {
-                            item {
-                                androidx.compose.material3.Text(
-                                    modifier = Modifier.fillMaxWidth().padding(spacing.medium),
-                                    text = "No more posts",
+                    } else if ((pagingItems?.itemCount ?: 0) == 0 && refreshError != null) {
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(300.dp)
+                                    .padding(spacing.medium),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = refreshError.error.message ?: "An error occurred",
                                     color = IssueSpotColors.OnBackground,
-                                    style = IssueSpotTypography.bodyMedium,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    style = IssueSpotTypography.bodyMedium
                                 )
+                                Spacer(Modifier.height(spacing.small))
+                                Button(
+                                    onClick = { pagingItems?.refresh() },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = IssueSpotColors.Primary,
+                                        contentColor = IssueSpotColors.OnPrimary
+                                    )
+                                ) {
+                                    Text("Retry")
+                                }
+                            }
+                        }
+                    } else if ((pagingItems?.itemCount ?: 0) == 0 && isRefreshIdle && isMediatorIdle && refreshError == null) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(300.dp)
+                                    .padding(spacing.huge),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No posts found",
+                                    color = IssueSpotColors.OnBackground,
+                                    style = IssueSpotTypography.bodyLarge
+                                )
+                            }
+                        }
+                    }
+
+                    items(
+                        count = pagingItems?.itemCount ?: 0,
+                        key = pagingItems?.itemKey { "${state.isMine}_${state.sort}_${it.id}" }
+                    ) { index ->
+                        val post = pagingItems?.get(index)
+                        if (post != null) {
+                            val override = state.postOverrides[post.id]
+
+                            val isLiked = override?.isLiked ?: post.isLiked
+                            val resolvedLikes = override?.likesCount ?: post.likes
+                            val resolvedComments = override?.commentsCount ?: post.comments
+                            val isReported = override?.isReported ?: post.isReported
+
+                            PostCard(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = spacing.smallMedium),
+                                post = post,
+                                isLiked = isLiked,
+                                likesCount = resolvedLikes,
+                                commentsCount = resolvedComments,
+                                isReported = isReported,
+                                canDelete = state.isMine,
+                                canReport = !state.isMine,
+                                onDeleteClick = { postToDelete = post.id },
+                                onLikeClick = {
+                                    onIntent(ProfileIntent.LikeClicked(post.id, isLiked, resolvedLikes))
+                                },
+                                onCommentIconClick = {
+                                    onIntent(ProfileIntent.CommentsIconClicked(post.id, resolvedComments))
+                                },
+                                onShareClick = { onIntent(ProfileIntent.ShareClicked(post)) },
+                                onReportClick = { reason -> 
+                                    onIntent(ProfileIntent.ReportClicked(post.id, reason)) 
+                                },
+                                onPostClick = { onIntent(ProfileIntent.PostClicked(post)) }
+                            )
+                        }
+                    }
+
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(72.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            when {
+                                isAppendLoading -> {
+                                    CircularProgressIndicator(color = IssueSpotColors.Primary)
+                                }
+                                appendError != null -> {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(spacing.medium),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Text(
+                                            text = appendError.error.message ?: "An error occurred",
+                                            color = IssueSpotColors.OnBackground,
+                                            style = IssueSpotTypography.bodyMedium
+                                        )
+                                        Spacer(Modifier.height(spacing.small))
+                                        Button(
+                                            onClick = { pagingItems?.retry() },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = IssueSpotColors.Primary,
+                                                contentColor = IssueSpotColors.OnPrimary
+                                            )
+                                        ) {
+                                            Text("Retry")
+                                        }
+                                    }
+                                }
+                                isAppendEndOfPagination && (pagingItems?.itemCount ?: 0) > 0 -> {
+                                    Text(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(spacing.medium),
+                                        text = "No more posts",
+                                        color = IssueSpotColors.OnBackground,
+                                        style = IssueSpotTypography.bodyMedium,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                                else -> {
+                                    // Empty state, box remains 72dp
+                                }
                             }
                         }
                     }
