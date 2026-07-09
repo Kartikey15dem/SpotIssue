@@ -19,6 +19,8 @@ import org.example.project.core.utils.NetworkMonitor
 import org.example.project.core.utils.DataState
 import org.example.project.core.utils.safeApiCall
 
+private const val DB_TRACE = "[DB_TRACE]"
+
 @OptIn(ExperimentalPagingApi::class)
 /**
  * ===================================================================================
@@ -51,7 +53,7 @@ class FeedPostsRemoteMediator(
     private val cacheMetadataDao = database.cacheMetadataDao()
 
     private val keyType = "FEED_${postLevel.name}"
-    private val maxCachedPosts = 100
+    private val maxCachedPosts = 1000
     override suspend fun initialize(): InitializeAction {
         val isStale = localDataSource.isPostsCacheStale(postLevel)
         return if (forceRefresh || isStale) {
@@ -111,6 +113,19 @@ class FeedPostsRemoteMediator(
                     )
                 }
 
+                println("""
+$DB_TRACE MEDIATOR START
+$DB_TRACE loadType=$loadType
+$DB_TRACE page=$page
+$DB_TRACE returnedPosts=${posts.size}
+$DB_TRACE first=${posts.firstOrNull()?.id}
+$DB_TRACE last=${posts.lastOrNull()?.id}
+$DB_TRACE nextKey=${response.nextKey}
+$DB_TRACE prevKey=${response.prevKey}
+$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
+$DB_TRACE =========================
+""")
+
                 if (loadType == LoadType.REFRESH) {
                     database.mediatorTransactionDao().refreshFeed(
                         postDao = postDao,
@@ -120,6 +135,12 @@ class FeedPostsRemoteMediator(
                         posts = posts,
                         remoteKeys = keys
                     )
+                    
+                    val afterRefresh = postDao.getPostsByLevel(postLevel.name).take(30)
+                    println("[DATABASE_ORDER] AFTER REFRESH | size=${afterRefresh.size}")
+                    afterRefresh.forEachIndexed { index, post ->
+                        println("[DATABASE_ORDER] $index | ${post.id} | ${post.cachedAt}")
+                    }
                 } else {
                     database.mediatorTransactionDao().appendPage(
                         postDao = postDao,
@@ -130,7 +151,21 @@ class FeedPostsRemoteMediator(
                         keyType = keyType,
                         maxCachedPosts = maxCachedPosts
                     )
+                    
+                    val afterAppend = postDao.getPostsByLevel(postLevel.name).take(30)
+                    println("[DATABASE_ORDER] AFTER APPEND | size=${afterAppend.size}")
+                    afterAppend.forEachIndexed { index, post ->
+                        println("[DATABASE_ORDER] $index | ${post.id} | ${post.cachedAt}")
+                    }
                 }
+
+                println("""
+$DB_TRACE MEDIATOR END
+$DB_TRACE loadType=$loadType
+$DB_TRACE page=$page
+$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
+$DB_TRACE =========================
+""")
 
                 response.activeIssuesCount?.let { count ->
                     localDataSource.cacheActiveIssues(postLevel, count)

@@ -55,38 +55,40 @@ fun PostDetailScreen(
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = IssueSpotColors.Primary)
             }
-        } else if (state.error != null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = state.error!!, color = IssueSpotColors.Error)
-            }
-        } else if (state.post != null) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                item {
-                    PostCard(
-                        post = state.post!!,
-                        isLiked = false, // You might want to implement proper liked state logic later
-                        likesCount = state.post!!.likes,
-                        commentsCount = state.post!!.comments,
-                        isReported = false,
-                        onLikeClick = { },
-                        onCommentIconClick = { },
-                        onShareClick = { },
-                        onReportClick = { }
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Comments",
-                        style = IssueSpotTypography.titleMedium,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                    HorizontalDivider(color = IssueSpotColors.Outline, thickness = 1.dp)
+        } else {
+            val error = state.error
+            val post = state.post
+            if (error != null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(text = error, color = IssueSpotColors.Error)
                 }
+            } else if (post != null) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {
+                    item {
+                        PostCard(
+                            post = post,
+                            isLiked = false, // You might want to implement proper liked state logic later
+                            likesCount = post.likes,
+                            commentsCount = post.comments,
+                            isReported = false,
+                            onLikeClick = { },
+                            onCommentIconClick = { },
+                            onShareClick = { },
+                            onReportClick = { }
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Comments",
+                            style = IssueSpotTypography.titleMedium,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                        HorizontalDivider(color = IssueSpotColors.Outline, thickness = 1.dp)
+                    }
 
-                if (comments != null) {
                     items(comments.itemCount) { index ->
                         comments[index]?.let { comment ->
                             CommentItem(comment)

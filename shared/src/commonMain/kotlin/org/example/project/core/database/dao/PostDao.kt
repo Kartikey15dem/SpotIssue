@@ -13,7 +13,7 @@ interface PostDao {
     /**
      * Get all posts for a specific post level
      */
-    @Query("SELECT * FROM posts WHERE postLevel = :postLevel ORDER BY cachedAt DESC")
+    @Query("SELECT * FROM posts WHERE postLevel = :postLevel ORDER BY cachedAt DESC, id DESC")
     suspend fun getPostsByLevel(postLevel: String): List<PostEntity>
 
     /**

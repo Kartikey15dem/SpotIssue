@@ -12,11 +12,18 @@ import kotlinx.coroutines.flow.collectLatest
 internal class PagingCollector<T : Any>(
     private val presenter: PagingDataPresenter<T>
 ) {
+    private val LOG = "[KMP_PAGING_TRACE]"
+
     /**
      * Suspends and continuously collects the paging flow.
      * This should be called from within the bridge's CoroutineScope.
      */
     suspend fun collectFrom(pagingFlow: Flow<PagingData<T>>) {
+        println("""
+$LOG COLLECT START
+$LOG flow=${pagingFlow.hashCode()}
+$LOG ==========================
+""")
         pagingFlow.collectLatest { pagingData ->
             presenter.collectFrom(pagingData)
         }

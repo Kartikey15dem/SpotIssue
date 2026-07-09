@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import org.example.project.core.utils.NetworkMonitor
+import android.annotation.SuppressLint
+
+@SuppressLint("MissingPermission")
 
 class ConnectivityManagerNetworkMonitor(
     private val context: Context,

@@ -13,11 +13,6 @@ import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.content.PartData
 import io.ktor.utils.io.ByteReadChannel
-import kotlin.time.Clock
-import kotlinx.datetime.Instant
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.serialization.json.Json
 import okio.FileSystem
 import okio.Path.Companion.toPath
@@ -44,6 +39,8 @@ import org.example.project.core.utils.NetworkMonitor
 import org.example.project.core.data.paging.CommentPagingSource
 import org.example.project.core.model.home.toComment
 
+private const val DB_TRACE = "[DB_TRACE]"
+
 class PostRepositoryImpl(
     private val postService: PostService,
     private val database: IssueSpotDatabase,
@@ -66,6 +63,12 @@ class PostRepositoryImpl(
         val newLikesCount = if (newIsLiked) likesCountCurrent + 1 else (likesCountCurrent - 1).coerceAtLeast(0)
         
         // Optimistic Update
+        println("""
+$DB_TRACE updateLikeStatus
+$DB_TRACE postId=$postId
+$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
+$DB_TRACE =========================
+""")
         database.postDao().updateLikeStatus(postId, newLikesCount, newIsLiked)
         database.userPostDao().updatePostLikeStatus(postId, newLikesCount, newIsLiked)
         database.likedPostDao().updatePostLikeStatus(postId, newLikesCount, newIsLiked)
@@ -94,6 +97,12 @@ class PostRepositoryImpl(
         val isReportedCurrent = postEntity?.isReported ?: userPostEntity?.isReported ?: likedPostEntity?.isReported ?: false
         
         // Optimistic Update
+        println("""
+$DB_TRACE updateReportStatus
+$DB_TRACE postId=$postId
+$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
+$DB_TRACE =========================
+""")
         database.postDao().updateReportStatus(postId, true)
         database.userPostDao().updateReportStatus(postId, true)
         database.likedPostDao().updateReportStatus(postId, true)
@@ -149,6 +158,13 @@ class PostRepositoryImpl(
         val newCommentsCount = commentsCountCurrent + 1
         
         // Optimistic Update
+        println("""
+$DB_TRACE updateCommentsCount
+$DB_TRACE postId=$postId
+$DB_TRACE comments=$newCommentsCount
+$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
+$DB_TRACE =========================
+""")
         database.postDao().updateCommentsCount(postId, newCommentsCount)
         database.userPostDao().updateCommentsCount(postId, newCommentsCount)
         database.likedPostDao().updateCommentsCount(postId, newCommentsCount)
@@ -246,6 +262,12 @@ class PostRepositoryImpl(
         val userPostEntity = database.userPostDao().getPostById(postId)
         val likedPostEntity = database.likedPostDao().getLikedPostById(postId)
         
+        println("""
+$DB_TRACE deletePostById
+$DB_TRACE postId=$postId
+$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
+$DB_TRACE =========================
+""")
         database.postDao().deletePostById(postId)
         if (userPostEntity != null) database.userPostDao().deletePost(postId)
         if (likedPostEntity != null) database.likedPostDao().deleteLikedPost(postId)

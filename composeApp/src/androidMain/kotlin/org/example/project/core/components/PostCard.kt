@@ -61,6 +61,15 @@ fun PostCard(
     var showReportDialog by rememberSaveable { mutableStateOf(false) }
     var hasOverflow by remember { mutableStateOf(false) }
 
+    println("[KMP_PAGING]\nPostCard BODY\npostId: ${post.id}\nlikes: $likesCount\ncomments: $commentsCount")
+
+    androidx.compose.runtime.DisposableEffect(post.id) {
+        println("[KMP_PAGING]\nPostCard APPEAR\npostId: ${post.id}")
+        onDispose {
+            println("[KMP_PAGING]\nPostCard DISAPPEAR\npostId: ${post.id}")
+        }
+    }
+
     Box {
         Card(
             modifier = modifier

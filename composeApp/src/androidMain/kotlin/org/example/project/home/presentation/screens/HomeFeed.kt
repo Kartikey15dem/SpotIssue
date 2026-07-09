@@ -30,6 +30,8 @@ fun HomeFeed(
     modifier: Modifier = Modifier,
     header: @Composable () -> Unit
 ) {
+    println("[KMP_PAGING]\nHomePostsList BODY\nitemCount=${pagingItems.itemCount}\nrefreshing=${pagingState.isRefreshing}\nappending=${pagingState.isAppending}")
+    
     val spacing = IssueSpotTheme.spacing
 
     Column(modifier = modifier) {
@@ -63,6 +65,10 @@ fun HomeFeed(
             ) { index ->
                 val post = pagingItems[index]
                 if (post != null) {
+                    val isFirstOrLast = index == 0 || index >= pagingItems.itemCount - 5
+                    if (isFirstOrLast) {
+                        println("[KMP_PAGING]\nROW\nindex=$index\npostId=${post.id}")
+                    }
                     PostCard(
                         modifier = Modifier
                             .fillMaxWidth()

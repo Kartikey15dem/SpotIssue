@@ -5,7 +5,7 @@ import org.example.project.core.database.entities.LikedPostEntity
 import org.example.project.core.model.home.MediaType
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * Map UserPostEntity to Post domain model

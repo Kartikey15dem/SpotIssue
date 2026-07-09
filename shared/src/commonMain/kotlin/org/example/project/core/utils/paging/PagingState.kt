@@ -11,6 +11,9 @@ data class PagingState<T : Any>(
     val snapshot: ItemSnapshotList<T>,
     val loadStates: CombinedLoadStates? = null
 ) {
+    val itemCount: Int
+        get() = snapshot.size
+
     val items: List<T>
         get() = snapshot.items
 

@@ -48,6 +48,7 @@ import org.example.project.R
 import org.example.project.core.components.CommentsBottomSheet
 import org.example.project.core.components.PostCard
 import org.example.project.core.components.PostLevelChip
+import org.example.project.core.model.home.Comment
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.getText
 import org.example.project.feature.home.viewmodel.HomeIntent
@@ -66,13 +67,29 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit = {},
     viewModel: HomeViewModel = koinViewModel()
 ) {
+    println("[KMP_PAGING]\nHomeScreen BODY")
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val currentLevel by viewModel.currentLevel.collectAsStateWithLifecycle()
     val activeIssues by viewModel.activeIssues.collectAsStateWithLifecycle()
     val expandedPost by viewModel.expandedPost.collectAsStateWithLifecycle()
     val pagingItems = viewModel.pagedPosts.collectAsLazyPagingItems()
+    println("[PAGING_UI] LAZY PAGING ITEMS | identity=${System.identityHashCode(pagingItems)} | itemCount=${pagingItems.itemCount} | refresh=${pagingItems.loadState.refresh} | append=${pagingItems.loadState.append} | mediatorRefresh=${pagingItems.loadState.mediator?.refresh} | mediatorAppend=${pagingItems.loadState.mediator?.append} | time=${kotlin.time.Clock.System.now()}")
+    
+    val activeCommentsFlow by viewModel.activeCommentsFlow.collectAsStateWithLifecycle()
+    val activePostId = state.showCommentsSheetForPostId
     
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+
+    LaunchedEffect(expandedPost) {
+        println("[KMP_PAGING]\nExpandedPost Changed\npostId: ${expandedPost?.id ?: "nil"}")
+    }
+    LaunchedEffect(currentLevel) {
+        println("[KMP_PAGING]\nCurrentLevel Changed\nlevel: $currentLevel")
+    }
+    LaunchedEffect(activeCommentsFlow) {
+        println("[KMP_PAGING]\nComments Flow Changed\npostId: $activePostId")
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.sideEffects.collectLatest { effect ->
@@ -114,10 +131,30 @@ fun HomeScreen(
         HomeContent(
             modifier = modifier.padding(padding),
             state = state,
+            currentLevel = currentLevel,
             activeIssues = activeIssues,
             expandedPost = expandedPost,
             pagingItems = pagingItems,
             onIntent = viewModel::onIntent,
+        )
+    }
+
+    val currentCommentsFlow = activeCommentsFlow
+    if (activePostId != null && currentCommentsFlow != null) {
+        val commentsPagingItems = currentCommentsFlow.collectAsLazyPagingItems()
+        
+        CommentsBottomSheet(
+            comments = commentsPagingItems,
+            onDismiss = { viewModel.onIntent(HomeIntent.DismissCommentsSheet) },
+            onSubmit = { text ->
+                viewModel.onIntent(
+                    HomeIntent.CommentSubmitted(
+                        postId = activePostId,
+                        commentText = text
+                    )
+                )
+            },
+            currentUserImageUrl = state.currentUserImage
         )
     }
 }
@@ -153,18 +190,16 @@ fun rememberPagingPresentationState(
 
     val isInitialLoading = pagingItems.itemCount == 0 && isRefreshing
 
-    return remember(
-        isInitialLoading, isRefreshing, isAppending, refreshError, appendError, endReached
-    ) {
-        PagingPresentationState(
-            isInitialLoading = isInitialLoading,
-            isRefreshing = isRefreshing,
-            isAppending = isAppending,
-            refreshError = refreshError,
-            appendError = appendError,
-            endReached = endReached
-        )
-    }
+    println("[PAGING_UI] LOAD STATE UPDATE | identity=${System.identityHashCode(pagingItems)} | itemCount=${pagingItems.itemCount} | refresh=${pagingItems.loadState.refresh} | append=${pagingItems.loadState.append} | prepend=${pagingItems.loadState.prepend} | mediatorRefresh=${pagingItems.loadState.mediator?.refresh} | mediatorAppend=${pagingItems.loadState.mediator?.append} | isRefreshing=$isRefreshing | isAppending=$isAppending | time=${kotlin.time.Clock.System.now()}")
+
+    return PagingPresentationState(
+        isInitialLoading = isInitialLoading,
+        isRefreshing = isRefreshing,
+        isAppending = isAppending,
+        refreshError = refreshError,
+        appendError = appendError,
+        endReached = endReached
+    )
 }
 
 @Stable
@@ -201,26 +236,22 @@ fun rememberFeedUiState(
         else -> FooterState.Hidden
     }
 
-    return remember(
-        showInitialLoading, showFeed, showEmptyFeed, showInitialError,
-        footerState, pagingState.refreshError, isPullRefreshing
-    ) {
-        FeedUiState(
-            showInitialLoading = showInitialLoading,
-            showFeed = showFeed,
-            showEmptyFeed = showEmptyFeed,
-            showInitialError = showInitialError,
-            footerState = footerState,
-            refreshError = pagingState.refreshError,
-            isPullRefreshing = isPullRefreshing
-        )
-    }
+    return FeedUiState(
+        showInitialLoading = showInitialLoading,
+        showFeed = showFeed,
+        showEmptyFeed = showEmptyFeed,
+        showInitialError = showInitialError,
+        footerState = footerState,
+        refreshError = pagingState.refreshError,
+        isPullRefreshing = isPullRefreshing
+    )
 }
 
 @Composable
 fun HomeContent(
     modifier: Modifier = Modifier,
     state: HomeState,
+    currentLevel: org.example.project.core.model.home.PostLevel,
     activeIssues: Int,
     expandedPost: Post?,
     pagingItems: LazyPagingItems<Post>,
@@ -231,7 +262,7 @@ fun HomeContent(
     val stateState = rememberLazyListState()
     val nationalState = rememberLazyListState()
 
-    val listState = when (state.postLevel) {
+    val listState = when (currentLevel) {
         org.example.project.core.model.home.PostLevel.LOCALITY -> localityState
         org.example.project.core.model.home.PostLevel.DISTRICT -> districtState
         org.example.project.core.model.home.PostLevel.STATE -> stateState
@@ -239,12 +270,23 @@ fun HomeContent(
     }
     
     val pagingState = rememberPagingPresentationState(pagingItems)
+    LaunchedEffect(
+        pagingItems.itemCount,
+        pagingState.isRefreshing,
+        pagingState.isAppending
+    ) {
+        println("[PAGING_UI] HOME CONTENT STATE | identity=${System.identityHashCode(pagingItems)} | itemCount=${pagingItems.itemCount} | refreshing=${pagingState.isRefreshing} | appending=${pagingState.isAppending} | time=${kotlin.time.Clock.System.now()}")
+    }
     val feedUiState = rememberFeedUiState(pagingState, pagingItems.itemCount)
 
     LaunchedEffect(feedUiState.refreshError) {
         if (feedUiState.refreshError != null && pagingItems.itemCount > 0) {
             onIntent(HomeIntent.ShowRefreshErrorSnackbar(feedUiState.refreshError.message ?: "An error occurred"))
         }
+    }
+
+    LaunchedEffect(feedUiState.isPullRefreshing) {
+        println("[KMP_PAGING]\nPull Refresh\n${feedUiState.isPullRefreshing}")
     }
 
     HomePullRefresh(
@@ -294,6 +336,7 @@ fun HomeContent(
                         HomeHeader(
                             modifier = Modifier.fillMaxWidth(),
                             state = state,
+                            currentLevel = currentLevel,
                             activeIssues = activeIssues,
                             onIntent = onIntent
                         )
@@ -302,31 +345,13 @@ fun HomeContent(
             }
         }
     }
-
-    val activePostId = state.showCommentsSheetForPostId
-    if (activePostId != null) {
-        val commentsPagingItems = state.commentFlows[activePostId]?.collectAsLazyPagingItems()
-
-        CommentsBottomSheet(
-            comments = commentsPagingItems,
-            onDismiss = { onIntent(HomeIntent.DismissCommentsSheet) },
-            onSubmit = { text ->
-                onIntent(
-                    HomeIntent.CommentSubmitted(
-                        postId = activePostId,
-                        commentText = text
-                    )
-                )
-            },
-            currentUserImageUrl = state.currentUserImage
-        )
-    }
 }
 
 @Composable
 fun HomeHeader(
     modifier: Modifier = Modifier,
     state: HomeState,
+    currentLevel: org.example.project.core.model.home.PostLevel,
     activeIssues: Int,
     onIntent: (HomeIntent) -> Unit,
 ) {
@@ -410,7 +435,7 @@ fun HomeHeader(
             Spacer(Modifier.height(spacing.smallMedium))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                PostLevelChip(postLevel = state.postLevel)
+                PostLevelChip(postLevel = currentLevel)
 
                 Spacer(Modifier.width(spacing.small))
 
@@ -424,7 +449,7 @@ fun HomeHeader(
             Spacer(Modifier.height(spacing.smallMedium))
 
             Text(
-                text = "${state.postLevel.displayName} Issues",
+                text = "${currentLevel.displayName} Issues",
                 style = IssueSpotTypography.bodyLarge,
                 color = IssueSpotColors.OnSurface,
                 fontWeight = FontWeight.Bold
@@ -433,7 +458,7 @@ fun HomeHeader(
             Spacer(Modifier.height(spacing.extraSmall))
 
             Text(
-                text = state.postLevel.getText(),
+                text = currentLevel.getText(),
                 style = IssueSpotTypography.bodyLarge,
                 color = IssueSpotColors.OnSurfaceVariant
             )

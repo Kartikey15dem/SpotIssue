@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.example.project.core.utils.paging.internal.PagingCollector
 import org.example.project.core.utils.paging.internal.PagingLifecycle
 import org.example.project.core.utils.paging.internal.PagingStateUpdater
+import kotlin.time.Clock
+
+private const val LOG = "[KMP_PAGING_TRACE]"
 
 /**
  * The core presentation object for paging in Kotlin Multiplatform.
@@ -31,11 +34,26 @@ class PagingItems<T : Any>(
 
     private lateinit var stateUpdater: PagingStateUpdater<T>
 
-    private val presenter = object : PagingDataPresenter<T>() {
+    private val presenter: PagingDataPresenter<T> = object : PagingDataPresenter<T>() {
         override suspend fun presentPagingDataEvent(event: PagingDataEvent<T>) {
+            println("""
+$LOG PAGING EVENT
+$LOG event=${event.toString().substringBefore("@")}
+$LOG before=${snapshot().items.size}
+$LOG ==========================
+""")
+            println("[PRESENTER_EVENTS] EVENT RECEIVED | event=${event.toString().substringBefore("@")} | snapshotBefore=${snapshot().items.size} | time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}")
+            
             if (::stateUpdater.isInitialized) {
                 stateUpdater.updateSnapshot()
             }
+            
+            println("""
+$LOG PAGING EVENT COMPLETE
+$LOG after=${snapshot().items.size}
+$LOG ==========================
+""")
+            println("[PRESENTER_EVENTS] EVENT COMPLETE | event=${event.toString().substringBefore("@")} | snapshotAfter=${snapshot().items.size}")
         }
     }
 
@@ -48,6 +66,11 @@ class PagingItems<T : Any>(
         get() = mutableState.value.items.size
 
     init {
+        println("""
+$LOG PAGING ITEMS CREATED
+$LOG instance=${this.hashCode()}
+$LOG ==========================
+""")
         stateUpdater = PagingStateUpdater(presenter, mutableState)
         
         // Initial snapshot sync
@@ -58,11 +81,19 @@ class PagingItems<T : Any>(
         }
 
         lifecycle.launch {
-            stateUpdater.collectLoadStates()
+            stateUpdater.collectUpdates()
         }
     }
 
     operator fun get(index: Int): T? {
+        if (index == itemCount - 1) {
+            println("""
+$LOG VIEWPORT HINT
+$LOG requestedIndex=$index
+$LOG itemCount=$itemCount
+$LOG ==========================
+""")
+        }
         return try {
             if (index >= 0 && index < presenter.snapshot().size) {
                 presenter[index]
@@ -83,14 +114,21 @@ class PagingItems<T : Any>(
     }
 
     fun refresh() {
+        println("[KMP_PAGING]\nPagingItems REFRESH")
         presenter.refresh()
     }
 
     fun retry() {
+        println("[KMP_PAGING]\nPagingItems RETRY")
         presenter.retry()
     }
 
     fun close() {
+        println("""
+$LOG PAGING ITEMS CLOSED
+$LOG instance=${this.hashCode()}
+$LOG ==========================
+""")
         lifecycle.close()
     }
 }

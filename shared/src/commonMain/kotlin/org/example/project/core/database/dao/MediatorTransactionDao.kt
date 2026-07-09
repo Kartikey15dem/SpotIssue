@@ -7,6 +7,7 @@ import org.example.project.core.database.entities.LikedPostEntity
 import org.example.project.core.database.entities.UserPostEntity
 import org.example.project.core.database.entities.RemoteKeysEntity
 
+private const val DB_TRACE = "[DB_TRACE]"
 
 @Dao
 /**
@@ -34,12 +35,37 @@ interface MediatorTransactionDao {
         posts: List<PostEntity>,
         remoteKeys: List<RemoteKeysEntity>
     ) {
+        println("""
+$DB_TRACE refreshFeed()
+$DB_TRACE posts=${posts.size}
+$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
+$DB_TRACE =========================
+""")
+        println("$DB_TRACE clearRemoteKeys")
         remoteKeysDao.clearRemoteKeys(keyType)
+        
+        println("$DB_TRACE deletePostsByLevel")
         postDao.deletePostsByLevel(level)
         
+        println("$DB_TRACE insertRemoteKeys")
         remoteKeysDao.insertAll(remoteKeys)
         
+        println("$DB_TRACE insertPosts")
+        println("""
+$DB_TRACE INSERTING POSTS
+$DB_TRACE count=${posts.size}
+$DB_TRACE ids=
+${posts.joinToString("\n") { "$DB_TRACE " + it.id }}
+$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
+$DB_TRACE =========================
+""")
         postDao.insertPosts(posts)
+        
+        println("""
+$DB_TRACE refreshFeed FINISHED
+$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
+$DB_TRACE =========================
+""")
     }
 
     @Transaction
@@ -52,8 +78,33 @@ interface MediatorTransactionDao {
         keyType: String,
         maxCachedPosts: Int
     ) {
+        println("""
+$DB_TRACE appendPage()
+$DB_TRACE posts=${posts.size}
+$DB_TRACE first=${posts.firstOrNull()?.id}
+$DB_TRACE last=${posts.lastOrNull()?.id}
+$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
+$DB_TRACE =========================
+""")
+        println("$DB_TRACE insertRemoteKeys")
         remoteKeysDao.insertAll(remoteKeys)
+        
+        println("$DB_TRACE insertPosts")
+        println("""
+$DB_TRACE INSERTING POSTS
+$DB_TRACE count=${posts.size}
+$DB_TRACE ids=
+${posts.joinToString("\n") { "$DB_TRACE " + it.id }}
+$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
+$DB_TRACE =========================
+""")
         postDao.insertPosts(posts)
+        
+        println("""
+$DB_TRACE appendPage FINISHED
+$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
+$DB_TRACE =========================
+""")
     }
 
     @Transaction

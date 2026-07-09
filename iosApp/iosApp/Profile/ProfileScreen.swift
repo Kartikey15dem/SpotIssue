@@ -2,14 +2,29 @@ import SwiftUI
 import Shared
 
 struct ProfileScreen: View {
-    @StateObject private var holder = KoinHelper().holder { $0.getProfileViewModel() }
+    @StateObject private var holder: ViewModelHolder<ProfileViewModel>
+    @StateObject private var postsPagingHolder: PagingItemsHolder<Post>
     @EnvironmentObject var router: Router
     
     @State private var postToDelete: String? = nil
+    @State private var showScrollToTop = false
+
+    private let scrollTopID = "profile-scroll-top"
+
+    init() {
+        let holder = KoinHelper().holder { $0.getProfileViewModel() }
+        _holder = StateObject(wrappedValue: holder)
+        _postsPagingHolder = StateObject(
+            wrappedValue: PagingItemsHolder(
+                flow: holder.vm.pagedPosts,
+                sourceKey: "profile-posts"
+            )
+        )
+    }
 
     var body: some View {
         Observing(holder.vm.uiState) { (state: ProfileState) in
-            ZStack(alignment: .bottom) {
+            ZStack(alignment: .top) {
                 IssueSpotColors.background
                     .ignoresSafeArea()
                 
@@ -38,12 +53,12 @@ struct ProfileScreen: View {
                     }
                     .padding()
                 } else {
-                    if let expandedPost = state.expandedPost {
-                        let override = state.postOverrides[expandedPost.id]
-                        let isLiked = override?.isLiked?.boolValue ?? expandedPost.isLiked
-                        let resolvedLikes = override?.likesCount?.intValue ?? Int(expandedPost.likes)
-                        let resolvedComments = override?.commentsCount?.intValue ?? Int(expandedPost.comments)
-                        let isReported = override?.isReported?.boolValue ?? expandedPost.isReported
+                    Observing(holder.vm.expandedPost) { expandedPost in
+                        if let expandedPost {
+                        let isLiked = expandedPost.isLiked
+                        let resolvedLikes = Int(expandedPost.likes)
+                        let resolvedComments = Int(expandedPost.comments)
+                        let isReported = expandedPost.isReported
                         
                         PostCard(
                             post: expandedPost,
@@ -55,10 +70,10 @@ struct ProfileScreen: View {
                             canReport: !state.isMine,
                             isDetailMode: true,
                             onLikeClick: {
-                                holder.vm.onIntent(intent: ProfileIntentLikeClicked(postId: expandedPost.id, currentIsLiked: isLiked, currentLikesCount: Int32(resolvedLikes)))
+                                holder.vm.onIntent(intent: ProfileIntentLikeClicked(postId: expandedPost.id))
                             },
                             onCommentIconClick: {
-                                holder.vm.onIntent(intent: ProfileIntentCommentsIconClicked(postId: expandedPost.id, currentCommentsCount: Int32(resolvedComments)))
+                                holder.vm.onIntent(intent: ProfileIntentCommentsIconClicked(postId: expandedPost.id))
                             },
                             onShareClick: {
                                 holder.vm.onIntent(intent: ProfileIntentShareClicked(post: expandedPost))
@@ -74,66 +89,23 @@ struct ProfileScreen: View {
                                 holder.vm.onIntent(intent: ProfileIntentDismissPost.shared)
                             }
                         )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .transition(.move(edge: .bottom))
                         .zIndex(1)
                     } else {
-                        ScrollView {
-                            LazyVStack(spacing: IssueSpotSpacing.smallMedium) {
-                                Spacer().frame(height: IssueSpotSpacing.small)
-                                
-                                if let profile = state.profile {
-                                    ProfileHeader(profile: profile, onEditClick: {
-                                        holder.vm.onIntent(intent: ProfileIntentEditProfileClicked.shared)
-                                    })
-                                    .padding(.horizontal, IssueSpotSpacing.medium)
-                                    
-                                    VStack(alignment: .leading, spacing: IssueSpotSpacing.extraSmall) {
-                                        Text("Posts by Area")
-                                            .font(IssueSpotTypography.titleLarge)
-                                            .fontWeight(.semibold)
-                                            .padding(.bottom, IssueSpotSpacing.extraSmall)
-                                        
-                                        let postLevels: [Shared.PostLevel] = [.locality, .district, .state, .national]
-                                        ForEach(0..<postLevels.count, id: \.self) { i in
-                                            let entry = postLevels[i]
-                                            let count = Int(profile.postByArea.count > Int32(i) ? profile.postByArea[i].int32Value : 0)
-                                            PostByAreaBar(postByArea: count, postLevel: entry)
-                                        }
-                                    }
-                                    .padding(.horizontal, IssueSpotSpacing.medium)
-                                    .padding(.top, IssueSpotSpacing.smallMedium)
-                                }
-                                
-                                Button(action: { holder.vm.onIntent(intent: ProfileIntentCreatePostClicked.shared) }) {
-                                    Text("+  Post New Issue")
-                                        .font(IssueSpotTypography.bodyLarge)
-                                        .fontWeight(.bold)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 12)
-                                        .background(IssueSpotColors.primary)
-                                        .foregroundColor(.white)
-                                        .cornerRadius(12)
-                                }
-                                .padding(.horizontal, IssueSpotSpacing.medium)
-                                .padding(.vertical, IssueSpotSpacing.smallMedium)
-                                
-                                ProfilePostTabsHeader(state: state, onIntent: { holder.vm.onIntent(intent: $0) })
-                                    .padding(.horizontal, IssueSpotSpacing.medium)
-                                
-                                ObservePagingItems(Post.self, flow: state.activePostsFlow) { snapshot, pagingHolder in
-                                    ProfilePostsListView(
-                                        snapshot: snapshot,
-                                        pagingHolder: pagingHolder,
-                                        state: state,
-                                        holder: holder,
-                                        onDelete: { postToDelete = $0 }
-                                    )
-                                }
-                                Spacer().frame(height: IssueSpotSpacing.medium)
-                            }
-                        }
+                        let pagingSourceKey = "profile:\(state.isMine):\(state.sort.name)"
+                        ProfilePagingContainer(
+                            state: state,
+                            holder: holder,
+                            postsPagingHolder: postsPagingHolder,
+                            pagingSourceKey: pagingSourceKey,
+                            showScrollToTop: $showScrollToTop,
+                            postToDelete: $postToDelete
+                        )
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
             }
             .navigationBarHidden(false)
             .navigationTitle("Profile")
@@ -150,6 +122,8 @@ struct ProfileScreen: View {
                         shareContent(text: shareEffect.text)
                     case let snackbarEffect as ProfileSideEffectShowSnackbar:
                         SnackbarManager.shared.show(snackbarEffect.message)
+                    case let errorEffect as ProfileSideEffectShowError:
+                        SnackbarManager.shared.show(errorEffect.message)
                     default:
                         break
                     }
@@ -160,23 +134,40 @@ struct ProfileScreen: View {
                 set: { if !$0 { holder.vm.onIntent(intent: ProfileIntentDismissCommentsSheet.shared) } }
             )) {
                 if let postId = state.showCommentsSheetForPostId {
-                    let override = state.postOverrides[postId]
-                    let commentsFlow = override?.commentsFlow
-                    ObservePagingItems(Comment.self, flow: commentsFlow) { commentsSnapshot, pagingHolder in
-                        CommentsBottomSheet(
-                            comments: commentsSnapshot.items,
-                            currentUserImageUrl: state.profile?.imageUrl,
-                            onDismiss: { holder.vm.onIntent(intent: ProfileIntentDismissCommentsSheet.shared) },
-                            onSubmit: { text in
-                                let currentCount = override?.commentsCount?.int32Value ?? 0
-                                holder.vm.onIntent(intent: ProfileIntentCommentSubmitted(postId: postId, commentText: text, currentCommentCount: currentCount))
-                            },
-                            onItemAppeared: { index in
-                                pagingHolder.loadNextPageIfNecessary(index: index)
+                    Observing(holder.vm.activeCommentsFlow) { activeCommentsFlow in
+                        let _ = print("\(PagingDebug.tag)\nComments Flow Changed\npostId: \(postId)")
+                        if let activeCommentsFlow {
+                            ObserveErasedPagingItems(
+                                Comment.self,
+                                flow: activeCommentsFlow,
+                                sourceKey: "profile-comments:\(postId)"
+                            ) { commentsSnapshot, pagingHolder in
+                                let commentsPresentation = PagingPresentation(
+                                    snapshot: commentsSnapshot,
+                                    endRule: .comments
+                                )
+
+                                CommentsBottomSheet(
+                                    pagingHolder: pagingHolder,
+                                    presentation: commentsPresentation,
+                                    currentUserImageUrl: state.profile?.imageUrl,
+                                    onDismiss: { holder.vm.onIntent(intent: ProfileIntentDismissCommentsSheet.shared) },
+                                    onSubmit: { text in
+                                        holder.vm.onIntent(intent: ProfileIntentCommentSubmitted(postId: postId, commentText: text))
+                                    },
+                                    onRefresh: pagingHolder.refresh,
+                                    onRetry: pagingHolder.retry,
+                                    onItemAppeared: { index in
+                                        pagingHolder.loadNextPageIfNecessary(index: index)
+                                    }
+                                )
                             }
-                        )
+                            .id("comments_\(postId)")
+                        } else {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: IssueSpotColors.primary))
+                        }
                     }
-                    .id("comments_\(postId)")
                 }
             }
             .alert(isPresented: Binding(
@@ -210,94 +201,203 @@ struct ProfileScreen: View {
     }
 }
 
-private struct ProfilePostsListView: View {
-    let snapshot: Shared.PagingState<Shared.Post>
-    let pagingHolder: PagingItemsHolder<Shared.Post>
-    let state: Shared.ProfileState
-    let holder: ViewModelHolder<Shared.ProfileViewModel>
-    let onDelete: (String) -> Void
+private struct ProfilePagingContainer: View {
+    let state: ProfileState
+    let holder: ViewModelHolder<ProfileViewModel>
+    @ObservedObject var postsPagingHolder: PagingItemsHolder<Post>
+    let pagingSourceKey: String
+    @Binding var showScrollToTop: Bool
+    @Binding var postToDelete: String?
     
+    private let scrollTopID = "profile-scroll-top"
+
     var body: some View {
-        if (snapshot.isRefreshing) && snapshot.items.isEmpty {
-            ProgressView().padding(.top, IssueSpotSpacing.huge)
-        } else if snapshot.isRefreshError && snapshot.items.isEmpty {
-            VStack(spacing: IssueSpotSpacing.small) {
-                Text(snapshot.error ?? "An error occurred")
-                    .font(IssueSpotTypography.bodyMedium)
-                    .foregroundColor(IssueSpotColors.onSurfaceVariant)
-                Button(action: { pagingHolder.refresh() }) {
-                    Text("Retry")
-                        .font(IssueSpotTypography.labelMedium)
-                        .foregroundColor(IssueSpotColors.onPrimary)
+        ScrollViewReader { proxy in
+            ZStack(alignment: .bottomTrailing) {
+                ScrollView {
+                    LazyVStack(spacing: IssueSpotSpacing.smallMedium) {
+                        Color.clear
+                            .frame(height: IssueSpotSpacing.small)
+                            .id(scrollTopID)
+
+                        if let profile = state.profile {
+                            ProfileHeader(profile: profile, onEditClick: {
+                                holder.vm.onIntent(intent: ProfileIntentEditProfileClicked.shared)
+                            })
+                            .padding(.horizontal, IssueSpotSpacing.medium)
+
+                            VStack(alignment: .leading, spacing: IssueSpotSpacing.extraSmall) {
+                                Text("Posts by Area")
+                                    .font(IssueSpotTypography.titleLarge)
+                                    .fontWeight(.semibold)
+                                    .padding(.bottom, IssueSpotSpacing.extraSmall)
+
+                                let postLevels: [Shared.PostLevel] = [.locality, .district, .state, .national]
+                                ForEach(0..<postLevels.count, id: \.self) { i in
+                                    let entry = postLevels[i]
+                                    let count = Int(profile.postByArea.count > Int32(i) ? profile.postByArea[i].int32Value : 0)
+                                    PostByAreaBar(postByArea: count, postLevel: entry)
+                                }
+                            }
+                            .padding(.horizontal, IssueSpotSpacing.medium)
+                            .padding(.top, IssueSpotSpacing.smallMedium)
+                        }
+
+                        Button(action: { holder.vm.onIntent(intent: ProfileIntentCreatePostClicked.shared) }) {
+                            Text("+  Post New Issue")
+                                .font(IssueSpotTypography.bodyLarge)
+                                .fontWeight(.bold)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(IssueSpotColors.primary)
+                                .foregroundColor(.white)
+                                .cornerRadius(12)
+                        }
                         .padding(.horizontal, IssueSpotSpacing.medium)
-                        .padding(.vertical, IssueSpotSpacing.small)
-                        .background(IssueSpotColors.primary)
-                        .cornerRadius(8)
+                        .padding(.vertical, IssueSpotSpacing.smallMedium)
+
+                        ProfilePostTabsHeader(state: state, onIntent: { holder.vm.onIntent(intent: $0) })
+                            .padding(.horizontal, IssueSpotSpacing.medium)
+
+                        ProfilePostsListView(
+                            pagingHolder: postsPagingHolder,
+                            pagingSourceKey: pagingSourceKey,
+                            state: state,
+                            holder: holder,
+                            onDelete: { postToDelete = $0 }
+                        )
+                        Spacer().frame(height: IssueSpotSpacing.medium)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .top)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .refreshable {
+                    postsPagingHolder.refresh()
+                }
+                .onScrollGeometryChange(for: Bool.self) { geometry in
+                    geometry.contentOffset.y > 120
+                } action: { _, shouldShow in
+                    showScrollToTop = shouldShow
+                }
+
+                if showScrollToTop {
+                    Button {
+                        withAnimation {
+                            proxy.scrollTo(scrollTopID, anchor: .top)
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 44, height: 44)
+                            .background(IssueSpotColors.secondary)
+                            .clipShape(Circle())
+                    }
+                    .padding(IssueSpotSpacing.medium)
+                    .accessibilityLabel("Scroll to top")
                 }
             }
-            .padding(.top, IssueSpotSpacing.huge)
-        } else if snapshot.items.isEmpty {
-            Text("No posts found")
-                .font(IssueSpotTypography.bodyLarge)
-                .foregroundColor(IssueSpotColors.onBackground)
-                .padding(.top, IssueSpotSpacing.huge)
-        } else {
-            ForEach(Array(snapshot.items.enumerated()), id: \.element.id) { index, post in
-                let override = state.postOverrides[post.id]
-                let isLiked = override?.isLiked?.boolValue ?? post.isLiked
-                let resolvedLikes = override?.likesCount?.intValue ?? Int(post.likes)
-                let resolvedComments = override?.commentsCount?.intValue ?? Int(post.comments)
-                let isReported = override?.isReported?.boolValue ?? post.isReported
-                
-                PostCard(
-                    post: post,
-                    isLiked: isLiked,
-                    likesCount: resolvedLikes,
-                    commentsCount: resolvedComments,
-                    isReported: isReported,
-                    canDelete: state.isMine,
-                    canReport: !state.isMine,
-                    isDetailMode: false,
-                    onLikeClick: { holder.vm.likePost(post: post) },
-                    onCommentIconClick: { holder.vm.openComments(post: post) },
-                    onShareClick: { holder.vm.sharePost(post: post) },
-                    onReportClick: { reason in
-                        holder.vm.onIntent(intent: ProfileIntentReportClicked(postId: post.id, reason: reason))
-                    },
-                    onDeleteClick: { onDelete(post.id) },
-                    onPostClick: {
-                        holder.vm.onIntent(intent: ProfileIntentPostClicked(post: post))
-                    },
-                    onCollapseClick: {}
-                )
-                .padding(.horizontal, IssueSpotSpacing.medium)
-                .onAppear {
-                    pagingHolder.loadNextPageIfNecessary(index: index)
-                }
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+}
+
+private struct ProfilePostsListView: View {
+    @ObservedObject var pagingHolder: PagingItemsHolder<Post>
+    let pagingSourceKey: String
+    let state: ProfileState
+    let holder: ViewModelHolder<ProfileViewModel>
+    let onDelete: (String) -> Void
+
+    init(
+        pagingHolder: PagingItemsHolder<Post>,
+        pagingSourceKey: String,
+        state: ProfileState,
+        holder: ViewModelHolder<ProfileViewModel>,
+        onDelete: @escaping (String) -> Void
+    ) {
+        self.pagingHolder = pagingHolder
+        self.pagingSourceKey = pagingSourceKey
+        self.state = state
+        self.holder = holder
+        self.onDelete = onDelete
+        
+        // Bind synchronously during struct initialization so no stale data is ever shown
+        pagingHolder.bind(flow: holder.vm.pagedPosts, sourceKey: pagingSourceKey)
+    }
+
+    var body: some View {
+        ObservePagingItemsHolder(pagingHolder: pagingHolder) { snapshot, pagingHolder in
+            let presentation = PagingPresentation(snapshot: snapshot, endRule: .profile)
             
-            if snapshot.isAppending {
-                ProgressView()
-                    .padding()
-            } else if snapshot.isAppendError, let error = snapshot.error {
-                VStack {
-                    Text(error)
-                        .font(IssueSpotTypography.bodyMedium)
-                        .foregroundColor(IssueSpotColors.onSurfaceVariant)
-                    Button("Retry") { pagingHolder.retry() }
-                        .font(IssueSpotTypography.labelMedium)
-                        .foregroundColor(IssueSpotColors.onPrimary)
-                        .padding(.horizontal, IssueSpotSpacing.medium)
-                        .padding(.vertical, IssueSpotSpacing.small)
-                        .background(IssueSpotColors.primary)
-                        .cornerRadius(8)
+            Group {
+                if !presentation.showContent {
+                    PagingInitialStateView(
+                        presentation: presentation,
+                        onRefresh: { pagingHolder.refresh() },
+                        emptyMessage: "No posts found"
+                    )
                 }
-                .padding()
-            } else if !snapshot.isAppending && snapshot.isAppendEndOfPaginationReached && !snapshot.items.isEmpty {
-                Text("No more posts")
-                    .font(IssueSpotTypography.bodyMedium)
-                    .foregroundColor(IssueSpotColors.onSurfaceVariant)
-                    .padding()
+
+        if presentation.showContent {
+            ForEach(0..<presentation.itemCount, id: \.self) { index in
+                if let post = pagingHolder.items?.get(index: Int32(index)) {
+                    let isLiked = post.isLiked
+                    let resolvedLikes = Int(post.likes)
+                    let resolvedComments = Int(post.comments)
+                    let isReported = post.isReported
+                    
+                    PostCard(
+                        post: post,
+                        isLiked: isLiked,
+                        likesCount: resolvedLikes,
+                        commentsCount: resolvedComments,
+                        isReported: isReported,
+                        canDelete: state.isMine,
+                        canReport: !state.isMine,
+                        isDetailMode: false,
+                        onLikeClick: { holder.vm.likePost(post: post) },
+                        onCommentIconClick: { holder.vm.openComments(post: post) },
+                        onShareClick: { holder.vm.sharePost(post: post) },
+                        onReportClick: { reason in
+                            holder.vm.onIntent(intent: ProfileIntentReportClicked(postId: post.id, reason: reason))
+                        },
+                        onDeleteClick: { onDelete(post.id) },
+                        onPostClick: {
+                            holder.vm.onIntent(intent: ProfileIntentPostClicked(post: post))
+                        },
+                        onCollapseClick: {}
+                    )
+                    .padding(.horizontal, IssueSpotSpacing.medium)
+                    .id(post.id)
+                    .onAppear {
+                        pagingHolder.loadNextPageIfNecessary(index: index)
+                    }
+                }
+            }
+        }
+
+        if presentation.showContent {
+            PagingFooterView(
+                state: presentation.footer,
+                onRetry: { pagingHolder.retry() },
+                endMessage: "No more posts"
+            )
+        }
+        } // closes Group(4)
+            .overlay(alignment: .top) {
+                PagingRefreshOverlay(isRefreshing: presentation.isPullRefreshing)
+            }
+            .onChange(of: presentation.isPullRefreshing) { _, newValue in
+                print("\(PagingDebug.tag)\nPull Refresh\n\(newValue)")
+            }
+            .onChange(of: presentation.refreshError) { _, error in
+                if let error, presentation.showContent {
+                    holder.vm.onIntent(
+                        intent: ProfileIntentShowRefreshErrorSnackbar(message: error)
+                    )
+                }
             }
         }
     }

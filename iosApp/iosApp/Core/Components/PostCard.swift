@@ -18,10 +18,17 @@ struct PostCard: View {
     let onDeleteClick: () -> Void
     let onPostClick: () -> Void
     let onCollapseClick: () -> Void
+    var isEdgeItem: Bool = false
     
     @State private var showReportDialog = false
     
     var body: some View {
+        let _ = isEdgeItem ? print("""
+        [HOME_RECOMPOSE] PostCard BODY
+        [HOME_RECOMPOSE] id=\(post.id)
+        [HOME_RECOMPOSE] time=\(Date())
+        [HOME_RECOMPOSE] ========================
+        """) : ()
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
                 Spacer().frame(height: IssueSpotSpacing.small)
@@ -86,6 +93,12 @@ struct PostCard: View {
             Button("Spam", action: { onReportClick("Spam") })
             Button("Inappropriate", action: { onReportClick("Inappropriate") })
             Button("Cancel", role: .cancel, action: {})
+        }
+        .onAppear {
+            print("\(PagingDebug.tag)\nPostCard APPEAR\npostId: \(post.id)")
+        }
+        .onDisappear {
+            print("\(PagingDebug.tag)\nPostCard DISAPPEAR\npostId: \(post.id)")
         }
     }
 }

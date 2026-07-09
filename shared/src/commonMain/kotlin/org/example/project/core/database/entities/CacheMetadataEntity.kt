@@ -13,7 +13,7 @@ data class CacheMetadataEntity(
     @PrimaryKey
     val cacheKey: String, // e.g., "posts_LOCALITY", "active_issues_LOCALITY"
     val lastFetchedAt: Long, // Timestamp when data was last fetched from API
-    val expiryDuration: Long = 2 * 60 * 1000 // Default 5 minutes in milliseconds
+    val expiryDuration: Long = 5 * 60 * 1000 // Default 5 minutes in milliseconds
 ) {
     /**
      * Check if cache is stale based on expiry duration

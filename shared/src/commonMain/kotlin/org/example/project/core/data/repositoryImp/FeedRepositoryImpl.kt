@@ -34,7 +34,7 @@ class FeedRepositoryImpl(
     @OptIn(ExperimentalPagingApi::class)
     override fun getPagedPosts(postLevel: PostLevel, userLocation: UserLocation, forceRefresh: Boolean): Flow<PagingData<Post>> {
         return Pager(
-            config = PagingConfig(pageSize = 10, initialLoadSize = 10, prefetchDistance = 5, enablePlaceholders = false),
+            config = PagingConfig(pageSize = 10, initialLoadSize = 5, prefetchDistance = 5, enablePlaceholders = false),
             remoteMediator = FeedPostsRemoteMediator(
                 postLevel = postLevel,
                 userLocation = userLocation,
@@ -45,6 +45,7 @@ class FeedRepositoryImpl(
                 networkMonitor = networkMonitor,
             ),
             pagingSourceFactory = {
+                println("[PAGING_SOURCE] FACTORY CALLED | postLevel=$postLevel | time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}")
                 database.postDao().pagingSourceByLevel(postLevel.name)
             },
         ).flow.map { pagingData ->

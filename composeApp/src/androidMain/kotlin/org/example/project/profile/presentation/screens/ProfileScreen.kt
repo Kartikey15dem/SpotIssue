@@ -51,6 +51,7 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -74,6 +75,7 @@ import org.example.project.R
 import org.example.project.core.components.PostCard
 import org.example.project.core.components.PostLevelChip
 import org.example.project.core.data.mappers.Sort
+import org.example.project.core.model.home.Comment
 import org.example.project.core.model.home.PostLevel
 import org.example.project.core.model.profile.Profile
 import org.example.project.feature.profile.viewmodel.ProfileIntent
@@ -95,8 +97,13 @@ fun ProfileScreen(
     onNavigateToPost: (postId: String) -> Unit ={},
     viewModel: ProfileViewModel = koinViewModel()
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val expandedPost by viewModel.expandedPost.collectAsStateWithLifecycle()
+    val pagingItems = viewModel.pagedPosts.collectAsLazyPagingItems()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val activeCommentsFlow by viewModel.activeCommentsFlow.collectAsStateWithLifecycle()
+    val activePostId = state.showCommentsSheetForPostId
 
     val listState = rememberLazyListState()
     val showFab by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
@@ -142,7 +149,7 @@ fun ProfileScreen(
             }
         },
         floatingActionButton = {
-            if (showFab && state.expandedPost == null) {
+            if (showFab && expandedPost == null) {
                 SmallFloatingActionButton(
                     onClick = { coroutineScope.launch { listState.animateScrollToItem(0) } },
                     containerColor = IssueSpotColors.Secondary,
@@ -157,8 +164,29 @@ fun ProfileScreen(
         ProfileScreenContent(
             modifier = modifier.padding(padding),
             state = state,
+            expandedPost = expandedPost,
+            pagingItems = pagingItems,
             onIntent = viewModel::onIntent,
             listState = listState
+        )
+    }
+
+    val currentCommentsFlow = activeCommentsFlow
+    if (activePostId != null && currentCommentsFlow != null) {
+        val commentsPagingItems = currentCommentsFlow.collectAsLazyPagingItems()
+
+        CommentsBottomSheet(
+            comments = commentsPagingItems,
+            onDismiss = { viewModel.onIntent(ProfileIntent.DismissCommentsSheet) },
+            onSubmit = { text ->
+                viewModel.onIntent(
+                    ProfileIntent.CommentSubmitted(
+                        postId = activePostId,
+                        commentText = text
+                    )
+                )
+            },
+            currentUserImageUrl = state.profile?.imageUrl
         )
     }
 }
@@ -170,10 +198,11 @@ fun ProfileScreen(
 fun ProfileScreenContent(
     modifier: Modifier = Modifier,
     state: ProfileState,
+    expandedPost: org.example.project.core.model.home.Post?,
+    pagingItems: androidx.paging.compose.LazyPagingItems<org.example.project.core.model.home.Post>,
     onIntent: (ProfileIntent) -> Unit,
     listState: LazyListState
 ) {
-    val pagingItems = state.activePostsFlow?.collectAsLazyPagingItems()
     var postToDelete by remember { mutableStateOf<String?>(null) }
     val spacing = IssueSpotTheme.spacing
 
@@ -230,15 +259,13 @@ fun ProfileScreenContent(
         val profile = state.profile
         if (profile != null) {
             Box(modifier = modifier.fillMaxSize().background(IssueSpotColors.Background)) {
-                val expandedPost = state.expandedPost
                 if (expandedPost != null) {
                     val post = expandedPost
-                    val override = state.postOverrides[post.id]
 
-                    val isLiked = override?.isLiked ?: post.isLiked
-                    val resolvedLikes = override?.likesCount ?: post.likes
-                    val resolvedComments = override?.commentsCount ?: post.comments
-                    val isReported = override?.isReported ?: post.isReported
+                    val isLiked = post.isLiked
+                    val resolvedLikes = post.likes
+                    val resolvedComments = post.comments
+                    val isReported = post.isReported
 
                 BackHandler {
                     onIntent(ProfileIntent.DismissPost)
@@ -255,10 +282,10 @@ fun ProfileScreenContent(
                     canReport = !state.isMine,
                     onDeleteClick = { postToDelete = post.id },
                     onLikeClick = {
-                        onIntent(ProfileIntent.LikeClicked(post.id, isLiked, resolvedLikes))
+                        onIntent(ProfileIntent.LikeClicked(post.id))
                     },
                     onCommentIconClick = {
-                        onIntent(ProfileIntent.CommentsIconClicked(post.id, resolvedComments))
+                        onIntent(ProfileIntent.CommentsIconClicked(post.id))
                     },
                     onShareClick = { onIntent(ProfileIntent.ShareClicked(post)) },
                     onReportClick = { reason ->
@@ -319,16 +346,7 @@ fun ProfileScreenContent(
                         ProfilePostTabsHeader(state, onIntent)
                     }
 
-                    if (state.activePostsFlow == null) {
-                        item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().height(300.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(color = IssueSpotColors.Primary)
-                            }
-                        }
-                    } else if ((pagingItems?.itemCount ?: 0) == 0 && (isRefreshLoading || isMediatorRefreshLoading)) {
+                    if ((pagingItems?.itemCount ?: 0) == 0 && (isRefreshLoading || isMediatorRefreshLoading)) {
                         item {
                             Box(
                                 modifier = Modifier.fillMaxWidth().height(300.dp),
@@ -388,12 +406,10 @@ fun ProfileScreenContent(
                     ) { index ->
                         val post = pagingItems?.get(index)
                         if (post != null) {
-                            val override = state.postOverrides[post.id]
-
-                            val isLiked = override?.isLiked ?: post.isLiked
-                            val resolvedLikes = override?.likesCount ?: post.likes
-                            val resolvedComments = override?.commentsCount ?: post.comments
-                            val isReported = override?.isReported ?: post.isReported
+                            val isLiked = post.isLiked
+                            val resolvedLikes = post.likes
+                            val resolvedComments = post.comments
+                            val isReported = post.isReported
 
                             PostCard(
                                 modifier = Modifier
@@ -408,10 +424,10 @@ fun ProfileScreenContent(
                                 canReport = !state.isMine,
                                 onDeleteClick = { postToDelete = post.id },
                                 onLikeClick = {
-                                    onIntent(ProfileIntent.LikeClicked(post.id, isLiked, resolvedLikes))
+                                    onIntent(ProfileIntent.LikeClicked(post.id))
                                 },
                                 onCommentIconClick = {
-                                    onIntent(ProfileIntent.CommentsIconClicked(post.id, resolvedComments))
+                                    onIntent(ProfileIntent.CommentsIconClicked(post.id))
                                 },
                                 onShareClick = { onIntent(ProfileIntent.ShareClicked(post)) },
                                 onReportClick = { reason -> 
@@ -483,7 +499,8 @@ fun ProfileScreenContent(
         }
     }
 
-    if (postToDelete != null) {
+    val currentPostToDelete = postToDelete
+    if (currentPostToDelete != null) {
         AlertDialog(
             onDismissRequest = { postToDelete = null },
             title = { Text("Delete Post", style = IssueSpotTypography.titleMedium, fontWeight = FontWeight.Bold, color = IssueSpotColors.OnBackground) },
@@ -491,7 +508,7 @@ fun ProfileScreenContent(
             containerColor = IssueSpotColors.Surface,
             confirmButton = {
                 TextButton(onClick = { 
-                    onIntent(ProfileIntent.DeletePostClicked(postToDelete!!)) 
+                    onIntent(ProfileIntent.DeletePostClicked(currentPostToDelete)) 
                     postToDelete = null 
                 }) { 
                     Text("Delete", color = Color.Red, fontWeight = FontWeight.Bold, style = IssueSpotTypography.labelLarge) 
@@ -505,27 +522,7 @@ fun ProfileScreenContent(
         )
     }
 
-    val activePostId = state.showCommentsSheetForPostId
-    if (activePostId != null) {
-        val activeOverride = state.postOverrides[activePostId]
-        val commentsPagingItems = activeOverride?.commentsFlow?.collectAsLazyPagingItems()
 
-        CommentsBottomSheet(
-            comments = commentsPagingItems,
-            onDismiss = { onIntent(ProfileIntent.DismissCommentsSheet) },
-            onSubmit = { text ->
-                val fallbackCount = pagingItems?.itemSnapshotList?.items?.find { it.id == activePostId }?.comments ?: 0
-                onIntent(
-                    ProfileIntent.CommentSubmitted(
-                        postId = activePostId,
-                        commentText = text,
-                        currentCommentCount = activeOverride?.commentsCount ?: fallbackCount
-                    )
-                )
-            },
-            currentUserImageUrl = state.profile?.imageUrl
-        )
-    }
 }
 
 @Composable

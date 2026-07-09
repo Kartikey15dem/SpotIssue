@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import androidx.paging.insertHeaderItem
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
@@ -21,7 +22,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+
 import org.example.project.core.data.repository.FeedRepository
 import org.example.project.core.data.repository.PostRepository
 import org.example.project.core.data.repository.ProfileRepository
@@ -46,6 +49,11 @@ class HomeViewModel(
     private val _sideEffects = Channel<HomeSideEffect>(Channel.BUFFERED)
     val sideEffects = _sideEffects.receiveAsFlow()
 
+    private val conversationCache = mutableMapOf<String, Flow<PagingData<Comment>>>()
+
+    private val _activeCommentsFlow = MutableStateFlow<Flow<PagingData<Comment>>?>(null)
+    val activeCommentsFlow = _activeCommentsFlow.asStateFlow()
+
     @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
     val pagedPosts: Flow<PagingData<Post>> = combine(
         currentLevelManager.currentLevel,
@@ -54,12 +62,22 @@ class HomeViewModel(
     ) { level, query, location ->
         Triple(level, query, location)
     }.flatMapLatest { (level, query, location) ->
+        println("[KMP_PAGING_VIEWMODEL]\nNEW PAGING FLOW\nlevel=$level\nquery=$query\nlocation=$location\ntime=${kotlin.time.Clock.System.now()}")
         if (query.isBlank()) {
             feedRepository.getPagedPosts(level, location, forceRefresh = false)
         } else {
             feedRepository.getPagedSearchPosts(query, level)
         }
+    }.onEach {
+        println("[PAGING_VM] PAGING DATA EMITTED | flowHash=${System.identityHashCode(it)} | time=${kotlin.time.Clock.System.now()}")
     }.cachedIn(viewModelScope)
+
+    val currentLevel: StateFlow<PostLevel> = currentLevelManager.currentLevel
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = PostLevel.LOCALITY
+        )
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val activeIssues: StateFlow<Int> = currentLevelManager.currentLevel
@@ -86,11 +104,6 @@ class HomeViewModel(
 
     init {
         observeProfile()
-        viewModelScope.launch {
-            currentLevelManager.currentLevel.collect { level ->
-                updateState { it.copy(postLevel = level) }
-            }
-        }
     }
 
     private fun observeProfile() {
@@ -160,33 +173,56 @@ class HomeViewModel(
         }
     }
 
-    private fun openComments(postId: String) {
-        val existingFlow = _uiState.value.commentFlows[postId]
-        if (existingFlow == null) {
-            val flow = postRepository.getPagedComments(postId).cachedIn(viewModelScope)
-            updateState { 
-                it.copy(
-                    commentFlows = it.commentFlows + (postId to flow),
-                    showCommentsSheetForPostId = postId
-                ) 
-            }
-        } else {
-            updateState { it.copy(showCommentsSheetForPostId = postId) }
+    private fun comments(postId: String): Flow<PagingData<Comment>> {
+        return conversationCache.getOrPut(postId) {
+            postRepository.getPagedComments(postId).cachedIn(viewModelScope)
         }
     }
 
+    private fun openComments(postId: String) {
+        val cachedFlow = comments(postId)
+        _activeCommentsFlow.value = cachedFlow
+        updateState { it.copy(showCommentsSheetForPostId = postId) }
+    }
+
     private fun dismissComments() {
+        _activeCommentsFlow.value = null
         updateState { it.copy(showCommentsSheetForPostId = null) }
     }
 
     private fun comment(postId: String, comment: String) {
-        viewModelScope.launch {
-            when (val result = postRepository.addComment(postId, comment)) {
-                is DataState.Error -> handleError(result.exception)
-                else -> {
-                    // When comment is successfully added to backend, we could optionally trigger a local reload 
-                    // of the comment paging flow if needed, but since it's an optimistic update on post's 
-                    // comment count, the count will increment anyway.
+        val currentFlow = conversationCache[postId]
+        if (currentFlow != null) {
+            val optimisticComment = Comment(
+                id = "temp_${kotlin.random.Random.nextLong()}",
+                postId = postId,
+                text = comment,
+                timeAgo = "Just now",
+                userName = "You",
+                userImageUrl = _uiState.value.currentUserImage ?: ""
+            )
+            
+            val updatedFlow = currentFlow.map { pagingData ->
+                pagingData.insertHeaderItem(item = optimisticComment)
+            }
+            conversationCache[postId] = updatedFlow
+            _activeCommentsFlow.value = updatedFlow
+            
+            viewModelScope.launch {
+                when (val result = postRepository.addComment(postId, comment)) {
+                    is DataState.Error -> {
+                        conversationCache[postId] = currentFlow
+                        _activeCommentsFlow.value = currentFlow
+                        handleError(result.exception)
+                    }
+                    else -> {}
+                }
+            }
+        } else {
+            viewModelScope.launch {
+                when (val result = postRepository.addComment(postId, comment)) {
+                    is DataState.Error -> handleError(result.exception)
+                    else -> {}
                 }
             }
         }
@@ -238,10 +274,8 @@ sealed interface HomeIntent {
 }
 
 data class HomeState(
-    val postLevel: PostLevel = PostLevel.LOCALITY,
     val query: String = "",
     val error: String? = null,
-    val commentFlows: Map<String, Flow<PagingData<Comment>>> = emptyMap(),
     val showCommentsSheetForPostId: String? = null,
     val expandedPostId: String? = null,
     val currentUserImage: String? = null

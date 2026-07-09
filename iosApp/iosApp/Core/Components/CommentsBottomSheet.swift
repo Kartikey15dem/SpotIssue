@@ -2,10 +2,13 @@ import SwiftUI
 import Shared
 
 struct CommentsBottomSheet: View {
-    let comments: [Comment]
+    @ObservedObject var pagingHolder: PagingItemsHolder<Comment>
+    let presentation: PagingPresentation<Comment>
     let currentUserImageUrl: String?
     let onDismiss: () -> Void
     let onSubmit: (String) -> Void
+    let onRefresh: () -> Void
+    let onRetry: () -> Void
     var onItemAppeared: ((Int) -> Void)? = nil
     
     @State private var commentText: String = ""
@@ -28,16 +31,35 @@ struct CommentsBottomSheet: View {
             Divider()
             
             // Comments List
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    ForEach(Array(comments.enumerated()), id: \.element.id) { index, comment in
-                        CommentItem(comment: comment)
-                            .onAppear {
-                                onItemAppeared?(index)
+            Group {
+                if !presentation.showContent {
+                    PagingInitialStateView(
+                        presentation: presentation,
+                        onRefresh: onRefresh,
+                        emptyMessage: "No comments yet. Be the first to start the discussion!"
+                    )
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(0..<presentation.itemCount, id: \.self) { index in
+                                if let comment = pagingHolder.items?.get(index: Int32(index)) {
+                                    CommentItem(comment: comment)
+                                        .id(comment.id)
+                                        .onAppear {
+                                            onItemAppeared?(index)
+                                        }
+                                }
                             }
+
+                            PagingFooterView(
+                                state: presentation.footer,
+                                onRetry: onRetry,
+                                endMessage: "No more comments"
+                            )
+                        }
+                        .padding()
                     }
                 }
-                .padding()
             }
             
             Divider()
@@ -80,6 +102,7 @@ struct CommentsBottomSheet: View {
         }
         .background(IssueSpotColors.surface)
     }
+
 }
 
 private struct CommentItem: View {
@@ -121,6 +144,12 @@ private struct CommentItem: View {
                     .font(IssueSpotTypography.bodyLarge)
                     .foregroundColor(IssueSpotColors.onSurface)
             }
+        }
+        .onAppear {
+            print("\(PagingDebug.tag)\nComments PagingHolder CREATED")
+        }
+        .onDisappear {
+            print("\(PagingDebug.tag)\nComments PagingHolder DESTROYED")
         }
     }
 }

@@ -2,200 +2,134 @@ import SwiftUI
 import Shared
 
 struct HomeScreen: View {
-    @StateObject private var holder = KoinHelper().holder { $0.getHomeViewModel() }
+    @StateObject private var holder: ViewModelHolder<HomeViewModel>
+    @StateObject private var postsPagingHolder: PagingItemsHolder<Post>
     @EnvironmentObject var router: Router
-    
-    
+
+    @State private var localityScrollPosition = ScrollPosition(idType: String.self)
+    @State private var districtScrollPosition = ScrollPosition(idType: String.self)
+    @State private var stateScrollPosition = ScrollPosition(idType: String.self)
+    @State private var nationalScrollPosition = ScrollPosition(idType: String.self)
+
+    init() {
+        let holder = KoinHelper().holder { $0.getHomeViewModel() }
+        _holder = StateObject(wrappedValue: holder)
+        _postsPagingHolder = StateObject(
+            wrappedValue: PagingItemsHolder(
+                flow: holder.vm.pagedPosts,
+                sourceKey: "home-feed"
+            )
+        )
+    }
 
     var body: some View {
+        let _ = print("""
+        [HOME_RECOMPOSE] HomeScreen BODY
+        [HOME_RECOMPOSE] time=\(Date())
+        [HOME_RECOMPOSE] ========================
+        """)
+        let _ = print("\(PagingDebug.tag)\nHomeScreen BODY")
         Observing(holder.vm.uiState) { (state: HomeState) in
-            ZStack(alignment: .bottom) {
+            ZStack(alignment: .top) {
                 IssueSpotColors.background
                     .ignoresSafeArea()
                 
-                let flow = state.postsFlow
-                
-                VStack(spacing: 0) {
-                    if let expandedPost = state.expandedPost {
-                        let override = state.postOverrides[expandedPost.id]
-                        let isLiked = override?.isLiked?.boolValue ?? expandedPost.isLiked
-                        let resolvedLikes = override?.likesCount?.intValue ?? Int(expandedPost.likes)
-                        let resolvedComments = override?.commentsCount?.intValue ?? Int(expandedPost.comments)
-                        let isReported = override?.isReported?.boolValue ?? expandedPost.isReported
-                        
-                        PostCard(
-                            post: expandedPost,
-                            isLiked: isLiked,
-                            likesCount: resolvedLikes,
-                            commentsCount: resolvedComments,
-                            isReported: isReported,
-                            canDelete: false,
-                            canReport: true,
-                            isDetailMode: true,
-                            onLikeClick: {
-                                holder.vm.onIntent(intent: HomeIntentLikeClicked(postId: expandedPost.id, currentIsLiked: isLiked, currentLikesCount: Int32(resolvedLikes)))
-                            },
-                            onCommentIconClick: {
-                                holder.vm.onIntent(intent: HomeIntentCommentsIconClicked(postId: expandedPost.id, currentCommentsCount: Int32(resolvedComments)))
-                            },
-                            onShareClick: {
-                                holder.vm.onIntent(intent: HomeIntentShareClicked(post: expandedPost))
-                            },
-                            onReportClick: { reason in
-                                holder.vm.onIntent(intent: HomeIntentReportClicked(postId: expandedPost.id, reason: reason))
-                            },
-                            onDeleteClick: {},
-                            onPostClick: {},
-                            onCollapseClick: {
-                                holder.vm.onIntent(intent: HomeIntentDismissPost.shared)
-                            }
-                        )
-                        .transition(.move(edge: .bottom))
-                        .zIndex(1)
-                    } else {
-                        HomeHeader(state: state, onIntent: { intent in
-                            holder.vm.onIntent(intent: intent)
-                        })
-                        
-                        let isQueryNotBlank = !state.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        let activeFlow = (isQueryNotBlank && state.searchPostsFlow != nil)
-                            ? state.searchPostsFlow
-                            : state.postsFlow
-                        
-                        ScrollView {
-                            LazyVStack(spacing: IssueSpotSpacing.smallMedium) {
-                                Spacer().frame(height: IssueSpotSpacing.small)
-                                
-                                let flowId = (isQueryNotBlank && state.searchPostsFlow != nil) ? "search_\(state.query)" : "posts"
-                                ObservePagingItems(Post.self, flow: activeFlow) { snapshot, pagingHolder in
-                                    Group {
-                                        if snapshot.items.isEmpty {
-                                            if snapshot.isRefreshing {
-                                                ProgressView()
-                                                    .progressViewStyle(CircularProgressViewStyle(tint: IssueSpotColors.primary))
-                                                    .frame(maxWidth: .infinity)
-                                                    .frame(height: 300)
-                                            } else if let error = snapshot.error, !snapshot.isAppendError {
-                                                VStack(spacing: IssueSpotSpacing.small) {
-                                                    Text(error)
-                                                        .font(IssueSpotTypography.bodyMedium)
-                                                        .foregroundColor(IssueSpotColors.onSurfaceVariant)
-                                                    Button(action: { pagingHolder.refresh() }) {
-                                                        Text("Retry")
-                                                            .font(IssueSpotTypography.labelMedium)
-                                                            .foregroundColor(IssueSpotColors.onPrimary)
-                                                            .padding(.horizontal, IssueSpotSpacing.medium)
-                                                            .padding(.vertical, IssueSpotSpacing.small)
-                                                            .background(IssueSpotColors.primary)
-                                                            .cornerRadius(8)
-                                                    }
-                                                }
-                                                .frame(maxWidth: .infinity)
-                                                .frame(height: 300)
-                                            } else {
-                                                Text("No posts found")
-                                                    .font(IssueSpotTypography.bodyLarge)
-                                                    .foregroundColor(IssueSpotColors.onBackground)
-                                                    .frame(maxWidth: .infinity)
-                                                    .frame(height: 300)
-                                            }
-                                        }
-                                        
-                                        ForEach(Array(snapshot.items.enumerated()), id: \.element.id) { index, post in
-                                            let override = state.postOverrides[post.id]
-                                            let isLiked = override?.isLiked?.boolValue ?? post.isLiked
-                                            let resolvedLikes = override?.likesCount?.intValue ?? Int(post.likes)
-                                            let resolvedComments = override?.commentsCount?.intValue ?? Int(post.comments)
-                                            let isReported = override?.isReported?.boolValue ?? post.isReported
-                                            
-                                            PostCard(
-                                                post: post,
-                                                isLiked: isLiked,
-                                                likesCount: resolvedLikes,
-                                                commentsCount: resolvedComments,
-                                                isReported: isReported,
-                                                canDelete: false,
-                                                canReport: true,
-                                                isDetailMode: false,
-                                                onLikeClick: {
-                                                    holder.vm.onIntent(intent: HomeIntentLikeClicked(postId: post.id, currentIsLiked: isLiked, currentLikesCount: Int32(resolvedLikes)))
-                                                },
-                                                onCommentIconClick: {
-                                                    holder.vm.onIntent(intent: HomeIntentCommentsIconClicked(postId: post.id, currentCommentsCount: Int32(resolvedComments)))
-                                                },
-                                                onShareClick: {
-                                                    holder.vm.onIntent(intent: HomeIntentShareClicked(post: post))
-                                                },
-                                                onReportClick: { reason in
-                                                    holder.vm.onIntent(intent: HomeIntentReportClicked(postId: post.id, reason: reason))
-                                                },
-                                                onDeleteClick: {},
-                                                onPostClick: {
-                                                    holder.vm.onIntent(intent: HomeIntentPostClicked(post: post))
-                                                },
-                                                onCollapseClick: {}
-                                            )
-                                            .padding(.horizontal, IssueSpotSpacing.medium)
-                                            .onAppear {
-                                                pagingHolder.loadNextPageIfNecessary(index: index)
-                                            }
-                                        }
-                                        
-                                        if snapshot.isAppending {
-                                            ProgressView()
-                                                .padding()
-                                        } else if snapshot.isAppendError, let error = snapshot.error {
-                                            VStack {
-                                                Text(error)
-                                                    .font(IssueSpotTypography.bodyMedium)
-                                                    .foregroundColor(IssueSpotColors.onSurfaceVariant)
-                                                Button("Retry") { pagingHolder.retry() }
-                                                    .font(IssueSpotTypography.labelMedium)
-                                                    .foregroundColor(IssueSpotColors.onPrimary)
-                                                    .padding(.horizontal, IssueSpotSpacing.medium)
-                                                    .padding(.vertical, IssueSpotSpacing.small)
-                                                    .background(IssueSpotColors.primary)
-                                                    .cornerRadius(8)
-                                            }
-                                            .padding()
-                                        } else if !snapshot.isAppending && snapshot.isAppendEndOfPaginationReached && !snapshot.items.isEmpty {
-                                            Text("No more posts")
-                                                .font(IssueSpotTypography.bodyMedium)
-                                                .foregroundColor(IssueSpotColors.onSurfaceVariant)
-                                                .padding()
-                                        } else {
-                                            Spacer().frame(height: IssueSpotSpacing.medium)
-                                        }
-                                        
-                                        Color.clear
-                                            .frame(width: 0, height: 0)
-                                            .onChange(of: snapshot.error) { newError in
-                                                if let error = newError, !snapshot.isAppendError, !snapshot.items.isEmpty {
-                                                    holder.vm.onIntent(intent: HomeIntentShowRefreshErrorSnackbar(message: error))
-                                                }
-                                            }
-                                    }
-                                    .refreshable {
-                                        holder.vm.onIntent(intent: HomeIntentPullRefreshStarted.shared)
-                                        pagingHolder.refresh()
-                                    }
+                Observing(holder.vm.expandedPost) { expandedPost in
+                    let _ = print("""
+                    [HOME_RECOMPOSE] ExpandedPost OBSERVED
+                    [HOME_RECOMPOSE] postId=\(expandedPost?.id ?? "nil")
+                    [HOME_RECOMPOSE] time=\(Date())
+                    [HOME_RECOMPOSE] ========================
+                    """)
+                    let _ = print("\(PagingDebug.tag)\nExpandedPost Changed\npostId: \(expandedPost?.id ?? "nil")")
+                    VStack(spacing: 0) {
+                        if let expandedPost {
+                            let isLiked = expandedPost.isLiked
+                            let resolvedLikes = Int(expandedPost.likes)
+                            let resolvedComments = Int(expandedPost.comments)
+                            let isReported = expandedPost.isReported
+
+                            PostCard(
+                                post: expandedPost,
+                                isLiked: isLiked,
+                                likesCount: resolvedLikes,
+                                commentsCount: resolvedComments,
+                                isReported: isReported,
+                                canDelete: false,
+                                canReport: true,
+                                isDetailMode: true,
+                                onLikeClick: {
+                                    holder.vm.onIntent(intent: HomeIntentLikeClicked(postId: expandedPost.id))
+                                },
+                                onCommentIconClick: {
+                                    holder.vm.onIntent(intent: HomeIntentCommentsIconClicked(postId: expandedPost.id))
+                                },
+                                onShareClick: {
+                                    holder.vm.onIntent(intent: HomeIntentShareClicked(post: expandedPost))
+                                },
+                                onReportClick: { reason in
+                                    holder.vm.onIntent(intent: HomeIntentReportClicked(postId: expandedPost.id, reason: reason))
+                                },
+                                onDeleteClick: {},
+                                onPostClick: {},
+                                onCollapseClick: {
+                                    holder.vm.onIntent(intent: HomeIntentDismissPost.shared)
                                 }
-                                .id(flowId)
+                            )
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                            .transition(.move(edge: .bottom))
+                            .zIndex(1)
+                        } else {
+                            Observing(holder.vm.currentLevel) { currentLevel in
+                                let _ = print("""
+                                [HOME_RECOMPOSE] CurrentLevel OBSERVED
+                                [HOME_RECOMPOSE] \(currentLevel)
+                                [HOME_RECOMPOSE] time=\(Date())
+                                [HOME_RECOMPOSE] ========================
+                                """)
+                                let _ = print("\(PagingDebug.tag)\nCurrentLevel Changed\nlevel: \(currentLevel)")
+                                Observing(holder.vm.activeIssues) { activeIssues in
+                                    let _ = print("""
+                                    [HOME_RECOMPOSE] ActiveIssues OBSERVED
+                                    [HOME_RECOMPOSE] count=\(activeIssues)
+                                    [HOME_RECOMPOSE] time=\(Date())
+                                    [HOME_RECOMPOSE] ========================
+                                    """)
+                                    HomePagingContainer(
+                                        state: state,
+                                        currentLevel: currentLevel,
+                                        activeIssues: activeIssues,
+                                        pagingHolder: postsPagingHolder,
+                                        scrollPosition: scrollPosition(for: currentLevel),
+                                        onIntent: holder.vm.onIntent
+                                    )
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                                }
                             }
                         }
                     }
-                } // End VStack
-                
-                // Bottom Navigation Bar
-                if state.expandedPost == nil {
-                    VStack {
-                        Spacer()
-                        HomeBottomNavigationBar(
-                            currentLevel: state.postLevel,
-                            onLevelChange: { level in
-                                holder.vm.onIntent(intent: HomeIntentChangeLevel(level: level))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+                    // Bottom Navigation Bar
+                    if expandedPost == nil {
+                        Observing(holder.vm.currentLevel) { currentLevel in
+                            let _ = print("""
+                            [HOME_RECOMPOSE] CurrentLevel OBSERVED
+                            [HOME_RECOMPOSE] \(currentLevel)
+                            [HOME_RECOMPOSE] time=\(Date())
+                            [HOME_RECOMPOSE] ========================
+                            """)
+                            VStack {
+                                Spacer()
+                                HomeBottomNavigationBar(
+                                    currentLevel: currentLevel,
+                                    onLevelChange: { level in
+                                        holder.vm.onIntent(intent: HomeIntentChangeLevel(level: level))
+                                    }
+                                )
                             }
-                        )
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
                     }
                 }
             }
@@ -208,7 +142,7 @@ struct HomeScreen: View {
                     case is HomeSideEffectNavigateToProfile:
                         router.navigate(to: .profile)
                     case let errorEffect as HomeSideEffectShowError:
-                        print("Error: \(errorEffect.message)")
+                        SnackbarManager.shared.show(errorEffect.message)
                     case let snackbarEffect as HomeSideEffectShowSnackbar:
                         SnackbarManager.shared.show(snackbarEffect.message)
                     case let shareEffect as HomeSideEffectSharePost:
@@ -223,23 +157,40 @@ struct HomeScreen: View {
                 set: { if !$0 { holder.vm.onIntent(intent: HomeIntentDismissCommentsSheet.shared) } }
             )) {
                 if let postId = state.showCommentsSheetForPostId {
-                    let override = state.postOverrides[postId]
-                    let commentsFlow = override?.commentsFlow
-                    ObservePagingItems(Comment.self, flow: commentsFlow) { commentsSnapshot, pagingHolder in
-                        CommentsBottomSheet(
-                            comments: commentsSnapshot.items,
-                            currentUserImageUrl: state.currentUserImage,
-                            onDismiss: { holder.vm.onIntent(intent: HomeIntentDismissCommentsSheet.shared) },
-                            onSubmit: { text in
-                                let currentCount = override?.commentsCount?.int32Value ?? 0
-                                holder.vm.onIntent(intent: HomeIntentCommentSubmitted(postId: postId, commentText: text, currentCommentCount: currentCount))
-                            },
-                            onItemAppeared: { index in
-                                pagingHolder.loadNextPageIfNecessary(index: index)
+                    Observing(holder.vm.activeCommentsFlow) { activeCommentsFlow in
+                        let _ = print("\(PagingDebug.tag)\nComments Flow Changed\npostId: \(postId)")
+                        if let activeCommentsFlow {
+                            ObserveErasedPagingItems(
+                                Comment.self,
+                                flow: activeCommentsFlow,
+                                sourceKey: "home-comments:\(postId)"
+                            ) { commentsSnapshot, pagingHolder in
+                                let commentsPresentation = PagingPresentation(
+                                    snapshot: commentsSnapshot,
+                                    endRule: .comments
+                                )
+
+                                CommentsBottomSheet(
+                                    pagingHolder: pagingHolder,
+                                    presentation: commentsPresentation,
+                                    currentUserImageUrl: state.currentUserImage,
+                                    onDismiss: { holder.vm.onIntent(intent: HomeIntentDismissCommentsSheet.shared) },
+                                    onSubmit: { text in
+                                        holder.vm.onIntent(intent: HomeIntentCommentSubmitted(postId: postId, commentText: text))
+                                    },
+                                    onRefresh: pagingHolder.refresh,
+                                    onRetry: pagingHolder.retry,
+                                    onItemAppeared: { index in
+                                        pagingHolder.loadNextPageIfNecessary(index: index)
+                                    }
+                                )
                             }
-                        )
+                            .id("comments_\(postId)")
+                        } else {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: IssueSpotColors.primary))
+                        }
                     }
-                    .id("comments_\(postId)")
                 }
             }
         }
@@ -253,13 +204,163 @@ struct HomeScreen: View {
         let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
         rootVC.present(activityVC, animated: true, completion: nil)
     }
+
+    private func scrollPosition(for level: Shared.PostLevel) -> Binding<ScrollPosition> {
+        switch level {
+        case .locality:
+            return $localityScrollPosition
+        case .district:
+            return $districtScrollPosition
+        case .state:
+            return $stateScrollPosition
+        case .national:
+            return $nationalScrollPosition
+        }
+    }
+}
+
+private struct HomePagingContainer: View {
+    let state: HomeState
+    let currentLevel: Shared.PostLevel
+    let activeIssues: KotlinInt
+    @ObservedObject var pagingHolder: PagingItemsHolder<Post>
+    let scrollPosition: Binding<ScrollPosition>
+    let onIntent: (HomeIntent) -> Void
+
+    var body: some View {
+        let _ = print("""
+        [HOME_RECOMPOSE] HomePagingContainer BODY
+        [HOME_RECOMPOSE] time=\(Date())
+        [HOME_RECOMPOSE] ========================
+        """)
+        let _ = print("\(PagingDebug.tag)\nHomePagingContainer BODY")
+        VStack(spacing: 0) {
+            HomeHeader(
+                state: state,
+                currentLevel: currentLevel,
+                activeIssues: activeIssues,
+                onIntent: onIntent
+            )
+
+            ScrollView {
+                LazyVStack(spacing: IssueSpotSpacing.smallMedium) {
+                    Spacer().frame(height: IssueSpotSpacing.small)
+                    HomePostsList(pagingHolder: pagingHolder, onIntent: onIntent)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .scrollPosition(scrollPosition)
+            .refreshable {
+                pagingHolder.refresh()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+}
+
+private struct HomePostsList: View {
+    @ObservedObject var pagingHolder: PagingItemsHolder<Post>
+    let onIntent: (HomeIntent) -> Void
+
+    var body: some View {
+        ObservePagingItemsHolder(pagingHolder: pagingHolder) { snapshot, pagingHolder in
+            let _ = print("""
+            [HOME_RECOMPOSE] HomePostsList BODY
+            [HOME_RECOMPOSE] itemCount=\(snapshot.itemCount)
+            [HOME_RECOMPOSE] refresh=\(snapshot.isRefreshing)
+            [HOME_RECOMPOSE] append=\(snapshot.isAppending)
+            [HOME_RECOMPOSE] time=\(Date())
+            [HOME_RECOMPOSE] ========================
+            """)
+            let _ = print("\(PagingDebug.tag)\nHomePostsList BODY\nitemCount=\(snapshot.itemCount)\nrefreshing=\(snapshot.isRefreshing)\nappending=\(snapshot.isAppending)")
+            let presentation = PagingPresentation(snapshot: snapshot, endRule: .home)
+            
+            Group {
+                if !presentation.showContent {
+                    PagingInitialStateView(
+                        presentation: presentation,
+                        onRefresh: { pagingHolder.refresh() },
+                        emptyMessage: "No posts available"
+                    )
+                }
+
+                if presentation.showContent {
+                    ForEach(0..<presentation.itemCount, id: \.self) { index in
+                        if let post = pagingHolder.items?.get(index: Int32(index)) {
+                            let isFirstOrLast = index == 0 || index >= presentation.itemCount - 5
+                            let _ = isFirstOrLast ? print("\(PagingDebug.tag)\nROW\nindex=\(index)\npostId=\(post.id)") : ()
+                            PostCard(
+                                post: post,
+                                isLiked: post.isLiked,
+                                likesCount: Int(post.likes),
+                                commentsCount: Int(post.comments),
+                                isReported: post.isReported,
+                                canDelete: false,
+                                canReport: true,
+                                isDetailMode: false,
+                                onLikeClick: {
+                                    onIntent(HomeIntentLikeClicked(postId: post.id))
+                                },
+                                onCommentIconClick: {
+                                    onIntent(HomeIntentCommentsIconClicked(postId: post.id))
+                                },
+                                onShareClick: {
+                                    onIntent(HomeIntentShareClicked(post: post))
+                                },
+                                onReportClick: { reason in
+                                    onIntent(HomeIntentReportClicked(postId: post.id, reason: reason))
+                                },
+                                onDeleteClick: {},
+                                onPostClick: {
+                                    onIntent(HomeIntentPostClicked(postId: post.id))
+                                },
+                                onCollapseClick: {},
+                                isEdgeItem: isFirstOrLast
+                            )
+                            .padding(.horizontal, IssueSpotSpacing.medium)
+                            .id(post.id)
+                            .onAppear {
+                                pagingHolder.loadNextPageIfNecessary(index: index)
+                            }
+                        }
+                    }
+
+                    PagingFooterView(
+                        state: presentation.footer,
+                        onRetry: { pagingHolder.retry() },
+                        endMessage: "No more posts"
+                    )
+                }
+            }
+            .overlay(alignment: .top) {
+                PagingRefreshOverlay(isRefreshing: presentation.isPullRefreshing)
+            }
+            .onChange(of: presentation.isPullRefreshing) { _, newValue in
+                print("\(PagingDebug.tag)\nPull Refresh\n\(newValue)")
+            }
+            .onChange(of: presentation.refreshError) { _, error in
+                if let error, presentation.showContent {
+                    onIntent(HomeIntentShowRefreshErrorSnackbar(message: error))
+                }
+            }
+        }
+    }
 }
 
 struct HomeHeader: View {
     let state: HomeState
+    let currentLevel: Shared.PostLevel
+    let activeIssues: KotlinInt
     let onIntent: (HomeIntent) -> Void
     
     var body: some View {
+        let _ = print("""
+        [HOME_RECOMPOSE] HomeHeader BODY
+        [HOME_RECOMPOSE] query=\(state.query)
+        [HOME_RECOMPOSE] level=\(currentLevel)
+        [HOME_RECOMPOSE] time=\(Date())
+        [HOME_RECOMPOSE] ========================
+        """)
         VStack(spacing: 0) {
             HStack(alignment: .center) {
                 // Search Field
@@ -313,23 +414,23 @@ struct HomeHeader: View {
                     Spacer().frame(height: IssueSpotSpacing.smallMedium)
                     
                     HStack {
-                        PostLevelChip(postLevel: state.postLevel)
+                        PostLevelChip(postLevel: currentLevel)
                         Spacer().frame(width: IssueSpotSpacing.small)
-                        Text("\(state.activeIssues) active issues")
+                        Text("\(activeIssues.intValue) active issues")
                             .font(IssueSpotTypography.bodyLarge)
                             .foregroundColor(IssueSpotColors.onSurfaceVariant)
                     }
                     
                     Spacer().frame(height: IssueSpotSpacing.smallMedium)
                     
-                    Text("\(state.postLevel.displayName) Issues")
+                    Text("\(currentLevel.displayName) Issues")
                         .font(IssueSpotTypography.bodyLarge)
                         .fontWeight(.bold)
                         .foregroundColor(IssueSpotColors.onSurface)
                     
                     Spacer().frame(height: IssueSpotSpacing.extraSmall)
                     
-                    Text(state.postLevel.text)
+                    Text(currentLevel.text)
                         .font(IssueSpotTypography.bodyLarge)
                         .foregroundColor(IssueSpotColors.onSurfaceVariant)
                 }
@@ -359,6 +460,12 @@ struct HomeBottomNavigationBar: View {
     ]
     
     var body: some View {
+        let _ = print("""
+        [HOME_RECOMPOSE] BottomNavigation BODY
+        [HOME_RECOMPOSE] level=\(currentLevel)
+        [HOME_RECOMPOSE] time=\(Date())
+        [HOME_RECOMPOSE] ========================
+        """)
         HStack {
             ForEach(items, id: \.level.name) { item in
                 let isSelected = currentLevel == item.level
