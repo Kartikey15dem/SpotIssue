@@ -2,7 +2,10 @@ package org.example.project.core.data.repository
 
 import androidx.paging.PagingData
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import org.example.project.core.model.home.Post
+import org.example.project.core.presentation.FeedRefreshReason
+import org.example.project.core.presentation.FeedState
 import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
 
@@ -11,6 +14,17 @@ import org.example.project.core.utils.DataState
  * Defines data operations for the profile feature with caching strategy
  */
 interface ProfileRepository {
+    val profilePostsState: StateFlow<FeedState>
+
+    fun startProfilePosts(isMine: Boolean, sort: String = "LATEST")
+
+    fun stopProfilePosts()
+
+    fun refreshProfilePosts(reason: FeedRefreshReason)
+
+    fun retryProfilePosts()
+
+    fun loadMoreProfilePosts()
 
     /**
      * Get paged user posts (network PagingSource via Pager).

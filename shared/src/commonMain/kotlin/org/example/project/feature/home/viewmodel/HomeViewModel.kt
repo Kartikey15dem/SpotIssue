@@ -58,6 +58,7 @@ class HomeViewModel(
     val activeCommentsFlow = _activeCommentsFlow.asStateFlow()
 
     val feedState: StateFlow<FeedState> = feedRepository.feedState
+    val searchState: StateFlow<FeedState> = feedRepository.searchState
 
     init {
         viewModelScope.launch {
@@ -70,22 +71,22 @@ class HomeViewModel(
                 feedRepository.start(level, location)
             }
         }
-    }
 
-    @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
-    val pagedPosts: Flow<PagingData<Post>> = combine(
-        currentLevelManager.currentLevel,
-        _uiState.map { it.query }.debounce(300).distinctUntilChanged(),
-        prefRepository.userData.map { it.userLocation }.distinctUntilChanged()
-    ) { level, query, location ->
-        Triple(level, query, location)
-    }.flatMapLatest { (level, query, location) ->
-        if (query.isBlank()) {
-            emptyFlow() // Handled by feedState now
-        } else {
-            feedRepository.getPagedSearchPosts(query, level)
+        viewModelScope.launch {
+            combine(
+                currentLevelManager.currentLevel,
+                _uiState.map { it.query }.debounce(300).distinctUntilChanged()
+            ) { level, query ->
+                Pair(level, query)
+            }.collect { (level, query) ->
+                if (query.isBlank()) {
+                    feedRepository.clearSearch()
+                } else {
+                    feedRepository.startSearch(query, level)
+                }
+            }
         }
-    }.cachedIn(viewModelScope)
+    }
 
     val currentLevel: StateFlow<PostLevel> = currentLevelManager.currentLevel
         .stateIn(
@@ -150,8 +151,12 @@ class HomeViewModel(
                 viewModelScope.launch { _sideEffects.send(HomeSideEffect.ShowSnackbar(intent.message)) }
             }
             HomeIntent.LoadMorePosts -> feedRepository.loadMore()
-            is HomeIntent.RefreshPosts -> feedRepository.refresh(org.example.project.core.presentation.FeedRefreshReason.PULL_TO_REFRESH)
+            is HomeIntent.RefreshPosts,
+            HomeIntent.RefreshCurrentPosts -> feedRepository.refresh(org.example.project.core.presentation.FeedRefreshReason.PULL_TO_REFRESH)
             HomeIntent.RetryPosts -> feedRepository.retry()
+            HomeIntent.LoadMoreSearchPosts -> feedRepository.loadMoreSearch()
+            HomeIntent.RefreshSearchPosts -> feedRepository.refreshSearch()
+            HomeIntent.RetrySearchPosts -> feedRepository.retrySearch()
         }
     }
 
@@ -291,7 +296,11 @@ sealed interface HomeIntent {
     data class ChangeLevel(val level: PostLevel) : HomeIntent
     data object LoadMorePosts : HomeIntent
     data class RefreshPosts(val location: UserLocation = UserLocation()) : HomeIntent
+    data object RefreshCurrentPosts : HomeIntent
     data object RetryPosts : HomeIntent
+    data object LoadMoreSearchPosts : HomeIntent
+    data object RefreshSearchPosts : HomeIntent
+    data object RetrySearchPosts : HomeIntent
 }
 
 data class HomeState(

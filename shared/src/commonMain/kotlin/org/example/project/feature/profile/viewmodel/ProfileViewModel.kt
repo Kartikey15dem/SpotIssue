@@ -25,6 +25,8 @@ import kotlinx.coroutines.launch
 import org.example.project.core.data.repository.PostRepository
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.data.mappers.Sort
+import org.example.project.core.presentation.FeedRefreshReason
+import org.example.project.core.presentation.FeedState
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.Comment
 import org.example.project.core.model.profile.Profile
@@ -47,18 +49,7 @@ class ProfileViewModel(
     private val _activeCommentsFlow = MutableStateFlow<Flow<PagingData<Comment>>?>(null)
     val activeCommentsFlow = _activeCommentsFlow.asStateFlow()
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val pagedPosts: Flow<PagingData<Post>> = _uiState
-        .map { Pair(it.isMine, it.sort) }
-        .distinctUntilChanged()
-        .flatMapLatest { (isMine, sort) ->
-            if (isMine) profileRepository.getPagedUserPosts(sort.name)
-            else profileRepository.getPagedLikedPosts(sort.name)
-        }
-        .cachedIn(viewModelScope)
-
-
-
+    val profilePostsState: StateFlow<FeedState> = profileRepository.profilePostsState
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val expandedPost: StateFlow<Post?> = _uiState
@@ -77,6 +68,18 @@ class ProfileViewModel(
     init {
         observeProfile()
         fetchProfile()
+        observePostSelection()
+    }
+
+    private fun observePostSelection() {
+        viewModelScope.launch {
+            _uiState
+                .map { Pair(it.isMine, it.sort) }
+                .distinctUntilChanged()
+                .collect { (isMine, sort) ->
+                    profileRepository.startProfilePosts(isMine = isMine, sort = sort.name)
+                }
+        }
     }
 
     private fun observeProfile() {
@@ -107,8 +110,6 @@ class ProfileViewModel(
             }
         }
     }
-
-    // Post flows are now initialized directly in pagedPosts property
 
     private fun changeSort(sort: Sort) {
         if (_uiState.value.sort == sort) return
@@ -261,6 +262,9 @@ class ProfileViewModel(
             ProfileIntent.ErrorShown -> clearError()
             ProfileIntent.RetryProfileClicked -> fetchProfile()
             is ProfileIntent.ShowRefreshErrorSnackbar -> {}
+            ProfileIntent.LoadMorePosts -> profileRepository.loadMoreProfilePosts()
+            ProfileIntent.RefreshPosts -> profileRepository.refreshProfilePosts(FeedRefreshReason.PULL_TO_REFRESH)
+            ProfileIntent.RetryPosts -> profileRepository.retryProfilePosts()
         }
     }
 
@@ -314,6 +318,9 @@ sealed interface ProfileIntent {
     data object ErrorShown : ProfileIntent
     data object RetryProfileClicked : ProfileIntent
     data class ShowRefreshErrorSnackbar(val message: String) : ProfileIntent
+    data object LoadMorePosts : ProfileIntent
+    data object RefreshPosts : ProfileIntent
+    data object RetryPosts : ProfileIntent
 }
 
 data class ProfileState(

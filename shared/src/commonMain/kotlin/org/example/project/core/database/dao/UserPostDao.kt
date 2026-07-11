@@ -30,11 +30,11 @@ interface UserPostDao {
     @Query("SELECT * FROM user_posts ORDER BY createdAt DESC")
     suspend fun getUserPosts(): List<UserPostEntity>
 
-    @Query("SELECT * FROM user_posts ORDER BY createdAt DESC")
-    fun observeUserPosts(): Flow<List<UserPostEntity>>
+    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY createdAt DESC")
+    fun observeUserPosts(sort: String): Flow<List<UserPostEntity>>
 
-    @Query("SELECT * FROM user_posts ORDER BY createdAt ASC")
-    fun observeUserPostsOldest(): Flow<List<UserPostEntity>>
+    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY createdAt ASC")
+    fun observeUserPostsOldest(sort: String): Flow<List<UserPostEntity>>
 
     @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY likes DESC, createdAt DESC")
     fun observeUserPostsPopular(sort: String): Flow<List<UserPostEntity>>

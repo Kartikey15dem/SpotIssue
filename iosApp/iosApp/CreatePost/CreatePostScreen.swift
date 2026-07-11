@@ -198,7 +198,7 @@ struct CreatePostScreen: View {
                     case is CreatePostSideEffectNavigateBack:
                         router.goBack()
                     case let errorEffect as CreatePostSideEffectShowError:
-                        print("Error: \(errorEffect.message)")
+                        SnackbarManager.shared.show(errorEffect.message)
                     case is CreatePostSideEffectStartBackgroundUpload:
                         PostUploadWorker.shared.enqueue()
                     default:

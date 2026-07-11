@@ -16,6 +16,7 @@ import org.example.project.core.utils.DataState
  */
 interface FeedRepository {
     val feedState: StateFlow<FeedState>
+    val searchState: StateFlow<FeedState>
 
     fun start(postLevel: PostLevel, userLocation: UserLocation)
     fun stop()
@@ -23,6 +24,12 @@ interface FeedRepository {
     fun refresh(reason: FeedRefreshReason)
     fun retry()
     fun loadMore()
+
+    fun startSearch(query: String, postLevel: PostLevel)
+    fun clearSearch()
+    fun refreshSearch()
+    fun retrySearch()
+    fun loadMoreSearch()
 
     fun observeActiveIssuesCount(postLevel: PostLevel): Flow<Int>
     fun getPagedSearchPosts(query: String, postLevel: PostLevel): Flow<PagingData<Post>>

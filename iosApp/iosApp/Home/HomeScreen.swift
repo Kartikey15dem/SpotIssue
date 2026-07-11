@@ -3,7 +3,6 @@ import Shared
 
 struct HomeScreen: View {
     @StateObject private var holder: ViewModelHolder<HomeViewModel>
-    @StateObject private var postsPagingHolder: PagingItemsHolder<Post>
     @EnvironmentObject var router: Router
 
     @State private var localityScrollPosition = ScrollPosition(idType: String.self)
@@ -14,12 +13,6 @@ struct HomeScreen: View {
     init() {
         let holder = KoinHelper().holder { $0.getHomeViewModel() }
         _holder = StateObject(wrappedValue: holder)
-        _postsPagingHolder = StateObject(
-            wrappedValue: PagingItemsHolder(
-                flow: holder.vm.pagedPosts,
-                sourceKey: "home-feed"
-            )
-        )
     }
 
     var body: some View {
@@ -95,15 +88,33 @@ struct HomeScreen: View {
                                     [HOME_RECOMPOSE] time=\(Date())
                                     [HOME_RECOMPOSE] ========================
                                     """)
-                                    HomePagingContainer(
-                                        state: state,
-                                        currentLevel: currentLevel,
-                                        activeIssues: activeIssues,
-                                        pagingHolder: postsPagingHolder,
-                                        scrollPosition: scrollPosition(for: currentLevel),
-                                        onIntent: holder.vm.onIntent
-                                    )
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                                    if state.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                        Observing(holder.vm.feedState) { (feedState: FeedState) in
+                                            HomeFeedContainer(
+                                                state: state,
+                                                currentLevel: currentLevel,
+                                                activeIssues: activeIssues,
+                                                feedState: feedState,
+                                                scrollPosition: scrollPosition(for: currentLevel),
+                                                onIntent: holder.vm.onIntent,
+                                                isSearch: false
+                                            )
+                                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                                        }
+                                    } else {
+                                        Observing(holder.vm.searchState) { (searchState: FeedState) in
+                                            HomeFeedContainer(
+                                                state: state,
+                                                currentLevel: currentLevel,
+                                                activeIssues: activeIssues,
+                                                feedState: searchState,
+                                                scrollPosition: scrollPosition(for: currentLevel),
+                                                onIntent: holder.vm.onIntent,
+                                                isSearch: true
+                                            )
+                                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -219,21 +230,21 @@ struct HomeScreen: View {
     }
 }
 
-private struct HomePagingContainer: View {
+private struct HomeFeedContainer: View {
     let state: HomeState
     let currentLevel: Shared.PostLevel
     let activeIssues: KotlinInt
-    @ObservedObject var pagingHolder: PagingItemsHolder<Post>
+    let feedState: FeedState
     let scrollPosition: Binding<ScrollPosition>
     let onIntent: (HomeIntent) -> Void
+    let isSearch: Bool
 
     var body: some View {
         let _ = print("""
-        [HOME_RECOMPOSE] HomePagingContainer BODY
+        [HOME_RECOMPOSE] HomeFeedContainer BODY
         [HOME_RECOMPOSE] time=\(Date())
         [HOME_RECOMPOSE] ========================
         """)
-        let _ = print("\(PagingDebug.tag)\nHomePagingContainer BODY")
         VStack(spacing: 0) {
             HomeHeader(
                 state: state,
@@ -245,13 +256,17 @@ private struct HomePagingContainer: View {
             ScrollView {
                 LazyVStack(spacing: IssueSpotSpacing.smallMedium) {
                     Spacer().frame(height: IssueSpotSpacing.small)
-                    HomePostsList(pagingHolder: pagingHolder, onIntent: onIntent)
+                    HomePostsList(
+                        feedState: feedState,
+                        onIntent: onIntent,
+                        isSearch: isSearch
+                    )
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .scrollPosition(scrollPosition)
             .refreshable {
-                pagingHolder.refresh()
+                onIntent(isSearch ? HomeIntentRefreshSearchPosts.shared : HomeIntentRefreshCurrentPosts.shared)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -259,89 +274,77 @@ private struct HomePagingContainer: View {
 }
 
 private struct HomePostsList: View {
-    @ObservedObject var pagingHolder: PagingItemsHolder<Post>
+    let feedState: FeedState
     let onIntent: (HomeIntent) -> Void
+    let isSearch: Bool
 
     var body: some View {
-        ObservePagingItemsHolder(pagingHolder: pagingHolder) { snapshot, pagingHolder in
-            let _ = print("""
-            [HOME_RECOMPOSE] HomePostsList BODY
-            [HOME_RECOMPOSE] itemCount=\(snapshot.itemCount)
-            [HOME_RECOMPOSE] refresh=\(snapshot.isRefreshing)
-            [HOME_RECOMPOSE] append=\(snapshot.isAppending)
-            [HOME_RECOMPOSE] time=\(Date())
-            [HOME_RECOMPOSE] ========================
-            """)
-            let _ = print("\(PagingDebug.tag)\nHomePostsList BODY\nitemCount=\(snapshot.itemCount)\nrefreshing=\(snapshot.isRefreshing)\nappending=\(snapshot.isAppending)")
-            let presentation = PagingPresentation(snapshot: snapshot, endRule: .home)
-            
-            Group {
-                if !presentation.showContent {
-                    PagingInitialStateView(
-                        presentation: presentation,
-                        onRefresh: { pagingHolder.refresh() },
-                        emptyMessage: "No posts available"
-                    )
-                }
+        Group {
+            if feedState.posts.isEmpty {
+                FeedInitialStateView(
+                    feedState: feedState,
+                    onRetry: { onIntent(isSearch ? HomeIntentRetrySearchPosts.shared : HomeIntentRetryPosts.shared) },
+                    emptyMessage: "No posts available"
+                )
+            }
 
-                if presentation.showContent {
-                    ForEach(0..<presentation.itemCount, id: \.self) { index in
-                        if let post = pagingHolder.items?.get(index: Int32(index)) {
-                            let isFirstOrLast = index == 0 || index >= presentation.itemCount - 5
-                            let _ = isFirstOrLast ? print("\(PagingDebug.tag)\nROW\nindex=\(index)\npostId=\(post.id)") : ()
-                            PostCard(
-                                post: post,
-                                isLiked: post.isLiked,
-                                likesCount: Int(post.likes),
-                                commentsCount: Int(post.comments),
-                                isReported: post.isReported,
-                                canDelete: false,
-                                canReport: true,
-                                isDetailMode: false,
-                                onLikeClick: {
-                                    onIntent(HomeIntentLikeClicked(postId: post.id))
-                                },
-                                onCommentIconClick: {
-                                    onIntent(HomeIntentCommentsIconClicked(postId: post.id))
-                                },
-                                onShareClick: {
-                                    onIntent(HomeIntentShareClicked(post: post))
-                                },
-                                onReportClick: { reason in
-                                    onIntent(HomeIntentReportClicked(postId: post.id, reason: reason))
-                                },
-                                onDeleteClick: {},
-                                onPostClick: {
-                                    onIntent(HomeIntentPostClicked(postId: post.id))
-                                },
-                                onCollapseClick: {},
-                                isEdgeItem: isFirstOrLast
-                            )
-                            .padding(.horizontal, IssueSpotSpacing.medium)
-                            .id(post.id)
-                            .onAppear {
-                                pagingHolder.loadNextPageIfNecessary(index: index)
-                            }
+            if !feedState.posts.isEmpty {
+                ForEach(Array(feedState.posts.enumerated()), id: \.element.id) { index, post in
+                    let isFirstOrLast = index == 0 || index >= feedState.posts.count - 5
+                    PostCard(
+                        post: post,
+                        isLiked: post.isLiked,
+                        likesCount: Int(post.likes),
+                        commentsCount: Int(post.comments),
+                        isReported: post.isReported,
+                        canDelete: false,
+                        canReport: true,
+                        isDetailMode: false,
+                        onLikeClick: {
+                            onIntent(HomeIntentLikeClicked(postId: post.id))
+                        },
+                        onCommentIconClick: {
+                            onIntent(HomeIntentCommentsIconClicked(postId: post.id))
+                        },
+                        onShareClick: {
+                            onIntent(HomeIntentShareClicked(post: post))
+                        },
+                        onReportClick: { reason in
+                            onIntent(HomeIntentReportClicked(postId: post.id, reason: reason))
+                        },
+                        onDeleteClick: {},
+                        onPostClick: {
+                            onIntent(HomeIntentPostClicked(postId: post.id))
+                        },
+                        onCollapseClick: {},
+                        isEdgeItem: isFirstOrLast
+                    )
+                    .padding(.horizontal, IssueSpotSpacing.medium)
+                    .id(post.id)
+                    .onAppear {
+                        if index >= feedState.posts.count - 5 {
+                            onIntent(isSearch ? HomeIntentLoadMoreSearchPosts.shared : HomeIntentLoadMorePosts.shared)
                         }
                     }
+                }
 
-                    PagingFooterView(
-                        state: presentation.footer,
-                        onRetry: { pagingHolder.retry() },
-                        endMessage: "No more posts"
-                    )
-                }
+                FeedFooterView(
+                    feedState: feedState,
+                    onRetry: { onIntent(isSearch ? HomeIntentRetrySearchPosts.shared : HomeIntentRetryPosts.shared) },
+                    endMessage: "No more posts"
+                )
             }
-            .overlay(alignment: .top) {
-                PagingRefreshOverlay(isRefreshing: presentation.isPullRefreshing)
+        }
+        .overlay(alignment: .top) {
+            if feedState.isRefreshing && !feedState.posts.isEmpty {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: IssueSpotColors.primary))
+                    .padding(.top, IssueSpotSpacing.small)
             }
-            .onChange(of: presentation.isPullRefreshing) { _, newValue in
-                print("\(PagingDebug.tag)\nPull Refresh\n\(newValue)")
-            }
-            .onChange(of: presentation.refreshError) { _, error in
-                if let error, presentation.showContent {
-                    onIntent(HomeIntentShowRefreshErrorSnackbar(message: error))
-                }
+        }
+        .onChange(of: feedState.error?.message) { _, error in
+            if let error, !feedState.posts.isEmpty {
+                onIntent(HomeIntentShowRefreshErrorSnackbar(message: error))
             }
         }
     }

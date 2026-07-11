@@ -3,7 +3,6 @@ import Shared
 
 struct ProfileScreen: View {
     @StateObject private var holder: ViewModelHolder<ProfileViewModel>
-    @StateObject private var postsPagingHolder: PagingItemsHolder<Post>
     @EnvironmentObject var router: Router
     
     @State private var postToDelete: String? = nil
@@ -14,12 +13,6 @@ struct ProfileScreen: View {
     init() {
         let holder = KoinHelper().holder { $0.getProfileViewModel() }
         _holder = StateObject(wrappedValue: holder)
-        _postsPagingHolder = StateObject(
-            wrappedValue: PagingItemsHolder(
-                flow: holder.vm.pagedPosts,
-                sourceKey: "profile-posts"
-            )
-        )
     }
 
     var body: some View {
@@ -93,15 +86,16 @@ struct ProfileScreen: View {
                         .transition(.move(edge: .bottom))
                         .zIndex(1)
                     } else {
-                        let pagingSourceKey = "profile:\(state.isMine):\(state.sort.name)"
-                        ProfilePagingContainer(
-                            state: state,
-                            holder: holder,
-                            postsPagingHolder: postsPagingHolder,
-                            pagingSourceKey: pagingSourceKey,
-                            showScrollToTop: $showScrollToTop,
-                            postToDelete: $postToDelete
-                        )
+                        Observing(holder.vm.profilePostsState) { (profilePostsState: FeedState) in
+                            ProfileFeedContainer(
+                                state: state,
+                                holder: holder,
+                                profilePostsState: profilePostsState,
+                                showScrollToTop: $showScrollToTop,
+                                postToDelete: $postToDelete
+                            )
+                            .id("profile:\(state.isMine):\(state.sort.name)")
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -201,11 +195,10 @@ struct ProfileScreen: View {
     }
 }
 
-private struct ProfilePagingContainer: View {
+private struct ProfileFeedContainer: View {
     let state: ProfileState
     let holder: ViewModelHolder<ProfileViewModel>
-    @ObservedObject var postsPagingHolder: PagingItemsHolder<Post>
-    let pagingSourceKey: String
+    let profilePostsState: FeedState
     @Binding var showScrollToTop: Bool
     @Binding var postToDelete: String?
     
@@ -260,8 +253,7 @@ private struct ProfilePagingContainer: View {
                             .padding(.horizontal, IssueSpotSpacing.medium)
 
                         ProfilePostsListView(
-                            pagingHolder: postsPagingHolder,
-                            pagingSourceKey: pagingSourceKey,
+                            feedState: profilePostsState,
                             state: state,
                             holder: holder,
                             onDelete: { postToDelete = $0 }
@@ -272,7 +264,7 @@ private struct ProfilePagingContainer: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .refreshable {
-                    postsPagingHolder.refresh()
+                    holder.vm.onIntent(intent: ProfileIntentRefreshPosts.shared)
                 }
                 .onScrollGeometryChange(for: Bool.self) { geometry in
                     geometry.contentOffset.y > 120
@@ -304,45 +296,23 @@ private struct ProfilePagingContainer: View {
 }
 
 private struct ProfilePostsListView: View {
-    @ObservedObject var pagingHolder: PagingItemsHolder<Post>
-    let pagingSourceKey: String
+    let feedState: FeedState
     let state: ProfileState
     let holder: ViewModelHolder<ProfileViewModel>
     let onDelete: (String) -> Void
 
-    init(
-        pagingHolder: PagingItemsHolder<Post>,
-        pagingSourceKey: String,
-        state: ProfileState,
-        holder: ViewModelHolder<ProfileViewModel>,
-        onDelete: @escaping (String) -> Void
-    ) {
-        self.pagingHolder = pagingHolder
-        self.pagingSourceKey = pagingSourceKey
-        self.state = state
-        self.holder = holder
-        self.onDelete = onDelete
-        
-        // Bind synchronously during struct initialization so no stale data is ever shown
-        pagingHolder.bind(flow: holder.vm.pagedPosts, sourceKey: pagingSourceKey)
-    }
-
     var body: some View {
-        ObservePagingItemsHolder(pagingHolder: pagingHolder) { snapshot, pagingHolder in
-            let presentation = PagingPresentation(snapshot: snapshot, endRule: .profile)
-            
-            Group {
-                if !presentation.showContent {
-                    PagingInitialStateView(
-                        presentation: presentation,
-                        onRefresh: { pagingHolder.refresh() },
-                        emptyMessage: "No posts found"
-                    )
-                }
+        Group {
+            if feedState.posts.isEmpty {
+                FeedInitialStateView(
+                    feedState: feedState,
+                    onRetry: { holder.vm.onIntent(intent: ProfileIntentRetryPosts.shared) },
+                    emptyMessage: "No posts found"
+                )
+            }
 
-        if presentation.showContent {
-            ForEach(0..<presentation.itemCount, id: \.self) { index in
-                if let post = pagingHolder.items?.get(index: Int32(index)) {
+            if !feedState.posts.isEmpty {
+                ForEach(Array(feedState.posts.enumerated()), id: \.element.id) { index, post in
                     let isLiked = post.isLiked
                     let resolvedLikes = Int(post.likes)
                     let resolvedComments = Int(post.comments)
@@ -370,34 +340,33 @@ private struct ProfilePostsListView: View {
                         onCollapseClick: {}
                     )
                     .padding(.horizontal, IssueSpotSpacing.medium)
-                    .id(post.id)
+                    .id("\(state.isMine)_\(state.sort.name)_\(post.id)")
                     .onAppear {
-                        pagingHolder.loadNextPageIfNecessary(index: index)
+                        if index >= feedState.posts.count - 5 {
+                            holder.vm.onIntent(intent: ProfileIntentLoadMorePosts.shared)
+                        }
                     }
                 }
-            }
-        }
 
-        if presentation.showContent {
-            PagingFooterView(
-                state: presentation.footer,
-                onRetry: { pagingHolder.retry() },
-                endMessage: "No more posts"
-            )
+                FeedFooterView(
+                    feedState: feedState,
+                    onRetry: { holder.vm.onIntent(intent: ProfileIntentRetryPosts.shared) },
+                    endMessage: "No more posts"
+                )
+            }
         }
-        } // closes Group(4)
-            .overlay(alignment: .top) {
-                PagingRefreshOverlay(isRefreshing: presentation.isPullRefreshing)
+        .overlay(alignment: .top) {
+            if feedState.isRefreshing && !feedState.posts.isEmpty {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: IssueSpotColors.primary))
+                    .padding(.top, IssueSpotSpacing.small)
             }
-            .onChange(of: presentation.isPullRefreshing) { _, newValue in
-                print("\(PagingDebug.tag)\nPull Refresh\n\(newValue)")
-            }
-            .onChange(of: presentation.refreshError) { _, error in
-                if let error, presentation.showContent {
-                    holder.vm.onIntent(
-                        intent: ProfileIntentShowRefreshErrorSnackbar(message: error)
-                    )
-                }
+        }
+        .onChange(of: feedState.error?.message) { _, error in
+            if let error, !feedState.posts.isEmpty {
+                holder.vm.onIntent(
+                    intent: ProfileIntentShowRefreshErrorSnackbar(message: error)
+                )
             }
         }
     }

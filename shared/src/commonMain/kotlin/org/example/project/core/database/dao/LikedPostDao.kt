@@ -30,11 +30,11 @@ interface LikedPostDao {
     @Query("SELECT * FROM liked_posts ORDER BY createdAt DESC")
     suspend fun getLikedPosts(): List<LikedPostEntity>
 
-    @Query("SELECT * FROM liked_posts ORDER BY createdAt DESC")
-    fun observeLikedPosts(): Flow<List<LikedPostEntity>>
+    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY createdAt DESC")
+    fun observeLikedPosts(sort: String): Flow<List<LikedPostEntity>>
 
-    @Query("SELECT * FROM liked_posts ORDER BY likedAt ASC")
-    fun observeLikedPostsOldest(): Flow<List<LikedPostEntity>>
+    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY likedAt ASC")
+    fun observeLikedPostsOldest(sort: String): Flow<List<LikedPostEntity>>
 
     @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY likes DESC, createdAt DESC")
     fun observeLikedPostsPopular(sort: String): Flow<List<LikedPostEntity>>

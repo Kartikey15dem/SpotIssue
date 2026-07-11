@@ -1,6 +1,7 @@
 import SwiftUI
 import Shared
 import PhotosUI
+import UIKit
 
 struct EditProfileScreen: View {
     @StateObject private var holder = KoinHelper().holder { $0.getEditProfileViewModel() }
@@ -50,7 +51,10 @@ private struct EditProfileMainView: View {
                 get: { nil },
                 set: { url in
                     if let url = url {
-                        vm.onIntent(intent: EditProfileIntentImageUrlChanged(url: url.absoluteString))
+                        Task {
+                            let preparedUrl = await prepareProfileImage(from: url)
+                            vm.onIntent(intent: EditProfileIntentImageUrlChanged(url: preparedUrl.path))
+                        }
                     }
                 }
             ), isPresented: $isCameraPresented, sourceType: .camera)
@@ -194,11 +198,19 @@ private struct EditProfileMainView: View {
         if state.emailChangeStep == .request {
             TextField("New Email", text: Binding(get: { state.newEmail }, set: { vm.onIntent(intent: EditProfileIntentNewEmailChanged(email: $0)) }))
             Button("Send OTP") { vm.onIntent(intent: EditProfileIntentRequestEmailChangeClicked.shared) }
-            Button("Cancel", role: .cancel) { }
+                .disabled(state.isEmailUpdating || state.newEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button("Cancel", role: .cancel) { vm.onIntent(intent: EditProfileIntentDismissEmailChangeDialog.shared) }
+                .disabled(state.isEmailUpdating)
         } else {
-            TextField("6-digit code", text: $otpCode).keyboardType(.numberPad)
+            TextField("6-digit code", text: Binding(
+                get: { otpCode },
+                set: { otpCode = String($0.prefix(6)) }
+            ))
+            .keyboardType(.numberPad)
             Button("Verify") { vm.onIntent(intent: EditProfileIntentVerifyEmailChangeClicked(otp: otpCode)) }
-            Button("Cancel", role: .cancel) { }
+                .disabled(state.isEmailUpdating || otpCode.count != 6)
+            Button("Cancel", role: .cancel) { vm.onIntent(intent: EditProfileIntentDismissEmailChangeDialog.shared) }
+                .disabled(state.isEmailUpdating)
         }
     }
     
@@ -213,10 +225,44 @@ private struct EditProfileMainView: View {
                 if let data = try? await item.loadTransferable(type: Data.self) {
                     let tempUrl = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
                     try? data.write(to: tempUrl)
-                    vm.onIntent(intent: EditProfileIntentImageUrlChanged(url: tempUrl.absoluteString))
+                    let preparedUrl = await prepareProfileImage(from: tempUrl)
+                    vm.onIntent(intent: EditProfileIntentImageUrlChanged(url: preparedUrl.path))
                 }
             }
         }
+    }
+
+    private func prepareProfileImage(from url: URL) async -> URL {
+        await Task.detached(priority: .userInitiated) {
+            guard let imageData = try? Data(contentsOf: url),
+                  let image = UIImage(data: imageData) else {
+                return url
+            }
+
+            let maxDimension: CGFloat = 1024
+            var scaledSize = image.size
+            if image.size.width > maxDimension || image.size.height > maxDimension {
+                let ratio = min(maxDimension / image.size.width, maxDimension / image.size.height)
+                scaledSize = CGSize(width: image.size.width * ratio, height: image.size.height * ratio)
+            }
+
+            UIGraphicsBeginImageContextWithOptions(scaledSize, false, 1.0)
+            image.draw(in: CGRect(origin: .zero, size: scaledSize))
+            let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
+            UIGraphicsEndImageContext()
+
+            guard let compressedData = (resizedImage ?? image).jpegData(compressionQuality: 0.7) else {
+                return url
+            }
+
+            let compressedUrl = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "_profile.jpg")
+            do {
+                try compressedData.write(to: compressedUrl)
+                return compressedUrl
+            } catch {
+                return url
+            }
+        }.value
     }
     
     private func observeSideEffects() async {
@@ -226,6 +272,8 @@ private struct EditProfileMainView: View {
                 router.goBack()
             case is EditProfileSideEffectShowCamera:
                 isCameraPresented = true
+            case let errorEffect as EditProfileSideEffectShowError:
+                SnackbarManager.shared.show(errorEffect.message)
             case let snackbarEffect as EditProfileSideEffectShowSnackbar:
                 SnackbarManager.shared.show(snackbarEffect.message)
             default: break

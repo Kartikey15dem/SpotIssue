@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -50,6 +51,7 @@ import androidx.compose.material3.Snackbar
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
@@ -68,9 +70,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.paging.LoadState
-import androidx.paging.compose.itemKey
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.example.project.R
 import org.example.project.core.components.PostCard
 import org.example.project.core.components.PostLevelChip
@@ -78,6 +79,7 @@ import org.example.project.core.data.mappers.Sort
 import org.example.project.core.model.home.Comment
 import org.example.project.core.model.home.PostLevel
 import org.example.project.core.model.profile.Profile
+import org.example.project.core.presentation.FeedState
 import org.example.project.feature.profile.viewmodel.ProfileIntent
 import org.example.project.feature.profile.viewmodel.ProfileSideEffect
 import org.example.project.feature.profile.viewmodel.ProfileState
@@ -99,7 +101,7 @@ fun ProfileScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val expandedPost by viewModel.expandedPost.collectAsStateWithLifecycle()
-    val pagingItems = viewModel.pagedPosts.collectAsLazyPagingItems()
+    val profilePostsState by viewModel.profilePostsState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     val activeCommentsFlow by viewModel.activeCommentsFlow.collectAsStateWithLifecycle()
@@ -165,7 +167,7 @@ fun ProfileScreen(
             modifier = modifier.padding(padding),
             state = state,
             expandedPost = expandedPost,
-            pagingItems = pagingItems,
+            profilePostsState = profilePostsState,
             onIntent = viewModel::onIntent,
             listState = listState
         )
@@ -199,36 +201,33 @@ fun ProfileScreenContent(
     modifier: Modifier = Modifier,
     state: ProfileState,
     expandedPost: org.example.project.core.model.home.Post?,
-    pagingItems: androidx.paging.compose.LazyPagingItems<org.example.project.core.model.home.Post>,
+    profilePostsState: FeedState,
     onIntent: (ProfileIntent) -> Unit,
     listState: LazyListState
 ) {
     var postToDelete by remember { mutableStateOf<String?>(null) }
     val spacing = IssueSpotTheme.spacing
-
-    val refreshState = pagingItems?.loadState?.refresh
-    val mediatorState = pagingItems?.loadState?.mediator?.refresh
-
-    val isRefreshLoading = refreshState is LoadState.Loading
-    val isMediatorRefreshLoading = mediatorState is LoadState.Loading
-    val isRefreshIdle = refreshState is LoadState.NotLoading
-    val isMediatorIdle = mediatorState is LoadState.NotLoading
-    val refreshError = (refreshState as? LoadState.Error) ?: (mediatorState as? LoadState.Error)
-
-    val appendState = pagingItems?.loadState?.append
-    val mediatorAppendState = pagingItems?.loadState?.mediator?.append
-
-    val isAppendLoading = appendState is LoadState.Loading || mediatorAppendState is LoadState.Loading
-    val isAppendFinished = appendState is LoadState.NotLoading
-    val isMediatorAppendFinished = mediatorAppendState is LoadState.NotLoading
-    val appendError = (appendState as? LoadState.Error) ?: (mediatorAppendState as? LoadState.Error)
-    
-    val isAppendEndOfPagination = isAppendFinished && isMediatorAppendFinished && mediatorAppendState?.endOfPaginationReached == true
+    val refreshError = profilePostsState.error
+    val appendError = profilePostsState.appendError
 
     LaunchedEffect(refreshError) {
-        if (refreshError != null && (pagingItems?.itemCount ?: 0) > 0) {
-            onIntent(ProfileIntent.ShowRefreshErrorSnackbar(refreshError.error.message ?: "An error occurred"))
+        if (refreshError != null && profilePostsState.posts.isNotEmpty()) {
+            onIntent(ProfileIntent.ShowRefreshErrorSnackbar(refreshError.message))
         }
+    }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+            .distinctUntilChanged()
+            .collect { lastVisibleItem ->
+                val totalItems = listState.layoutInfo.totalItemsCount
+                if (lastVisibleItem != null &&
+                    totalItems > 0 &&
+                    lastVisibleItem >= totalItems - org.example.project.core.window.FeedConfig.LOAD_MORE_THRESHOLD
+                ) {
+                    onIntent(ProfileIntent.LoadMorePosts)
+                }
+            }
     }
 
     if (state.profile == null) {
@@ -346,7 +345,7 @@ fun ProfileScreenContent(
                         ProfilePostTabsHeader(state, onIntent)
                     }
 
-                    if ((pagingItems?.itemCount ?: 0) == 0 && (isRefreshLoading || isMediatorRefreshLoading)) {
+                    if (profilePostsState.posts.isEmpty() && profilePostsState.isLoading) {
                         item {
                             Box(
                                 modifier = Modifier.fillMaxWidth().height(300.dp),
@@ -355,7 +354,7 @@ fun ProfileScreenContent(
                                 CircularProgressIndicator(color = IssueSpotColors.Primary)
                             }
                         }
-                    } else if ((pagingItems?.itemCount ?: 0) == 0 && refreshError != null) {
+                    } else if (profilePostsState.posts.isEmpty() && refreshError != null) {
                         item {
                             Column(
                                 modifier = Modifier
@@ -366,13 +365,13 @@ fun ProfileScreenContent(
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 Text(
-                                    text = refreshError.error.message ?: "An error occurred",
+                                    text = refreshError.message,
                                     color = IssueSpotColors.OnBackground,
                                     style = IssueSpotTypography.bodyMedium
                                 )
                                 Spacer(Modifier.height(spacing.small))
                                 Button(
-                                    onClick = { pagingItems?.refresh() },
+                                    onClick = { onIntent(ProfileIntent.RetryPosts) },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = IssueSpotColors.Primary,
                                         contentColor = IssueSpotColors.OnPrimary
@@ -382,7 +381,12 @@ fun ProfileScreenContent(
                                 }
                             }
                         }
-                    } else if ((pagingItems?.itemCount ?: 0) == 0 && isRefreshIdle && isMediatorIdle && refreshError == null) {
+                    } else if (
+                        profilePostsState.posts.isEmpty() &&
+                        !profilePostsState.isLoading &&
+                        !profilePostsState.isRefreshing &&
+                        profilePostsState.error == null
+                    ) {
                         item {
                             Box(
                                 modifier = Modifier
@@ -401,11 +405,9 @@ fun ProfileScreenContent(
                     }
 
                     items(
-                        count = pagingItems?.itemCount ?: 0,
-                        key = pagingItems?.itemKey { "${state.isMine}_${state.sort}_${it.id}" }
-                    ) { index ->
-                        val post = pagingItems?.get(index)
-                        if (post != null) {
+                        items = profilePostsState.posts,
+                        key = { post -> "${state.isMine}_${state.sort}_${post.id}" }
+                    ) { post ->
                             val isLiked = post.isLiked
                             val resolvedLikes = post.likes
                             val resolvedComments = post.comments
@@ -435,7 +437,6 @@ fun ProfileScreenContent(
                                 },
                                 onPostClick = { onIntent(ProfileIntent.PostClicked(post)) }
                             )
-                        }
                     }
 
                     item {
@@ -446,7 +447,7 @@ fun ProfileScreenContent(
                             contentAlignment = Alignment.Center
                         ) {
                             when {
-                                isAppendLoading -> {
+                                profilePostsState.isAppending -> {
                                     CircularProgressIndicator(color = IssueSpotColors.Primary)
                                 }
                                 appendError != null -> {
@@ -458,13 +459,13 @@ fun ProfileScreenContent(
                                         verticalArrangement = Arrangement.Center
                                     ) {
                                         Text(
-                                            text = appendError.error.message ?: "An error occurred",
+                                            text = appendError.message,
                                             color = IssueSpotColors.OnBackground,
                                             style = IssueSpotTypography.bodyMedium
                                         )
                                         Spacer(Modifier.height(spacing.small))
                                         Button(
-                                            onClick = { pagingItems?.retry() },
+                                            onClick = { onIntent(ProfileIntent.RetryPosts) },
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = IssueSpotColors.Primary,
                                                 contentColor = IssueSpotColors.OnPrimary
@@ -474,7 +475,7 @@ fun ProfileScreenContent(
                                         }
                                     }
                                 }
-                                isAppendEndOfPagination && (pagingItems?.itemCount ?: 0) > 0 -> {
+                                !profilePostsState.hasMore && profilePostsState.posts.isNotEmpty() -> {
                                     Text(
                                         modifier = Modifier
                                             .fillMaxWidth()

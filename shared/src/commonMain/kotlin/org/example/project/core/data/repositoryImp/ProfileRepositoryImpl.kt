@@ -5,9 +5,17 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import androidx.paging.ExperimentalPagingApi
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.database.IssueSpotDatabase
@@ -28,6 +36,7 @@ import org.example.project.core.data.paging.ProfileLikedPostsRemoteMediator
 import org.example.project.core.data.paging.ProfileUserPostsRemoteMediator
 import org.example.project.core.datastore.UserPreferencesRepository
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
@@ -43,7 +52,16 @@ import okio.buffer
 import okio.SYSTEM
 import org.example.project.core.network.dto.EmailChangeRequest
 import org.example.project.core.network.dto.EmailChangeVerifyRequest
+import org.example.project.core.network.dto.PagedResponse
+import org.example.project.core.network.dto.PostWithProfileDto
+import org.example.project.core.presentation.FeedError
+import org.example.project.core.presentation.FeedRefreshReason
+import org.example.project.core.presentation.FeedState
+import org.example.project.core.presentationcache.PresentationCache
 import org.example.project.core.utils.NetworkMonitor
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class ProfileRepositoryImpl(
     private val profileService: ProfileService,
@@ -54,9 +72,287 @@ class ProfileRepositoryImpl(
 ) : ProfileRepository {
 
     private val logger = Logger.Companion.withTag("ProfileRepository")
+    private val scope = CoroutineScope(Dispatchers.IO)
+    private val pagingMutex = Mutex()
+    private val presentationCache = PresentationCache<Post, String> { it.id }
+    private val pagingStatesByKey = mutableMapOf<ProfilePostsKey, PagingState>()
+    private val automaticRefreshAttemptedKeys = mutableSetOf<ProfilePostsKey>()
+    private var activePostsKey: ProfilePostsKey? = null
+    private var pagingState = PagingState()
+    private var roomJob: Job? = null
+    private var networkJob: Job? = null
+
+    private data class ProfilePostsKey(val isMine: Boolean, val sort: String)
+
+    private data class PagingState(
+        val nextPage: Int = 0,
+        val hasMore: Boolean = true,
+        val generation: Long = 0L,
+        val lastFailedAction: RetryAction? = null,
+        val lastFailedPage: Int = 0
+    )
+
+    private enum class RetryAction {
+        REFRESH, LOAD_MORE
+    }
+
+    private val _profilePostsState = MutableStateFlow(FeedState())
+    override val profilePostsState: StateFlow<FeedState> = _profilePostsState.asStateFlow()
 
     companion object {
         private const val CURRENT_USER_ID = "current_user"
+    }
+
+    override fun startProfilePosts(isMine: Boolean, sort: String) {
+        val key = ProfilePostsKey(isMine = isMine, sort = sort)
+        if (activePostsKey == key) return
+
+        scope.launch {
+            val cachedCount = getCachedPostCount(key)
+            var shouldRefresh = false
+            pagingMutex.withLock {
+                networkJob?.cancel()
+                saveCurrentPagingState()
+                val restored = pagingStatesByKey[key] ?: PagingState()
+                pagingState = restored.copy(
+                    generation = restored.generation + 1,
+                    lastFailedAction = null
+                )
+                presentationCache.clear()
+                activePostsKey = key
+                shouldRefresh = key !in automaticRefreshAttemptedKeys
+                _profilePostsState.value = FeedState(
+                    isLoading = shouldRefresh && cachedCount == 0,
+                    hasMore = pagingState.hasMore
+                )
+            }
+
+            restartRoomObservation()
+            if (shouldRefresh) {
+                refreshProfilePosts(FeedRefreshReason.LEVEL_CHANGED)
+            } else if (cachedCount == 0) {
+                _profilePostsState.update { it.copy(isLoading = false) }
+            }
+        }
+    }
+
+    override fun stopProfilePosts() {
+        networkJob?.cancel()
+        roomJob?.cancel()
+    }
+
+    override fun refreshProfilePosts(reason: FeedRefreshReason) {
+        val key = activePostsKey ?: return
+        if ((reason == FeedRefreshReason.LEVEL_CHANGED || reason == FeedRefreshReason.NETWORK_RESTORED) &&
+            !automaticRefreshAttemptedKeys.add(key)
+        ) {
+            return
+        }
+
+        networkJob?.cancel()
+        networkJob = scope.launch {
+            val cachedCount = getCachedPostCount(key)
+            val requestGeneration = pagingMutex.withLock {
+                pagingState = pagingState.copy(
+                    nextPage = 0,
+                    hasMore = true,
+                    generation = pagingState.generation + 1,
+                    lastFailedAction = null,
+                    lastFailedPage = 0
+                )
+                pagingState.generation
+            }
+
+            _profilePostsState.update {
+                it.copy(
+                    isLoading = cachedCount == 0,
+                    isRefreshing = cachedCount > 0,
+                    isAppending = false,
+                    isRetrying = false,
+                    hasMore = true,
+                    error = null,
+                    appendError = null
+                )
+            }
+
+            try {
+                val response = fetchProfilePage(key, 0)
+                val posts = response.items.map { it.toPost() }
+                val hasMore = response.nextKey != null && posts.isNotEmpty()
+                pagingMutex.withLock {
+                    if (requestGeneration != pagingState.generation) return@launch
+                    replaceProfilePosts(key, posts)
+                    pagingState = pagingState.copy(
+                        nextPage = response.nextKey ?: 0,
+                        hasMore = hasMore
+                    )
+                    saveCurrentPagingState()
+                }
+                _profilePostsState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        isAppending = false,
+                        isRetrying = false,
+                        hasMore = hasMore,
+                        error = null,
+                        appendError = null
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val error = mapToFeedError(e)
+                pagingMutex.withLock {
+                    if (requestGeneration == pagingState.generation) {
+                        pagingState = pagingState.copy(lastFailedAction = RetryAction.REFRESH, lastFailedPage = 0)
+                        saveCurrentPagingState()
+                    }
+                }
+                _profilePostsState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        isRetrying = false,
+                        error = error
+                    )
+                }
+            }
+        }
+    }
+
+    override fun loadMoreProfilePosts() {
+        val key = activePostsKey ?: return
+        networkJob = scope.launch {
+            val (shouldFetch, requestGeneration, pageToLoad) = pagingMutex.withLock {
+                val state = _profilePostsState.value
+                if (state.isLoading || state.isRefreshing || state.isAppending || state.isRetrying || !pagingState.hasMore) {
+                    return@withLock Triple(false, 0L, 0)
+                }
+                _profilePostsState.update { it.copy(isAppending = true, appendError = null) }
+                Triple(true, pagingState.generation, pagingState.nextPage)
+            }
+
+            if (!shouldFetch) return@launch
+
+            try {
+                val response = fetchProfilePage(key, pageToLoad)
+                val posts = response.items.map { it.toPost() }
+                val hasMore = response.nextKey != null && posts.isNotEmpty()
+                pagingMutex.withLock {
+                    if (requestGeneration != pagingState.generation) return@launch
+                    appendProfilePosts(key, posts)
+                    pagingState = pagingState.copy(
+                        nextPage = response.nextKey ?: pageToLoad,
+                        hasMore = hasMore
+                    )
+                    saveCurrentPagingState()
+                }
+                _profilePostsState.update {
+                    it.copy(
+                        isAppending = false,
+                        hasMore = hasMore,
+                        appendError = null
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val error = mapToFeedError(e)
+                pagingMutex.withLock {
+                    if (requestGeneration == pagingState.generation) {
+                        pagingState = pagingState.copy(lastFailedAction = RetryAction.LOAD_MORE, lastFailedPage = pageToLoad)
+                        saveCurrentPagingState()
+                    }
+                }
+                _profilePostsState.update {
+                    it.copy(
+                        isAppending = false,
+                        hasMore = pagingState.hasMore,
+                        appendError = error
+                    )
+                }
+            }
+        }
+    }
+
+    override fun retryProfilePosts() {
+        when (pagingState.lastFailedAction) {
+            RetryAction.LOAD_MORE -> loadMoreProfilePosts()
+            else -> refreshProfilePosts(FeedRefreshReason.RETRY)
+        }
+    }
+
+    private fun saveCurrentPagingState() {
+        activePostsKey?.let { key ->
+            pagingStatesByKey[key] = pagingState
+        }
+    }
+
+    private fun restartRoomObservation() {
+        roomJob?.cancel()
+        roomJob = scope.launch {
+            MutableStateFlow(activePostsKey)
+                .flatMapLatest { key ->
+                    if (key == null) flowOf(emptyList())
+                    else observeProfilePosts(key)
+                }
+                .collect { posts ->
+                    presentationCache.update(posts)
+                    _profilePostsState.update { it.copy(posts = presentationCache.items.toList()) }
+                }
+        }
+    }
+
+    private fun observeProfilePosts(key: ProfilePostsKey): Flow<List<Post>> {
+        return if (key.isMine) observeUserPosts(key.sort) else observeLikedPosts(key.sort)
+    }
+
+    private suspend fun getCachedPostCount(key: ProfilePostsKey): Int {
+        return if (key.isMine) database.userPostDao().getUserPostCount(key.sort)
+        else database.likedPostDao().getLikedPostCount(key.sort)
+    }
+
+    private suspend fun fetchProfilePage(
+        key: ProfilePostsKey,
+        page: Int
+    ): PagedResponse<PostWithProfileDto> {
+        return if (key.isMine) {
+            profileService.getMyPosts(page = page, limit = 20, sort = key.sort)
+        } else {
+            profileService.getMyLikedPosts(page = page, limit = 20, sort = key.sort)
+        }
+    }
+
+    private suspend fun replaceProfilePosts(key: ProfilePostsKey, posts: List<Post>) {
+        if (key.isMine) {
+            database.userPostDao().deleteAllUserPosts(key.sort)
+            database.userPostDao().insertPosts(posts.map { it.toUserPostEntity(sort = key.sort) })
+        } else {
+            database.likedPostDao().deleteAllLikedPosts(key.sort)
+            database.likedPostDao().insertPosts(posts.map { it.toLikedPostEntity(sort = key.sort) })
+        }
+    }
+
+    private suspend fun appendProfilePosts(key: ProfilePostsKey, posts: List<Post>) {
+        if (key.isMine) {
+            database.userPostDao().insertPosts(posts.map { it.toUserPostEntity(sort = key.sort) })
+        } else {
+            database.likedPostDao().insertPosts(posts.map { it.toLikedPostEntity(sort = key.sort) })
+        }
+    }
+
+    private fun mapToFeedError(e: Throwable): FeedError {
+        val msg = e.message ?: ""
+        return when {
+            msg.contains("401") -> FeedError.Authentication()
+            msg.contains("50") -> FeedError.Server()
+            msg.contains("Timeout") -> FeedError.Timeout()
+            msg.contains("resolve host") || msg.contains("Failed to connect") -> FeedError.Offline()
+            msg.contains("Serialization") || msg.contains("JSON") -> FeedError.Parsing()
+            e is io.ktor.utils.io.errors.IOException -> FeedError.Network()
+            else -> FeedError.Unknown(msg)
+        }
     }
 
     @OptIn(ExperimentalPagingApi::class, ExperimentalCoroutinesApi::class)
@@ -107,18 +403,18 @@ class ProfileRepositoryImpl(
 
     override fun observeUserPosts(sort: String): Flow<List<Post>> {
         val flow = when (sort.uppercase()) {
-            "OLDEST" -> database.userPostDao().observeUserPostsOldest()
+            "OLDEST" -> database.userPostDao().observeUserPostsOldest(sort)
             "POPULAR" -> database.userPostDao().observeUserPostsPopular(sort)
-            else -> database.userPostDao().observeUserPosts()
+            else -> database.userPostDao().observeUserPosts(sort)
         }
         return flow.map { posts -> posts.map { it.toPost() } }
     }
 
     override fun observeLikedPosts(sort: String): Flow<List<Post>> {
         val flow = when (sort.uppercase()) {
-            "OLDEST" -> database.likedPostDao().observeLikedPostsOldest()
+            "OLDEST" -> database.likedPostDao().observeLikedPostsOldest(sort)
             "POPULAR" -> database.likedPostDao().observeLikedPostsPopular(sort)
-            else -> database.likedPostDao().observeLikedPosts()
+            else -> database.likedPostDao().observeLikedPosts(sort)
         }
         return flow.map { posts -> posts.map { it.toPost() } }
     }

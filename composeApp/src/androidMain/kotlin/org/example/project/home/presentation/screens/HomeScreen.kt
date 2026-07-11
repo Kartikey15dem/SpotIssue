@@ -73,6 +73,7 @@ fun HomeScreen(
     val expandedPost by viewModel.expandedPost.collectAsStateWithLifecycle()
     
     val feedState by viewModel.feedState.collectAsStateWithLifecycle()
+    val searchState by viewModel.searchState.collectAsStateWithLifecycle()
     
     val activeCommentsFlow by viewModel.activeCommentsFlow.collectAsStateWithLifecycle()
     val activePostId = state.showCommentsSheetForPostId
@@ -127,7 +128,6 @@ fun HomeScreen(
         },
         containerColor = IssueSpotColors.Background
     ) { padding ->
-        val searchPagingItems = viewModel.pagedPosts.collectAsLazyPagingItems()
         HomeContent(
             modifier = modifier.padding(padding),
             state = state,
@@ -135,7 +135,7 @@ fun HomeScreen(
             activeIssues = activeIssues,
             expandedPost = expandedPost,
             feedState = feedState,
-            searchPagingItems = searchPagingItems,
+            searchState = searchState,
             onIntent = viewModel::onIntent,
         )
     }
@@ -183,13 +183,14 @@ fun rememberFeedUiState(
     
     val isPullRefreshing = feedState.isRefreshing && itemCount > 0
 
-    val shouldShowFooter = itemCount > 0 && !showInitialLoading && !feedState.isRefreshing
-    val showNoMorePosts = shouldShowFooter && !feedState.hasMore && feedState.error == null && !feedState.isLoading
+    val appendError = feedState.appendError
+    val shouldShowFooter = itemCount > 0 && !feedState.isRefreshing
+    val showNoMorePosts = shouldShowFooter && !feedState.hasMore && appendError == null && !feedState.isAppending
 
     val footerState = when {
         !shouldShowFooter -> FooterState.Hidden
-        feedState.isLoading -> FooterState.Loading
-        feedState.error != null -> FooterState.Error(Throwable(feedState.error?.message))
+        feedState.isAppending -> FooterState.Loading
+        appendError != null -> FooterState.Error(Throwable(appendError.message))
         showNoMorePosts -> FooterState.EndReached
         else -> FooterState.Hidden
     }
@@ -213,7 +214,7 @@ fun HomeContent(
     activeIssues: Int,
     expandedPost: Post?,
     feedState: org.example.project.core.presentation.FeedState,
-    searchPagingItems: androidx.paging.compose.LazyPagingItems<Post>,
+    searchState: org.example.project.core.presentation.FeedState,
     onIntent: (HomeIntent) -> Unit,
 ) {
     val localityState = rememberLazyListState()
@@ -280,7 +281,7 @@ fun HomeContent(
             } else {
                 if (state.query.isNotBlank()) {
                     HomeSearchFeed(
-                        searchPagingItems = searchPagingItems,
+                        searchState = searchState,
                         onIntent = onIntent,
                         modifier = Modifier.fillMaxSize(),
                         header = {

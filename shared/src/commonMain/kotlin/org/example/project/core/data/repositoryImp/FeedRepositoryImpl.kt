@@ -42,7 +42,6 @@ import org.example.project.core.window.FeedConfig
 import org.example.project.core.network.services.HomeService
 import org.example.project.core.network.dto.PagedResponse
 import org.example.project.core.network.dto.PostWithProfileDto
-import kotlin.time.Clock
 
 class FeedRepositoryImpl(
     private val homeService: HomeService,
@@ -53,16 +52,18 @@ class FeedRepositoryImpl(
 
     private val scope = CoroutineScope(Dispatchers.IO)
     
-    private val windowEngine = WindowEngine<Post>()
     private val presentationCache = PresentationCache<Post, String> { it.id }
     private val pagingMutex = Mutex()
+    private val pagingStatesByLevel = mutableMapOf<PostLevel, PagingState>()
+    private val windowEnginesByLevel = mutableMapOf<PostLevel, WindowEngine<Post>>()
+    private val automaticRefreshAttemptedLevels = mutableSetOf<PostLevel>()
 
     private data class PagingState(
-        val nextPage: Int = 1,
+        val nextPage: Int = 0,
         val hasMore: Boolean = true,
         val generation: Long = 0L,
         val lastFailedAction: RetryAction? = null,
-        val lastFailedPage: Int = 1
+        val lastFailedPage: Int = 0
     )
 
     private enum class RetryAction {
@@ -70,21 +71,34 @@ class FeedRepositoryImpl(
     }
 
     private var pagingState = PagingState()
+    private var searchPagingState = PagingState()
 
     private val _feedState = MutableStateFlow(FeedState())
     override val feedState: StateFlow<FeedState> = _feedState.asStateFlow()
+    private val _searchState = MutableStateFlow(FeedState())
+    override val searchState: StateFlow<FeedState> = _searchState.asStateFlow()
 
     private val levelFlow = MutableStateFlow<PostLevel?>(null)
-    private val windowState = MutableStateFlow(windowEngine.getState())
+    private data class SearchKey(val query: String, val level: PostLevel)
+    private var activeSearchKey: SearchKey? = null
+    private val windowState = MutableStateFlow(WindowEngine<Post>().getState())
     private var currentLocation: UserLocation? = null
 
     private var roomJob: Job? = null
     private var networkJob: Job? = null
+    private var searchJob: Job? = null
     private var networkMonitorJob: Job? = null
     private var isOnline = true
-    
-    private var lastSuccessfulRefresh: Long = 0L
-    private val REFRESH_COOLDOWN_MS = 60_000L
+
+    private fun windowEngineFor(postLevel: PostLevel): WindowEngine<Post> {
+        return windowEnginesByLevel.getOrPut(postLevel) { WindowEngine() }
+    }
+
+    private fun saveCurrentPagingState() {
+        levelFlow.value?.let { level ->
+            pagingStatesByLevel[level] = pagingState
+        }
+    }
     
     init {
         observeNetwork()
@@ -96,7 +110,8 @@ class FeedRepositoryImpl(
                 val wasOffline = !isOnline
                 isOnline = online
                 _feedState.update { it.copy(isOffline = !online) }
-                if (online && wasOffline) {
+                val currentLevel = levelFlow.value
+                if (online && wasOffline && currentLevel != null && currentLevel !in automaticRefreshAttemptedLevels) {
                     refresh(FeedRefreshReason.NETWORK_RESTORED)
                 }
             }
@@ -109,32 +124,222 @@ class FeedRepositoryImpl(
         
         if (levelChanged) {
             scope.launch {
+                val cachedCount = localDataSource.getCachedPostCount(postLevel)
+                var shouldRefreshLevel = false
                 pagingMutex.withLock {
-                    pagingState = pagingState.copy(
-                        nextPage = 1,
-                        hasMore = true,
-                        generation = pagingState.generation + 1,
+                    networkJob?.cancel()
+                    saveCurrentPagingState()
+                    val restoredState = pagingStatesByLevel[postLevel] ?: PagingState()
+                    pagingState = restoredState.copy(
+                        generation = restoredState.generation + 1,
                         lastFailedAction = null,
-                        lastFailedPage = 1
                     )
                     presentationCache.clear()
-                    windowEngine.reset()
-                    windowState.value = windowEngine.getState()
+                    windowState.value = windowEngineFor(postLevel).getState()
                     levelFlow.value = postLevel
+                    shouldRefreshLevel = postLevel !in automaticRefreshAttemptedLevels
                     
-                    _feedState.update { it.copy(posts = emptyList(), isLoading = true, error = null, isOffline = !isOnline) }
+                    _feedState.update {
+                        it.copy(
+                            posts = emptyList(),
+                            isLoading = shouldRefreshLevel && cachedCount == 0,
+                            isRefreshing = false,
+                            isAppending = false,
+                            isBackgroundRefreshing = false,
+                            isRetrying = false,
+                            hasMore = pagingState.hasMore,
+                            error = null,
+                            appendError = null,
+                            isOffline = !isOnline
+                        )
+                    }
                 }
                 restartRoomObservation()
-                refresh(FeedRefreshReason.LEVEL_CHANGED)
+                if (shouldRefreshLevel) {
+                    refresh(FeedRefreshReason.LEVEL_CHANGED)
+                } else if (cachedCount == 0) {
+                    _feedState.update { it.copy(isLoading = false) }
+                }
             }
-        } else {
-            refresh(FeedRefreshReason.APP_RESUMED)
         }
     }
     
     override fun stop() {
         networkJob?.cancel()
         roomJob?.cancel()
+    }
+
+    override fun startSearch(query: String, postLevel: PostLevel) {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isBlank()) {
+            clearSearch()
+            return
+        }
+
+        val key = SearchKey(normalizedQuery, postLevel)
+        if (activeSearchKey == key) return
+
+        activeSearchKey = key
+        searchJob?.cancel()
+        searchPagingState = PagingState(generation = searchPagingState.generation + 1)
+        _searchState.value = FeedState(isLoading = true, hasMore = true, isOffline = !isOnline)
+        refreshSearch()
+    }
+
+    override fun clearSearch() {
+        activeSearchKey = null
+        searchJob?.cancel()
+        searchPagingState = PagingState(generation = searchPagingState.generation + 1)
+        _searchState.value = FeedState()
+    }
+
+    override fun refreshSearch() {
+        val key = activeSearchKey ?: return
+        if (!isOnline) {
+            _searchState.update { it.copy(isLoading = false, isRefreshing = false, isOffline = true) }
+            return
+        }
+
+        searchJob?.cancel()
+        searchJob = scope.launch {
+            val requestGeneration = pagingMutex.withLock {
+                searchPagingState = searchPagingState.copy(
+                    nextPage = 0,
+                    hasMore = true,
+                    generation = searchPagingState.generation + 1,
+                    lastFailedAction = null,
+                    lastFailedPage = 0
+                )
+                searchPagingState.generation
+            }
+
+            val hasItems = _searchState.value.posts.isNotEmpty()
+            _searchState.update {
+                it.copy(
+                    isLoading = !hasItems,
+                    isRefreshing = hasItems,
+                    isAppending = false,
+                    isRetrying = false,
+                    hasMore = true,
+                    error = null,
+                    appendError = null,
+                    isOffline = false
+                )
+            }
+
+            try {
+                val response = fetchSearchPage(key, 0)
+                val posts = response.items.map { it.toPost() }
+                val hasMore = response.nextKey != null && posts.isNotEmpty()
+                pagingMutex.withLock {
+                    if (requestGeneration != searchPagingState.generation) return@launch
+                    searchPagingState = searchPagingState.copy(
+                        nextPage = response.nextKey ?: 0,
+                        hasMore = hasMore
+                    )
+                }
+                _searchState.update {
+                    it.copy(
+                        posts = posts,
+                        isLoading = false,
+                        isRefreshing = false,
+                        isAppending = false,
+                        isRetrying = false,
+                        hasMore = hasMore,
+                        error = null,
+                        appendError = null
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val error = mapToFeedError(e)
+                pagingMutex.withLock {
+                    if (requestGeneration == searchPagingState.generation) {
+                        searchPagingState = searchPagingState.copy(lastFailedAction = RetryAction.REFRESH, lastFailedPage = 0)
+                    }
+                }
+                _searchState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        isRetrying = false,
+                        error = error
+                    )
+                }
+            }
+        }
+    }
+
+    override fun loadMoreSearch() {
+        val key = activeSearchKey ?: return
+        if (!isOnline) return
+
+        searchJob = scope.launch {
+            val (shouldFetch, requestGeneration, pageToLoad) = pagingMutex.withLock {
+                val state = _searchState.value
+                if (state.isLoading || state.isRefreshing || state.isAppending || state.isRetrying || !searchPagingState.hasMore) {
+                    return@withLock Triple(false, 0L, 0)
+                }
+                _searchState.update { it.copy(isAppending = true, appendError = null) }
+                Triple(true, searchPagingState.generation, searchPagingState.nextPage)
+            }
+
+            if (!shouldFetch) return@launch
+
+            try {
+                val response = fetchSearchPage(key, pageToLoad)
+                val posts = response.items.map { it.toPost() }
+                val hasMore = response.nextKey != null && posts.isNotEmpty()
+                pagingMutex.withLock {
+                    if (requestGeneration != searchPagingState.generation) return@launch
+                    searchPagingState = searchPagingState.copy(
+                        nextPage = response.nextKey ?: pageToLoad,
+                        hasMore = hasMore
+                    )
+                }
+                _searchState.update {
+                    it.copy(
+                        posts = it.posts + posts,
+                        isAppending = false,
+                        hasMore = hasMore,
+                        appendError = null
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val error = mapToFeedError(e)
+                pagingMutex.withLock {
+                    if (requestGeneration == searchPagingState.generation) {
+                        searchPagingState = searchPagingState.copy(lastFailedAction = RetryAction.LOAD_MORE, lastFailedPage = pageToLoad)
+                    }
+                }
+                _searchState.update {
+                    it.copy(
+                        isAppending = false,
+                        hasMore = searchPagingState.hasMore,
+                        appendError = error
+                    )
+                }
+            }
+        }
+    }
+
+    override fun retrySearch() {
+        when (searchPagingState.lastFailedAction) {
+            RetryAction.LOAD_MORE -> loadMoreSearch()
+            else -> refreshSearch()
+        }
+    }
+
+    private suspend fun fetchSearchPage(key: SearchKey, page: Int): PagedResponse<PostWithProfileDto> {
+        return homeService.searchPosts(
+            query = key.query,
+            level = key.level.name,
+            page = page,
+            limit = 20
+        )
     }
 
     private fun restartRoomObservation() {
@@ -203,17 +408,15 @@ class FeedRepositoryImpl(
     }
 
     override fun refresh(reason: FeedRefreshReason) {
-        val now = Clock.System.now().toEpochMilliseconds()
-        
-        if (reason == FeedRefreshReason.APP_RESUMED || reason == FeedRefreshReason.NETWORK_RESTORED) {
-            if (now - lastSuccessfulRefresh < REFRESH_COOLDOWN_MS) {
-                println("[LIFECYCLE] Skipped Refresh (Cooldown active)")
-                return
-            }
-        }
-        
         if (!isOnline) {
             return
+        }
+
+        val activeLevel = levelFlow.value
+        if ((reason == FeedRefreshReason.LEVEL_CHANGED || reason == FeedRefreshReason.NETWORK_RESTORED) && activeLevel != null) {
+            if (!automaticRefreshAttemptedLevels.add(activeLevel)) {
+                return
+            }
         }
 
         networkJob?.cancel()
@@ -223,53 +426,98 @@ class FeedRepositoryImpl(
 
             val requestGeneration = pagingMutex.withLock {
                 pagingState = pagingState.copy(
-                    nextPage = 1,
+                    nextPage = 0,
                     generation = pagingState.generation + 1,
                     lastFailedAction = null,
                     hasMore = true
                 )
-                windowEngine.reset()
-                windowState.value = windowEngine.getState()
+                levelFlow.value?.let { level ->
+                    windowState.value = windowEngineFor(level).reset()
+                }
                 pagingState.generation
             }
 
-            _feedState.update { 
-                if (count == 0) it.copy(isLoading = true, error = null)
-                else if (isBackground) it.copy(isBackgroundRefreshing = true, error = null)
-                else it.copy(isRefreshing = true, error = null)
+            _feedState.update {
+                when {
+                    count == 0 -> it.copy(
+                        isLoading = true,
+                        isRefreshing = false,
+                        isAppending = false,
+                        isBackgroundRefreshing = false,
+                        isRetrying = false,
+                        hasMore = true,
+                        error = null,
+                        appendError = null
+                    )
+                    isBackground -> it.copy(
+                        isLoading = false,
+                        isBackgroundRefreshing = true,
+                        isAppending = false,
+                        hasMore = true,
+                        error = null,
+                        appendError = null
+                    )
+                    else -> it.copy(
+                        isLoading = false,
+                        isRefreshing = true,
+                        isAppending = false,
+                        hasMore = true,
+                        error = null,
+                        appendError = null
+                    )
+                }
             }
 
             try {
-                val response = fetchPageWithRetry(1)
+                val response = fetchPageWithRetry(0)
+                var hasMoreAfterRefresh = true
                 
                 pagingMutex.withLock {
                     if (requestGeneration != pagingState.generation) return@launch
                     val level = levelFlow.value ?: return@launch
                     val posts = response.items.map { it.toPost() }
                     localDataSource.replacePosts(level, posts)
+                    response.activeIssuesCount?.let { count ->
+                        localDataSource.cacheActiveIssues(level, count)
+                    }
                     
                     pagingState = pagingState.copy(
-                        nextPage = 2,
-                        hasMore = response.nextKey != null
+                        nextPage = 1,
+                        hasMore = response.nextKey != null && posts.isNotEmpty()
+                    )
+                    hasMoreAfterRefresh = pagingState.hasMore
+                    saveCurrentPagingState()
+                }
+                _feedState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        isAppending = false,
+                        isBackgroundRefreshing = false,
+                        isRetrying = false,
+                        hasMore = hasMoreAfterRefresh,
+                        error = null,
+                        appendError = null
                     )
                 }
-                lastSuccessfulRefresh = Clock.System.now().toEpochMilliseconds()
-                _feedState.update { it.copy(isLoading = false, isRefreshing = false, isBackgroundRefreshing = false, isRetrying = false, error = null) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 val error = mapToFeedError(e)
                 pagingMutex.withLock {
                     if (requestGeneration == pagingState.generation) {
-                        pagingState = pagingState.copy(lastFailedAction = RetryAction.REFRESH, lastFailedPage = 1)
+                        pagingState = pagingState.copy(lastFailedAction = RetryAction.REFRESH, lastFailedPage = 0)
+                        saveCurrentPagingState()
                     }
                 }
                 _feedState.update { 
                     it.copy(
                         isLoading = false, 
                         isRefreshing = false, 
+                        isAppending = false,
                         isBackgroundRefreshing = false,
                         isRetrying = false,
+                        hasMore = pagingState.hasMore,
                         error = if (isBackground) null else error
                     ) 
                 }
@@ -282,18 +530,19 @@ class FeedRepositoryImpl(
         
         scope.launch {
             val (shouldFetch, requestGeneration, pageToLoad) = pagingMutex.withLock {
-                if (_feedState.value.isLoading || _feedState.value.isRefreshing || _feedState.value.isRetrying || _feedState.value.isBackgroundRefreshing || !pagingState.hasMore) {
+                if (_feedState.value.isLoading || _feedState.value.isRefreshing || _feedState.value.isAppending || _feedState.value.isRetrying || _feedState.value.isBackgroundRefreshing || !pagingState.hasMore) {
                     return@withLock Triple(false, 0L, 0)
                 }
                 
                 val currentState = windowState.value
                 val items = presentationCache.items
                 val anchor = if (items.size > FeedConfig.LOAD_MORE_THRESHOLD) items[items.size - FeedConfig.LOAD_MORE_THRESHOLD] else items.lastOrNull()
-                val nextState = windowEngine.expand(anchor)
+                val activeLevel = levelFlow.value ?: return@withLock Triple(false, 0L, 0)
+                val nextState = windowEngineFor(activeLevel).expand(anchor)
                 
                 if (nextState != currentState) {
                     windowState.value = nextState
-                    _feedState.update { it.copy(isLoading = true, error = null) }
+                    _feedState.update { it.copy(isAppending = true, appendError = null) }
                     Triple(true, pagingState.generation, pagingState.nextPage)
                 } else {
                     Triple(false, 0L, 0)
@@ -304,18 +553,30 @@ class FeedRepositoryImpl(
             
             try {
                 val response = fetchPageWithRetry(pageToLoad)
+                var hasMoreAfterAppend = true
                 
                 pagingMutex.withLock {
                     if (requestGeneration != pagingState.generation) return@launch
                     val level = levelFlow.value ?: return@launch
                     val posts = response.items.map { it.toPost() }
                     localDataSource.appendPosts(level, posts)
+                    response.activeIssuesCount?.let { count ->
+                        localDataSource.cacheActiveIssues(level, count)
+                    }
                     
                     pagingState = pagingState.copy(
                         nextPage = pageToLoad + 1,
-                        hasMore = response.nextKey != null
+                        hasMore = response.nextKey != null && posts.isNotEmpty()
                     )
-                    _feedState.update { it.copy(isLoading = false, error = null) }
+                    hasMoreAfterAppend = pagingState.hasMore
+                    saveCurrentPagingState()
+                    _feedState.update {
+                        it.copy(
+                            isAppending = false,
+                            hasMore = hasMoreAfterAppend,
+                            appendError = null
+                        )
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -323,9 +584,16 @@ class FeedRepositoryImpl(
                 pagingMutex.withLock {
                     if (requestGeneration == pagingState.generation) {
                         pagingState = pagingState.copy(lastFailedAction = RetryAction.LOAD_MORE, lastFailedPage = pageToLoad)
+                        saveCurrentPagingState()
                     }
                 }
-                _feedState.update { it.copy(isLoading = false, error = mapToFeedError(e)) }
+                _feedState.update {
+                    it.copy(
+                        isAppending = false,
+                        hasMore = pagingState.hasMore,
+                        appendError = mapToFeedError(e)
+                    )
+                }
             }
         }
     }
@@ -340,44 +608,69 @@ class FeedRepositoryImpl(
             
             when (actionToRetry) {
                 RetryAction.REFRESH -> {
-                    _feedState.update { it.copy(isRetrying = true, error = null) }
+                    _feedState.update { it.copy(isRetrying = true, error = null, appendError = null) }
                     try {
-                        val response = fetchPageWithRetry(1)
+                        val response = fetchPageWithRetry(0)
+                        var hasMoreAfterRetry = true
                         pagingMutex.withLock {
                             if (requestGeneration != pagingState.generation) return@launch
                             val level = levelFlow.value ?: return@launch
                             val posts = response.items.map { it.toPost() }
                             localDataSource.replacePosts(level, posts)
-                            pagingState = pagingState.copy(nextPage = 2, hasMore = response.nextKey != null, lastFailedAction = null)
+                            response.activeIssuesCount?.let { count ->
+                                localDataSource.cacheActiveIssues(level, count)
+                            }
+                            pagingState = pagingState.copy(nextPage = 1, hasMore = response.nextKey != null && posts.isNotEmpty(), lastFailedAction = null)
+                            hasMoreAfterRetry = pagingState.hasMore
+                            saveCurrentPagingState()
                         }
-                        lastSuccessfulRefresh = Clock.System.now().toEpochMilliseconds()
-                        _feedState.update { it.copy(isRetrying = false, error = null) }
+                        _feedState.update { it.copy(isRetrying = false, hasMore = hasMoreAfterRetry, error = null, appendError = null) }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        _feedState.update { it.copy(isRetrying = false, error = mapToFeedError(e)) }
+                        _feedState.update { it.copy(isRetrying = false, hasMore = pagingState.hasMore, error = mapToFeedError(e)) }
                     }
                 }
                 RetryAction.LOAD_MORE -> {
-                    _feedState.update { it.copy(isRetrying = true, error = null) }
+                    _feedState.update { it.copy(isRetrying = true, isAppending = true, appendError = null) }
                     try {
                         val response = fetchPageWithRetry(pageToLoad)
+                        var hasMoreAfterRetry = true
                         pagingMutex.withLock {
                             if (requestGeneration != pagingState.generation) return@launch
                             val level = levelFlow.value ?: return@launch
                             val posts = response.items.map { it.toPost() }
                             localDataSource.appendPosts(level, posts)
-                            pagingState = pagingState.copy(nextPage = pageToLoad + 1, hasMore = response.nextKey != null, lastFailedAction = null)
+                            response.activeIssuesCount?.let { count ->
+                                localDataSource.cacheActiveIssues(level, count)
+                            }
+                            pagingState = pagingState.copy(nextPage = pageToLoad + 1, hasMore = response.nextKey != null && posts.isNotEmpty(), lastFailedAction = null)
+                            hasMoreAfterRetry = pagingState.hasMore
+                            saveCurrentPagingState()
                         }
-                        _feedState.update { it.copy(isRetrying = false, error = null) }
+                        _feedState.update {
+                            it.copy(
+                                isRetrying = false,
+                                isAppending = false,
+                                hasMore = hasMoreAfterRetry,
+                                appendError = null
+                            )
+                        }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        _feedState.update { it.copy(isRetrying = false, error = mapToFeedError(e)) }
+                        _feedState.update {
+                            it.copy(
+                                isRetrying = false,
+                                isAppending = false,
+                                hasMore = pagingState.hasMore,
+                                appendError = mapToFeedError(e)
+                            )
+                        }
                     }
                 }
                 null -> {
-                    if (pagingState.nextPage == 1) refresh(FeedRefreshReason.RETRY)
+                    if (pagingState.nextPage == 0) refresh(FeedRefreshReason.RETRY)
                     else loadMore()
                 }
             }
@@ -401,7 +694,7 @@ class FeedRepositoryImpl(
 
     override suspend fun searchPosts(query: String, postLevel: PostLevel): DataState<List<Post>> =
         safeApiCall(networkMonitor) {
-            homeService.searchPosts(query, postLevel.name, page = 1, limit = 100).items.map { it.toPost() }
+            homeService.searchPosts(query, postLevel.name, page = 0, limit = 100).items.map { it.toPost() }
         }
 
     override suspend fun updateLikeStatus(postId: String, likesCount: Int, isLiked: Boolean) {

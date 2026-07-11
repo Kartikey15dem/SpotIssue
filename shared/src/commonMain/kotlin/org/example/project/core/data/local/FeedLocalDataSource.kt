@@ -1,6 +1,7 @@
 package org.example.project.core.data.local
 
-import androidx.room.withTransaction
+import androidx.room.useWriterConnection
+import androidx.room.immediateTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.example.project.core.database.IssueSpotDatabase
@@ -42,19 +43,23 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
 
     suspend fun replacePosts(postLevel: PostLevel, posts: List<Post>) {
         println("[LOCAL] Replace")
-        database.withTransaction {
-            postDao.deletePostsByLevel(postLevel.name)
-            postDao.insertPosts(posts.map { it.toEntity(cachedAt = it.createdAt) })
-            updateMetadata(postLevel)
-            trimPosts(postLevel)
+        database.useWriterConnection { transactor ->
+            transactor.immediateTransaction {
+                postDao.deletePostsByLevel(postLevel.name)
+                postDao.insertPosts(posts.map { it.toEntity(cachedAt = it.createdAt) })
+                updateMetadata(postLevel)
+                trimPosts(postLevel)
+            }
         }
     }
 
     suspend fun appendPosts(postLevel: PostLevel, posts: List<Post>) {
         println("[LOCAL] Append")
-        database.withTransaction {
-            postDao.insertPosts(posts.map { it.toEntity(cachedAt = it.createdAt) })
-            updateMetadata(postLevel)
+        database.useWriterConnection { transactor ->
+            transactor.immediateTransaction {
+                postDao.insertPosts(posts.map { it.toEntity(cachedAt = it.createdAt) })
+                updateMetadata(postLevel)
+            }
         }
     }
 
@@ -93,13 +98,15 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
             count = count,
             cachedAt = now
         )
-        database.withTransaction {
-            activeIssuesDao.insertActiveIssues(entity)
-            val metadata = CacheMetadataEntity(
-                cacheKey = CacheMetadataEntity.activeIssuesKey(postLevel.name),
-                lastFetchedAt = now
-            )
-            cacheMetadataDao.insertMetadata(metadata)
+        database.useWriterConnection { transactor ->
+            transactor.immediateTransaction {
+                activeIssuesDao.insertActiveIssues(entity)
+                val metadata = CacheMetadataEntity(
+                    cacheKey = CacheMetadataEntity.activeIssuesKey(postLevel.name),
+                    lastFetchedAt = now
+                )
+                cacheMetadataDao.insertMetadata(metadata)
+            }
         }
     }
 }

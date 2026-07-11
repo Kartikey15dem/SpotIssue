@@ -39,12 +39,12 @@ class SearchPostsPagingSource(
             is DataState.Success -> {
                 val response = result.data
             val posts = response.items.map { it.toPost() }
-            val endReached = posts.isEmpty()
+            val endReached = response.nextKey == null || posts.isEmpty()
 
             LoadResult.Page(
                 data = posts,
-                prevKey = if (page == 0) null else page - 1,
-                nextKey = if (endReached) null else page + 1,
+                prevKey = response.prevKey,
+                nextKey = if (endReached) null else response.nextKey,
             )
             }
             is DataState.Error -> LoadResult.Error(result.exception)

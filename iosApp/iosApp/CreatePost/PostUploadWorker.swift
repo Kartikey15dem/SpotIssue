@@ -15,6 +15,7 @@ class PostUploadWorker {
         }
         
         Task {
+            var preparedTemporaryPaths: [String] = []
             do {
                 let prefRepository = KoinHelper().getUserPreferencesRepository()
                 let postRepository = KoinHelper().getPostRepository()
@@ -93,6 +94,7 @@ class PostUploadWorker {
                                 do {
                                     try compressedData.write(to: compressedUrl)
                                     mediaPaths.append(compressedUrl.path)
+                                    preparedTemporaryPaths.append(compressedUrl.path)
                                 } catch {
                                     print("Failed to write compressed image: \(error)")
                                 }
@@ -160,6 +162,9 @@ class PostUploadWorker {
                 }
             }
             
+            preparedTemporaryPaths.forEach { path in
+                try? FileManager.default.removeItem(atPath: path)
+            }
             await MainActor.run { UIApplication.shared.endBackgroundTask(backgroundTask) }
             backgroundTask = .invalid
         }
