@@ -7,7 +7,12 @@ import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
 import kotlin.time.Clock
 
-@Entity(tableName = "posts")
+@Entity(
+    tableName = "posts",
+    indices = [
+        androidx.room.Index(value = ["postLevel", "createdAt", "id"])
+    ]
+)
 data class PostEntity(
     @PrimaryKey
     val id: String,
@@ -27,6 +32,7 @@ data class PostEntity(
     val likes: Int,
     val comments: Int,
     val cachedAt: Long,
+    val createdAt: Long,
     val isLiked: Boolean = false,
     val isReported: Boolean = false
 )
@@ -49,7 +55,8 @@ fun PostEntity.toPost(): Post {
         locality = locality,
         district = district,
         state = state,
-        country = country
+        country = country,
+        createdAt = createdAt
     )
 }
 
@@ -73,6 +80,7 @@ fun Post.toEntity(cachedAt: Long = Clock.System.now().toEpochMilliseconds()): Po
         state = state,
         country = country,
         isLiked = isLiked,
-        isReported = isReported
+        isReported = isReported,
+        createdAt = createdAt
     )
 }

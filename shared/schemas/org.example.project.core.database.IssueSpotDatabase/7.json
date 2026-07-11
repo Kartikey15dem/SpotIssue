@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 7,
-    "identityHash": "88dc58f25e763310638e4f79e0c9184b",
+    "identityHash": "ed015535b7184dcab2168b75f990f2e8",
     "entities": [
       {
         "tableName": "profile",
@@ -75,7 +75,7 @@
       },
       {
         "tableName": "posts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `userUrl` TEXT NOT NULL, `userName` TEXT NOT NULL, `timeAgo` TEXT NOT NULL, `postLevel` TEXT NOT NULL, `location` TEXT NOT NULL, `locality` TEXT, `district` TEXT, `state` TEXT, `country` TEXT, `postText` TEXT NOT NULL, `mediaType` TEXT NOT NULL, `mediaUrlsStr` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, `isLiked` INTEGER NOT NULL, `isReported` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `userId` TEXT NOT NULL, `userUrl` TEXT NOT NULL, `userName` TEXT NOT NULL, `timeAgo` TEXT NOT NULL, `postLevel` TEXT NOT NULL, `location` TEXT NOT NULL, `locality` TEXT, `district` TEXT, `state` TEXT, `country` TEXT, `postText` TEXT NOT NULL, `mediaType` TEXT NOT NULL, `mediaUrlsStr` TEXT NOT NULL, `likes` INTEGER NOT NULL, `comments` INTEGER NOT NULL, `cachedAt` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `isLiked` INTEGER NOT NULL, `isReported` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -176,6 +176,12 @@
             "notNull": true
           },
           {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
             "fieldPath": "isLiked",
             "columnName": "isLiked",
             "affinity": "INTEGER",
@@ -193,7 +199,20 @@
           "columnNames": [
             "id"
           ]
-        }
+        },
+        "indices": [
+          {
+            "name": "index_posts_postLevel_createdAt_id",
+            "unique": false,
+            "columnNames": [
+              "postLevel",
+              "createdAt",
+              "id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_posts_postLevel_createdAt_id` ON `${TABLE_NAME}` (`postLevel`, `createdAt`, `id`)"
+          }
+        ]
       },
       {
         "tableName": "cache_metadata",
@@ -565,7 +584,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '88dc58f25e763310638e4f79e0c9184b')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ed015535b7184dcab2168b75f990f2e8')"
     ]
   }
 }

@@ -23,7 +23,9 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
+import org.example.project.core.presentation.FeedState
 
 import org.example.project.core.data.repository.FeedRepository
 import org.example.project.core.data.repository.PostRepository
@@ -33,6 +35,7 @@ import org.example.project.core.model.home.Comment
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
 import org.example.project.core.utils.DataState
+import org.example.project.core.model.auth.UserLocation
 import org.example.project.feature.home.CurrentLevelManager
 
 class HomeViewModel(
@@ -54,6 +57,21 @@ class HomeViewModel(
     private val _activeCommentsFlow = MutableStateFlow<Flow<PagingData<Comment>>?>(null)
     val activeCommentsFlow = _activeCommentsFlow.asStateFlow()
 
+    val feedState: StateFlow<FeedState> = feedRepository.feedState
+
+    init {
+        viewModelScope.launch {
+            combine(
+                currentLevelManager.currentLevel,
+                prefRepository.userData.map { it.userLocation }.distinctUntilChanged()
+            ) { level, location ->
+                Pair(level, location)
+            }.collect { (level, location) ->
+                feedRepository.start(level, location)
+            }
+        }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
     val pagedPosts: Flow<PagingData<Post>> = combine(
         currentLevelManager.currentLevel,
@@ -62,14 +80,11 @@ class HomeViewModel(
     ) { level, query, location ->
         Triple(level, query, location)
     }.flatMapLatest { (level, query, location) ->
-        println("[KMP_PAGING_VIEWMODEL]\nNEW PAGING FLOW\nlevel=$level\nquery=$query\nlocation=$location\ntime=${kotlin.time.Clock.System.now()}")
         if (query.isBlank()) {
-            feedRepository.getPagedPosts(level, location, forceRefresh = false)
+            emptyFlow() // Handled by feedState now
         } else {
             feedRepository.getPagedSearchPosts(query, level)
         }
-    }.onEach {
-        println("[PAGING_VM] PAGING DATA EMITTED | flowHash=${System.identityHashCode(it)} | time=${kotlin.time.Clock.System.now()}")
     }.cachedIn(viewModelScope)
 
     val currentLevel: StateFlow<PostLevel> = currentLevelManager.currentLevel
@@ -134,6 +149,9 @@ class HomeViewModel(
             is HomeIntent.ShowRefreshErrorSnackbar -> {
                 viewModelScope.launch { _sideEffects.send(HomeSideEffect.ShowSnackbar(intent.message)) }
             }
+            HomeIntent.LoadMorePosts -> feedRepository.loadMore()
+            is HomeIntent.RefreshPosts -> feedRepository.refresh(org.example.project.core.presentation.FeedRefreshReason.PULL_TO_REFRESH)
+            HomeIntent.RetryPosts -> feedRepository.retry()
         }
     }
 
@@ -271,6 +289,9 @@ sealed interface HomeIntent {
     data object DismissPost : HomeIntent
     data object ErrorShown : HomeIntent
     data class ChangeLevel(val level: PostLevel) : HomeIntent
+    data object LoadMorePosts : HomeIntent
+    data class RefreshPosts(val location: UserLocation = UserLocation()) : HomeIntent
+    data object RetryPosts : HomeIntent
 }
 
 data class HomeState(

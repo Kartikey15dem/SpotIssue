@@ -40,10 +40,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.paging.LoadState
-import androidx.paging.compose.LazyPagingItems
-import androidx.paging.compose.collectAsLazyPagingItems
 import kotlinx.coroutines.flow.collectLatest
+import androidx.paging.compose.collectAsLazyPagingItems
 import org.example.project.R
 import org.example.project.core.components.CommentsBottomSheet
 import org.example.project.core.components.PostCard
@@ -67,13 +65,14 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit = {},
     viewModel: HomeViewModel = koinViewModel()
 ) {
+    println("[PAGING_TRACE] HomeScreen recomposed | time=${System.currentTimeMillis()}")
     println("[KMP_PAGING]\nHomeScreen BODY")
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val currentLevel by viewModel.currentLevel.collectAsStateWithLifecycle()
     val activeIssues by viewModel.activeIssues.collectAsStateWithLifecycle()
     val expandedPost by viewModel.expandedPost.collectAsStateWithLifecycle()
-    val pagingItems = viewModel.pagedPosts.collectAsLazyPagingItems()
-    println("[PAGING_UI] LAZY PAGING ITEMS | identity=${System.identityHashCode(pagingItems)} | itemCount=${pagingItems.itemCount} | refresh=${pagingItems.loadState.refresh} | append=${pagingItems.loadState.append} | mediatorRefresh=${pagingItems.loadState.mediator?.refresh} | mediatorAppend=${pagingItems.loadState.mediator?.append} | time=${kotlin.time.Clock.System.now()}")
+    
+    val feedState by viewModel.feedState.collectAsStateWithLifecycle()
     
     val activeCommentsFlow by viewModel.activeCommentsFlow.collectAsStateWithLifecycle()
     val activePostId = state.showCommentsSheetForPostId
@@ -128,13 +127,15 @@ fun HomeScreen(
         },
         containerColor = IssueSpotColors.Background
     ) { padding ->
+        val searchPagingItems = viewModel.pagedPosts.collectAsLazyPagingItems()
         HomeContent(
             modifier = modifier.padding(padding),
             state = state,
             currentLevel = currentLevel,
             activeIssues = activeIssues,
             expandedPost = expandedPost,
-            pagingItems = pagingItems,
+            feedState = feedState,
+            searchPagingItems = searchPagingItems,
             onIntent = viewModel::onIntent,
         )
     }
@@ -160,49 +161,6 @@ fun HomeScreen(
 }
 
 @Stable
-data class PagingPresentationState(
-    val isInitialLoading: Boolean,
-    val isRefreshing: Boolean,
-    val isAppending: Boolean,
-    val refreshError: Throwable?,
-    val appendError: Throwable?,
-    val endReached: Boolean
-)
-
-@Composable
-fun rememberPagingPresentationState(
-    pagingItems: LazyPagingItems<Post>
-): PagingPresentationState {
-    val refreshState = pagingItems.loadState.refresh
-    val mediatorRefreshState = pagingItems.loadState.mediator?.refresh
-
-    val appendState = pagingItems.loadState.append
-    val mediatorAppendState = pagingItems.loadState.mediator?.append
-
-    val isRefreshing = refreshState is LoadState.Loading || mediatorRefreshState is LoadState.Loading
-    val isAppending = appendState is LoadState.Loading || mediatorAppendState is LoadState.Loading
-    
-    val refreshError = (refreshState as? LoadState.Error)?.error ?: (mediatorRefreshState as? LoadState.Error)?.error
-    val appendError = (appendState as? LoadState.Error)?.error ?: (mediatorAppendState as? LoadState.Error)?.error
-
-    val endReached = (appendState is LoadState.NotLoading && appendState.endOfPaginationReached) ||
-            (mediatorAppendState is LoadState.NotLoading && mediatorAppendState.endOfPaginationReached)
-
-    val isInitialLoading = pagingItems.itemCount == 0 && isRefreshing
-
-    println("[PAGING_UI] LOAD STATE UPDATE | identity=${System.identityHashCode(pagingItems)} | itemCount=${pagingItems.itemCount} | refresh=${pagingItems.loadState.refresh} | append=${pagingItems.loadState.append} | prepend=${pagingItems.loadState.prepend} | mediatorRefresh=${pagingItems.loadState.mediator?.refresh} | mediatorAppend=${pagingItems.loadState.mediator?.append} | isRefreshing=$isRefreshing | isAppending=$isAppending | time=${kotlin.time.Clock.System.now()}")
-
-    return PagingPresentationState(
-        isInitialLoading = isInitialLoading,
-        isRefreshing = isRefreshing,
-        isAppending = isAppending,
-        refreshError = refreshError,
-        appendError = appendError,
-        endReached = endReached
-    )
-}
-
-@Stable
 data class FeedUiState(
     val showInitialLoading: Boolean,
     val showFeed: Boolean,
@@ -215,23 +173,23 @@ data class FeedUiState(
 
 @Composable
 fun rememberFeedUiState(
-    pagingState: PagingPresentationState,
-    itemCount: Int
+    feedState: org.example.project.core.presentation.FeedState,
 ): FeedUiState {
-    val showInitialLoading = pagingState.isInitialLoading
-    val showInitialError = itemCount == 0 && pagingState.refreshError != null && !pagingState.isRefreshing
-    val showEmptyFeed = itemCount == 0 && !pagingState.isRefreshing && pagingState.refreshError == null
+    val itemCount = feedState.posts.size
+    val showInitialLoading = itemCount == 0 && feedState.isLoading
+    val showInitialError = itemCount == 0 && feedState.error != null && !feedState.isLoading
+    val showEmptyFeed = itemCount == 0 && !feedState.isLoading && feedState.error == null && !feedState.isRefreshing
     val showFeed = itemCount > 0
     
-    val isPullRefreshing = pagingState.isRefreshing && itemCount > 0
+    val isPullRefreshing = feedState.isRefreshing && itemCount > 0
 
-    val shouldShowFooter = itemCount > 0 && !showInitialLoading && !pagingState.isRefreshing
-    val showNoMorePosts = shouldShowFooter && pagingState.endReached && pagingState.appendError == null && !pagingState.isAppending
+    val shouldShowFooter = itemCount > 0 && !showInitialLoading && !feedState.isRefreshing
+    val showNoMorePosts = shouldShowFooter && !feedState.hasMore && feedState.error == null && !feedState.isLoading
 
     val footerState = when {
         !shouldShowFooter -> FooterState.Hidden
-        pagingState.isAppending -> FooterState.Loading
-        pagingState.appendError != null -> FooterState.Error(pagingState.appendError)
+        feedState.isLoading -> FooterState.Loading
+        feedState.error != null -> FooterState.Error(Throwable(feedState.error?.message))
         showNoMorePosts -> FooterState.EndReached
         else -> FooterState.Hidden
     }
@@ -242,7 +200,7 @@ fun rememberFeedUiState(
         showEmptyFeed = showEmptyFeed,
         showInitialError = showInitialError,
         footerState = footerState,
-        refreshError = pagingState.refreshError,
+        refreshError = if (feedState.error != null) Throwable(feedState.error?.message) else null,
         isPullRefreshing = isPullRefreshing
     )
 }
@@ -254,7 +212,8 @@ fun HomeContent(
     currentLevel: org.example.project.core.model.home.PostLevel,
     activeIssues: Int,
     expandedPost: Post?,
-    pagingItems: LazyPagingItems<Post>,
+    feedState: org.example.project.core.presentation.FeedState,
+    searchPagingItems: androidx.paging.compose.LazyPagingItems<Post>,
     onIntent: (HomeIntent) -> Unit,
 ) {
     val localityState = rememberLazyListState()
@@ -269,18 +228,10 @@ fun HomeContent(
         org.example.project.core.model.home.PostLevel.NATIONAL -> nationalState
     }
     
-    val pagingState = rememberPagingPresentationState(pagingItems)
-    LaunchedEffect(
-        pagingItems.itemCount,
-        pagingState.isRefreshing,
-        pagingState.isAppending
-    ) {
-        println("[PAGING_UI] HOME CONTENT STATE | identity=${System.identityHashCode(pagingItems)} | itemCount=${pagingItems.itemCount} | refreshing=${pagingState.isRefreshing} | appending=${pagingState.isAppending} | time=${kotlin.time.Clock.System.now()}")
-    }
-    val feedUiState = rememberFeedUiState(pagingState, pagingItems.itemCount)
+    val feedUiState = rememberFeedUiState(feedState)
 
     LaunchedEffect(feedUiState.refreshError) {
-        if (feedUiState.refreshError != null && pagingItems.itemCount > 0) {
+        if (feedUiState.refreshError != null && feedState.posts.isNotEmpty()) {
             onIntent(HomeIntent.ShowRefreshErrorSnackbar(feedUiState.refreshError.message ?: "An error occurred"))
         }
     }
@@ -291,12 +242,15 @@ fun HomeContent(
 
     HomePullRefresh(
         isRefreshing = feedUiState.isPullRefreshing,
-        onRefresh = { pagingItems.refresh() },
+        onRefresh = { onIntent(HomeIntent.RefreshPosts()) },
         modifier = modifier
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
+            if (feedState.isOffline) {
+                HomeOfflineBanner()
+            }
             if (expandedPost != null) {
                 BackHandler {
                     onIntent(HomeIntent.DismissPost)
@@ -324,24 +278,40 @@ fun HomeContent(
                 )
 
             } else {
-                HomeFeed(
-                    listState = listState,
-                    pagingItems = pagingItems,
-                    pagingState = pagingState,
-                    state = state,
-                    onIntent = onIntent,
-                    feedUiState = feedUiState,
-                    modifier = Modifier.fillMaxSize(),
-                    header = {
-                        HomeHeader(
-                            modifier = Modifier.fillMaxWidth(),
-                            state = state,
-                            currentLevel = currentLevel,
-                            activeIssues = activeIssues,
-                            onIntent = onIntent
-                        )
-                    }
-                )
+                if (state.query.isNotBlank()) {
+                    HomeSearchFeed(
+                        searchPagingItems = searchPagingItems,
+                        onIntent = onIntent,
+                        modifier = Modifier.fillMaxSize(),
+                        header = {
+                            HomeHeader(
+                                modifier = Modifier.fillMaxWidth(),
+                                state = state,
+                                currentLevel = currentLevel,
+                                activeIssues = activeIssues,
+                                onIntent = onIntent
+                            )
+                        }
+                    )
+                } else {
+                    HomeFeed(
+                        listState = listState,
+                        feedState = feedState,
+                        state = state,
+                        onIntent = onIntent,
+                        feedUiState = feedUiState,
+                        modifier = Modifier.fillMaxSize(),
+                        header = {
+                            HomeHeader(
+                                modifier = Modifier.fillMaxWidth(),
+                                state = state,
+                                currentLevel = currentLevel,
+                                activeIssues = activeIssues,
+                                onIntent = onIntent
+                            )
+                        }
+                    )
+                }
             }
         }
     }

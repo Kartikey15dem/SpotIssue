@@ -16,7 +16,7 @@ val RepositoryModule = module {
     single { AuthRepositoryImpl(get(), get(), get()) } bind AuthRepository::class
 
     // Feed
-    single { FeedRepositoryImpl(get(), get(), get(), get()) } bind FeedRepository::class
+    factory { FeedRepositoryImpl(get(), get(), get(), get()) } bind FeedRepository::class
 
     // Post
     single { PostRepositoryImpl(get(), get(), get()) } bind PostRepository::class

@@ -4,29 +4,22 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
 import org.example.project.core.database.entities.PostEntity
 
 @Dao
 interface PostDao {
     /**
-     * Get all posts for a specific post level
+     * Observe newest posts for a specific post level
      */
-    @Query("SELECT * FROM posts WHERE postLevel = :postLevel ORDER BY cachedAt DESC, id DESC")
-    suspend fun getPostsByLevel(postLevel: String): List<PostEntity>
+    @Query("SELECT * FROM posts WHERE postLevel = :postLevel ORDER BY cachedAt DESC, id DESC LIMIT :limit")
+    fun observeNewestByLevel(postLevel: String, limit: Int): Flow<List<PostEntity>>
 
     /**
-     * Paging Source for posts
+     * Observe posts starting from an anchor (for sliding window)
      */
-    @Query("SELECT * FROM posts WHERE postLevel = :postLevel ORDER BY cachedAt DESC")
-    fun pagingSourceByLevel(postLevel: String): PagingSource<Int, PostEntity>
-
-    /**
-     * Observe posts for a specific post level
-     */
-    @Query("SELECT * FROM posts WHERE postLevel = :postLevel ORDER BY cachedAt DESC")
-    fun observePostsByLevel(postLevel: String): Flow<List<PostEntity>>
+    @Query("SELECT * FROM posts WHERE postLevel = :postLevel AND (cachedAt < :anchorCachedAt OR (cachedAt = :anchorCachedAt AND id < :anchorId)) ORDER BY cachedAt DESC, id DESC LIMIT :limit")
+    fun observeAfterAnchorByLevel(postLevel: String, anchorCachedAt: Long, anchorId: String, limit: Int): Flow<List<PostEntity>>
 
     /**
      * Get post by ID
@@ -62,7 +55,7 @@ interface PostDao {
           AND id NOT IN (
             SELECT id FROM posts
             WHERE postLevel = :postLevel
-            ORDER BY cachedAt DESC
+            ORDER BY cachedAt DESC, id DESC
             LIMIT :maxPosts
           )
         """,
@@ -92,12 +85,6 @@ interface PostDao {
      */
     @Query("UPDATE posts SET comments = :commentsCount WHERE id = :postId")
     suspend fun updateCommentsCount(postId: String, commentsCount: Int)
-
-    /**
-     * Clear all posts
-     */
-    @Query("DELETE FROM posts")
-    suspend fun clearAll()
 
     /**
      * Get count of cached posts for a level

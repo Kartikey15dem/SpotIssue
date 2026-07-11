@@ -1,12 +1,13 @@
 package org.example.project.core.data.local
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.example.project.core.database.IssueSpotDatabase
 import org.example.project.core.database.entities.ActiveIssuesEntity
 import org.example.project.core.database.entities.CacheMetadataEntity
-import org.example.project.core.database.entities.toEntity
 import org.example.project.core.data.mappers.toPost
+import org.example.project.core.database.entities.toEntity
 import org.example.project.core.database.entities.toPost
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
@@ -14,24 +15,61 @@ import kotlin.time.Clock
 
 /**
  * Local data source for home/feed feature
- * Handles caching of posts and active issues count
+ * The single source of truth and only component allowed to access Feed-related DAOs.
+ * Does not contain business logic or cache policies.
  */
 class FeedLocalDataSource(private val database: IssueSpotDatabase) {
 
     private val postDao = database.postDao()
     private val cacheMetadataDao = database.cacheMetadataDao()
     private val activeIssuesDao = database.activeIssuesDao()
+    
+    private val maxCacheSize = 1000
 
-    suspend fun cachePosts(postLevel: PostLevel, posts: List<Post>) {
-        val now = Clock.System.now().toEpochMilliseconds()
+    fun observeNewestPosts(postLevel: PostLevel, limit: Int): Flow<List<Post>> {
+        println("[LOCAL] Observe (Newest) Limit: $limit")
+        return postDao.observeNewestByLevel(postLevel.name, limit).map { entities ->
+            entities.map { it.toPost() }
+        }
+    }
 
-        // Delete old posts for this level
+    fun observePostsAfterAnchor(postLevel: PostLevel, anchorCreatedAt: Long, anchorId: String, limit: Int): Flow<List<Post>> {
+        println("[LOCAL] Observe (After Anchor) Limit: $limit")
+        return postDao.observeAfterAnchorByLevel(postLevel.name, anchorCreatedAt, anchorId, limit).map { entities ->
+            entities.map { it.toPost() }
+        }
+    }
+
+    suspend fun replacePosts(postLevel: PostLevel, posts: List<Post>) {
+        println("[LOCAL] Replace")
+        database.withTransaction {
+            postDao.deletePostsByLevel(postLevel.name)
+            postDao.insertPosts(posts.map { it.toEntity(cachedAt = it.createdAt) })
+            updateMetadata(postLevel)
+            trimPosts(postLevel)
+        }
+    }
+
+    suspend fun appendPosts(postLevel: PostLevel, posts: List<Post>) {
+        println("[LOCAL] Append")
+        database.withTransaction {
+            postDao.insertPosts(posts.map { it.toEntity(cachedAt = it.createdAt) })
+            updateMetadata(postLevel)
+        }
+    }
+
+    suspend fun clearPosts(postLevel: PostLevel) {
         postDao.deletePostsByLevel(postLevel.name)
+    }
 
-        // Insert new posts - Use inherent createdAt for sequence stability
-        postDao.insertPosts(posts.map { it.toEntity(cachedAt = it.createdAt) })
+    suspend fun trimPosts(postLevel: PostLevel) {
+        println("[LOCAL] Trim")
+        postDao.trimPostsByLevel(postLevel.name, maxCacheSize)
+    }
 
-        // Update cache metadata
+    suspend fun updateMetadata(postLevel: PostLevel) {
+        println("[LOCAL] Metadata")
+        val now = Clock.System.now().toEpochMilliseconds()
         val metadata = CacheMetadataEntity(
             cacheKey = CacheMetadataEntity.postsKey(postLevel.name),
             lastFetchedAt = now
@@ -39,44 +77,14 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
         cacheMetadataDao.insertMetadata(metadata)
     }
 
-    /**
-     * Append posts for a level without clearing existing cache.
-     *
-     * This is used when paging subsequent pages from the network.
-     */
-    suspend fun appendPosts(postLevel: PostLevel, posts: List<Post>) {
-        val now = Clock.System.now().toEpochMilliseconds()
-
-        postDao.insertPosts(posts.map { it.toEntity(cachedAt = it.createdAt) })
-
-        // Mark cache as "updated" so the offline list reflects that it is fresh.
-        val metadata = CacheMetadataEntity(
-            cacheKey = CacheMetadataEntity.Companion.postsKey(postLevel.name),
-            lastFetchedAt = now,
-        )
-        cacheMetadataDao.insertMetadata(metadata)
+    suspend fun getCachedPostCount(postLevel: PostLevel): Int {
+        return postDao.getPostCountByLevel(postLevel.name)
     }
 
-    /**
-     * Check if cached posts are stale
-     */
-    suspend fun isPostsCacheStale(postLevel: PostLevel): Boolean {
-        val metadata = cacheMetadataDao.getMetadata(
-            CacheMetadataEntity.postsKey(postLevel.name)
-        )
-        return metadata?.isStale() ?: true
-    }
-
-    /**
-     * Observe cached active issues count
-     */
-    fun observeCachedActiveIssues(postLevel: PostLevel): Flow<Int?> {
+    fun observeActiveIssues(postLevel: PostLevel): Flow<Int?> {
         return activeIssuesDao.observeActiveIssues(postLevel.name).map { it?.count }
     }
 
-    /**
-     * Cache active issues count
-     */
     suspend fun cacheActiveIssues(postLevel: PostLevel, count: Int) {
         val now = Clock.System.now().toEpochMilliseconds()
 
@@ -85,14 +93,13 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
             count = count,
             cachedAt = now
         )
-        activeIssuesDao.insertActiveIssues(entity)
-
-        // Update cache metadata
-        val metadata = CacheMetadataEntity(
-            cacheKey = CacheMetadataEntity.Companion.activeIssuesKey(postLevel.name),
-            lastFetchedAt = now
-        )
-        cacheMetadataDao.insertMetadata(metadata)
+        database.withTransaction {
+            activeIssuesDao.insertActiveIssues(entity)
+            val metadata = CacheMetadataEntity(
+                cacheKey = CacheMetadataEntity.activeIssuesKey(postLevel.name),
+                lastFetchedAt = now
+            )
+            cacheMetadataDao.insertMetadata(metadata)
+        }
     }
-
 }

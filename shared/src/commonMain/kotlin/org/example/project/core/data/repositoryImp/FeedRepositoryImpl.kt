@@ -1,29 +1,48 @@
 package org.example.project.core.data.repositoryImp
 
-
+import androidx.paging.PagingData
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
-import androidx.paging.PagingData
-import androidx.paging.map
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import androidx.paging.ExperimentalPagingApi
-import org.example.project.core.data.paging.FeedPostsRemoteMediator
-import org.example.project.core.database.IssueSpotDatabase
-import org.example.project.core.network.services.HomeService
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.example.project.core.data.local.FeedLocalDataSource
+import org.example.project.core.data.paging.SearchPostsPagingSource
 import org.example.project.core.data.repository.FeedRepository
-import org.example.project.core.database.entities.toPost
+import org.example.project.core.database.IssueSpotDatabase
+import org.example.project.core.data.mappers.toPost
 import org.example.project.core.model.auth.UserLocation
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.PostLevel
-import org.example.project.core.utils.NetworkMonitor
-
-import org.example.project.core.data.paging.SearchPostsPagingSource
+import org.example.project.core.presentation.FeedState
+import org.example.project.core.presentation.FeedError
+import org.example.project.core.presentation.FeedRefreshReason
+import org.example.project.core.presentationcache.PresentationCache
 import org.example.project.core.utils.DataState
+import org.example.project.core.utils.NetworkMonitor
 import org.example.project.core.utils.safeApiCall
-import org.example.project.core.data.mappers.toPost
-
+import org.example.project.core.window.WindowEngine
+import org.example.project.core.window.WindowMode
+import org.example.project.core.window.WindowState
+import org.example.project.core.window.FeedConfig
+import org.example.project.core.network.services.HomeService
+import org.example.project.core.network.dto.PagedResponse
+import org.example.project.core.network.dto.PostWithProfileDto
+import kotlin.time.Clock
 
 class FeedRepositoryImpl(
     private val homeService: HomeService,
@@ -31,31 +50,342 @@ class FeedRepositoryImpl(
     private val localDataSource: FeedLocalDataSource,
     private val networkMonitor: NetworkMonitor,
 ) : FeedRepository {
-    @OptIn(ExperimentalPagingApi::class)
-    override fun getPagedPosts(postLevel: PostLevel, userLocation: UserLocation, forceRefresh: Boolean): Flow<PagingData<Post>> {
-        return Pager(
-            config = PagingConfig(pageSize = 10, initialLoadSize = 5, prefetchDistance = 5, enablePlaceholders = false),
-            remoteMediator = FeedPostsRemoteMediator(
-                postLevel = postLevel,
-                userLocation = userLocation,
-                homeService = homeService,
-                database = database,
-                localDataSource = localDataSource,
-                forceRefresh = forceRefresh,
-                networkMonitor = networkMonitor,
-            ),
-            pagingSourceFactory = {
-                println("[PAGING_SOURCE] FACTORY CALLED | postLevel=$postLevel | time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}")
-                database.postDao().pagingSourceByLevel(postLevel.name)
-            },
-        ).flow.map { pagingData ->
-            pagingData.map { entity -> entity.toPost() }
+
+    private val scope = CoroutineScope(Dispatchers.IO)
+    
+    private val windowEngine = WindowEngine<Post>()
+    private val presentationCache = PresentationCache<Post, String> { it.id }
+    private val pagingMutex = Mutex()
+
+    private data class PagingState(
+        val nextPage: Int = 1,
+        val hasMore: Boolean = true,
+        val generation: Long = 0L,
+        val lastFailedAction: RetryAction? = null,
+        val lastFailedPage: Int = 1
+    )
+
+    private enum class RetryAction {
+        REFRESH, LOAD_MORE
+    }
+
+    private var pagingState = PagingState()
+
+    private val _feedState = MutableStateFlow(FeedState())
+    override val feedState: StateFlow<FeedState> = _feedState.asStateFlow()
+
+    private val levelFlow = MutableStateFlow<PostLevel?>(null)
+    private val windowState = MutableStateFlow(windowEngine.getState())
+    private var currentLocation: UserLocation? = null
+
+    private var roomJob: Job? = null
+    private var networkJob: Job? = null
+    private var networkMonitorJob: Job? = null
+    private var isOnline = true
+    
+    private var lastSuccessfulRefresh: Long = 0L
+    private val REFRESH_COOLDOWN_MS = 60_000L
+    
+    init {
+        observeNetwork()
+    }
+
+    private fun observeNetwork() {
+        networkMonitorJob = scope.launch {
+            networkMonitor.isOnline.collect { online ->
+                val wasOffline = !isOnline
+                isOnline = online
+                _feedState.update { it.copy(isOffline = !online) }
+                if (online && wasOffline) {
+                    refresh(FeedRefreshReason.NETWORK_RESTORED)
+                }
+            }
+        }
+    }
+
+    override fun start(postLevel: PostLevel, userLocation: UserLocation) {
+        val levelChanged = levelFlow.value != postLevel
+        currentLocation = userLocation
+        
+        if (levelChanged) {
+            scope.launch {
+                pagingMutex.withLock {
+                    pagingState = pagingState.copy(
+                        nextPage = 1,
+                        hasMore = true,
+                        generation = pagingState.generation + 1,
+                        lastFailedAction = null,
+                        lastFailedPage = 1
+                    )
+                    presentationCache.clear()
+                    windowEngine.reset()
+                    windowState.value = windowEngine.getState()
+                    levelFlow.value = postLevel
+                    
+                    _feedState.update { it.copy(posts = emptyList(), isLoading = true, error = null, isOffline = !isOnline) }
+                }
+                restartRoomObservation()
+                refresh(FeedRefreshReason.LEVEL_CHANGED)
+            }
+        } else {
+            refresh(FeedRefreshReason.APP_RESUMED)
+        }
+    }
+    
+    override fun stop() {
+        networkJob?.cancel()
+        roomJob?.cancel()
+    }
+
+    private fun restartRoomObservation() {
+        roomJob?.cancel()
+        roomJob = scope.launch {
+            combine(levelFlow, windowState) { level, window -> Pair(level, window) }
+                .flatMapLatest { (level, window) ->
+                    if (level == null) return@flatMapLatest kotlinx.coroutines.flow.flowOf(emptyList())
+                    if (window.mode == WindowMode.SLIDING) {
+                        localDataSource.observePostsAfterAnchor(level, window.anchor!!.createdAt, window.anchor!!.id, window.limit)
+                    } else {
+                        localDataSource.observeNewestPosts(level, window.limit)
+                    }
+                }
+                .collect { roomPosts ->
+                    presentationCache.update(roomPosts)
+                    _feedState.update { it.copy(posts = presentationCache.items.toList()) }
+                }
+        }
+    }
+
+    private suspend fun fetchPageWithRetry(page: Int): PagedResponse<PostWithProfileDto> {
+        var attempt = 1
+        var delayMs = 1000L
+        while (true) {
+            try {
+                val level = levelFlow.value ?: throw IllegalStateException("No active level")
+                val location = currentLocation ?: UserLocation()
+                return homeService.getPosts(
+                    level = level.name,
+                    locality = location.locality,
+                    district = location.district,
+                    state = location.state,
+                    country = location.country,
+                    lat = location.latitude,
+                    lon = location.longitude,
+                    page = page,
+                    limit = 20
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val error = mapToFeedError(e)
+                val isRetryable = error is FeedError.Server || error is FeedError.Network || error is FeedError.Timeout
+                if (!isRetryable || attempt >= 4) {
+                    throw e
+                }
+                delay(delayMs)
+                attempt++
+                delayMs *= 2
+            }
+        }
+    }
+
+    private fun mapToFeedError(e: Throwable): FeedError {
+        val msg = e.message ?: ""
+        return when {
+            msg.contains("401") -> FeedError.Authentication()
+            msg.contains("50") -> FeedError.Server()
+            msg.contains("Timeout") -> FeedError.Timeout()
+            msg.contains("resolve host") || msg.contains("Failed to connect") -> FeedError.Offline()
+            msg.contains("Serialization") || msg.contains("JSON") -> FeedError.Parsing()
+            e is io.ktor.utils.io.errors.IOException -> FeedError.Network()
+            else -> FeedError.Unknown(msg)
+        }
+    }
+
+    override fun refresh(reason: FeedRefreshReason) {
+        val now = Clock.System.now().toEpochMilliseconds()
+        
+        if (reason == FeedRefreshReason.APP_RESUMED || reason == FeedRefreshReason.NETWORK_RESTORED) {
+            if (now - lastSuccessfulRefresh < REFRESH_COOLDOWN_MS) {
+                println("[LIFECYCLE] Skipped Refresh (Cooldown active)")
+                return
+            }
+        }
+        
+        if (!isOnline) {
+            return
+        }
+
+        networkJob?.cancel()
+        networkJob = scope.launch {
+            val count = levelFlow.value?.let { localDataSource.getCachedPostCount(it) } ?: 0
+            val isBackground = (reason == FeedRefreshReason.APP_RESUMED || reason == FeedRefreshReason.NETWORK_RESTORED) && count > 0
+
+            val requestGeneration = pagingMutex.withLock {
+                pagingState = pagingState.copy(
+                    nextPage = 1,
+                    generation = pagingState.generation + 1,
+                    lastFailedAction = null,
+                    hasMore = true
+                )
+                windowEngine.reset()
+                windowState.value = windowEngine.getState()
+                pagingState.generation
+            }
+
+            _feedState.update { 
+                if (count == 0) it.copy(isLoading = true, error = null)
+                else if (isBackground) it.copy(isBackgroundRefreshing = true, error = null)
+                else it.copy(isRefreshing = true, error = null)
+            }
+
+            try {
+                val response = fetchPageWithRetry(1)
+                
+                pagingMutex.withLock {
+                    if (requestGeneration != pagingState.generation) return@launch
+                    val level = levelFlow.value ?: return@launch
+                    val posts = response.items.map { it.toPost() }
+                    localDataSource.replacePosts(level, posts)
+                    
+                    pagingState = pagingState.copy(
+                        nextPage = 2,
+                        hasMore = response.nextKey != null
+                    )
+                }
+                lastSuccessfulRefresh = Clock.System.now().toEpochMilliseconds()
+                _feedState.update { it.copy(isLoading = false, isRefreshing = false, isBackgroundRefreshing = false, isRetrying = false, error = null) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val error = mapToFeedError(e)
+                pagingMutex.withLock {
+                    if (requestGeneration == pagingState.generation) {
+                        pagingState = pagingState.copy(lastFailedAction = RetryAction.REFRESH, lastFailedPage = 1)
+                    }
+                }
+                _feedState.update { 
+                    it.copy(
+                        isLoading = false, 
+                        isRefreshing = false, 
+                        isBackgroundRefreshing = false,
+                        isRetrying = false,
+                        error = if (isBackground) null else error
+                    ) 
+                }
+            }
+        }
+    }
+
+    override fun loadMore() {
+        if (!isOnline) return
+        
+        scope.launch {
+            val (shouldFetch, requestGeneration, pageToLoad) = pagingMutex.withLock {
+                if (_feedState.value.isLoading || _feedState.value.isRefreshing || _feedState.value.isRetrying || _feedState.value.isBackgroundRefreshing || !pagingState.hasMore) {
+                    return@withLock Triple(false, 0L, 0)
+                }
+                
+                val currentState = windowState.value
+                val items = presentationCache.items
+                val anchor = if (items.size > FeedConfig.LOAD_MORE_THRESHOLD) items[items.size - FeedConfig.LOAD_MORE_THRESHOLD] else items.lastOrNull()
+                val nextState = windowEngine.expand(anchor)
+                
+                if (nextState != currentState) {
+                    windowState.value = nextState
+                    _feedState.update { it.copy(isLoading = true, error = null) }
+                    Triple(true, pagingState.generation, pagingState.nextPage)
+                } else {
+                    Triple(false, 0L, 0)
+                }
+            }
+
+            if (!shouldFetch) return@launch
+            
+            try {
+                val response = fetchPageWithRetry(pageToLoad)
+                
+                pagingMutex.withLock {
+                    if (requestGeneration != pagingState.generation) return@launch
+                    val level = levelFlow.value ?: return@launch
+                    val posts = response.items.map { it.toPost() }
+                    localDataSource.appendPosts(level, posts)
+                    
+                    pagingState = pagingState.copy(
+                        nextPage = pageToLoad + 1,
+                        hasMore = response.nextKey != null
+                    )
+                    _feedState.update { it.copy(isLoading = false, error = null) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                pagingMutex.withLock {
+                    if (requestGeneration == pagingState.generation) {
+                        pagingState = pagingState.copy(lastFailedAction = RetryAction.LOAD_MORE, lastFailedPage = pageToLoad)
+                    }
+                }
+                _feedState.update { it.copy(isLoading = false, error = mapToFeedError(e)) }
+            }
+        }
+    }
+
+    override fun retry() {
+        if (!isOnline) return
+        
+        scope.launch {
+            val (actionToRetry, requestGeneration, pageToLoad) = pagingMutex.withLock { 
+                Triple(pagingState.lastFailedAction, pagingState.generation, pagingState.lastFailedPage)
+            }
+            
+            when (actionToRetry) {
+                RetryAction.REFRESH -> {
+                    _feedState.update { it.copy(isRetrying = true, error = null) }
+                    try {
+                        val response = fetchPageWithRetry(1)
+                        pagingMutex.withLock {
+                            if (requestGeneration != pagingState.generation) return@launch
+                            val level = levelFlow.value ?: return@launch
+                            val posts = response.items.map { it.toPost() }
+                            localDataSource.replacePosts(level, posts)
+                            pagingState = pagingState.copy(nextPage = 2, hasMore = response.nextKey != null, lastFailedAction = null)
+                        }
+                        lastSuccessfulRefresh = Clock.System.now().toEpochMilliseconds()
+                        _feedState.update { it.copy(isRetrying = false, error = null) }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        _feedState.update { it.copy(isRetrying = false, error = mapToFeedError(e)) }
+                    }
+                }
+                RetryAction.LOAD_MORE -> {
+                    _feedState.update { it.copy(isRetrying = true, error = null) }
+                    try {
+                        val response = fetchPageWithRetry(pageToLoad)
+                        pagingMutex.withLock {
+                            if (requestGeneration != pagingState.generation) return@launch
+                            val level = levelFlow.value ?: return@launch
+                            val posts = response.items.map { it.toPost() }
+                            localDataSource.appendPosts(level, posts)
+                            pagingState = pagingState.copy(nextPage = pageToLoad + 1, hasMore = response.nextKey != null, lastFailedAction = null)
+                        }
+                        _feedState.update { it.copy(isRetrying = false, error = null) }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        _feedState.update { it.copy(isRetrying = false, error = mapToFeedError(e)) }
+                    }
+                }
+                null -> {
+                    if (pagingState.nextPage == 1) refresh(FeedRefreshReason.RETRY)
+                    else loadMore()
+                }
+            }
         }
     }
 
     override fun observeActiveIssuesCount(postLevel: PostLevel): Flow<Int> {
-        return localDataSource.observeCachedActiveIssues(postLevel)
-            .map { it ?: 0 }
+        return localDataSource.observeActiveIssues(postLevel).map { it ?: 0 }
     }
 
     override fun getPagedSearchPosts(query: String, postLevel: PostLevel): Flow<PagingData<Post>> {
@@ -66,34 +396,12 @@ class FeedRepositoryImpl(
     }
 
     override fun observePosts(postLevel: PostLevel): Flow<List<Post>> {
-        return database.postDao().observePostsByLevel(postLevel.name)
-            .map { entities -> entities.map { it.toPost() } }
-    }
-
-    override suspend fun refreshPosts(
-        postLevel: PostLevel,
-        userLocation: UserLocation
-    ): DataState<List<Post>> = safeApiCall(networkMonitor) {
-        val posts = homeService.getPosts(
-            level = postLevel.name,
-            locality = userLocation.locality,
-            district = userLocation.district,
-            state = userLocation.state,
-            country = userLocation.country,
-            lat = userLocation.latitude,
-            lon = userLocation.longitude,
-            page = 1,
-            limit = 10
-        ).items.map { it.toPost() }
-        localDataSource.cachePosts(postLevel, posts)
-        posts
+        return localDataSource.observeNewestPosts(postLevel, 100)
     }
 
     override suspend fun searchPosts(query: String, postLevel: PostLevel): DataState<List<Post>> =
         safeApiCall(networkMonitor) {
-            homeService.searchPosts(query, postLevel.name, page = 1, limit = 100)
-                .items
-                .map { it.toPost() }
+            homeService.searchPosts(query, postLevel.name, page = 1, limit = 100).items.map { it.toPost() }
         }
 
     override suspend fun updateLikeStatus(postId: String, likesCount: Int, isLiked: Boolean) {
