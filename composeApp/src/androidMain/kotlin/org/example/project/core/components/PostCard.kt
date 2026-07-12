@@ -61,12 +61,9 @@ fun PostCard(
     var showReportDialog by rememberSaveable { mutableStateOf(false) }
     var hasOverflow by remember { mutableStateOf(false) }
 
-    println("[KMP_PAGING]\nPostCard BODY\npostId: ${post.id}\nlikes: $likesCount\ncomments: $commentsCount")
 
     androidx.compose.runtime.DisposableEffect(post.id) {
-        println("[KMP_PAGING]\nPostCard APPEAR\npostId: ${post.id}")
         onDispose {
-            println("[KMP_PAGING]\nPostCard DISAPPEAR\npostId: ${post.id}")
         }
     }
 
@@ -441,7 +438,7 @@ fun PostMediaPreview(
         ) {
             when (post.mediaType) {
                 MediaType.IMAGE -> {
-                    PostImageGrid(
+                    SharedImageGrid(
                         images = mediaUrls,
                         onImageClick = { clickedIndex ->
                             overlayController.show(
@@ -449,7 +446,8 @@ fun PostMediaPreview(
                                 urls = mediaUrls,
                                 initialIndex = clickedIndex
                             )
-                        }
+                        },
+                        isEditable = false
                     )
                 }
                 MediaType.VIDEO -> {
@@ -487,93 +485,3 @@ fun PostMediaPreview(
     }
 }
 
-@Composable
-fun PostImageGrid(
-    images: List<String>,
-    onImageClick: (Int) -> Unit
-) {
-    val count = images.size
-    val gridHeight = 300.dp
-    val spacing = 4.dp
-
-    Box(modifier = Modifier.fillMaxWidth()) {
-        when (count) {
-            1 -> {
-                PostGridImageItem(
-                    uri = images[0],
-                    onClick = { onImageClick(0) },
-                    modifier = Modifier.fillMaxWidth().height(gridHeight),
-                    contentScale = ContentScale.Crop
-                )
-            }
-            2 -> {
-                Row(modifier = Modifier.fillMaxWidth().height(gridHeight), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                    PostGridImageItem(uri = images[0], onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
-                    PostGridImageItem(uri = images[1], onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxHeight())
-                }
-            }
-            3 -> {
-                Row(modifier = Modifier.fillMaxWidth().height(gridHeight), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                    PostGridImageItem(uri = images[0], onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
-                    Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(spacing)) {
-                        PostGridImageItem(uri = images[1], onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxWidth())
-                        PostGridImageItem(uri = images[2], onClick = { onImageClick(2) }, modifier = Modifier.weight(1f).fillMaxWidth())
-                    }
-                }
-            }
-            else -> {
-                Column(modifier = Modifier.fillMaxWidth().height(gridHeight), verticalArrangement = Arrangement.spacedBy(spacing)) {
-                    Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                        PostGridImageItem(uri = images[0], onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
-                        PostGridImageItem(uri = images[1], onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxHeight())
-                    }
-                    Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                        PostGridImageItem(uri = images[2], onClick = { onImageClick(2) }, modifier = Modifier.weight(1f).fillMaxHeight())
-
-                        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            PostGridImageItem(uri = images[3], onClick = { onImageClick(3) }, modifier = Modifier.fillMaxSize())
-
-                            if (count > 4) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(Color.Black.copy(alpha = 0.5f))
-                                        .clickable { onImageClick(3) },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "+${count - 4}",
-                                        color = Color.White,
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PostGridImageItem(
-    uri: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    contentScale: ContentScale = ContentScale.Crop,
-    onSuccess: ((AsyncImagePainter.State.Success) -> Unit)? = null
-) {
-    Box(modifier = modifier.clip(RoundedCornerShape(8.dp))) {
-        AsyncImage(
-            model = uri.toUri(),
-            contentDescription = "Post Image",
-            onSuccess = onSuccess,
-            modifier = Modifier.fillMaxSize().clickable(onClick = onClick),
-            contentScale = contentScale,
-            error = painterResource(R.drawable.img_post_placeholder),
-            fallback = painterResource(R.drawable.img_post_placeholder)
-        )
-    }
-}

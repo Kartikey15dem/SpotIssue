@@ -1,8 +1,5 @@
 package org.example.project.core.data.repositoryImp
 
-import androidx.paging.PagingData
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,7 +18,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.example.project.core.data.local.FeedLocalDataSource
-import org.example.project.core.data.paging.SearchPostsPagingSource
 import org.example.project.core.data.repository.FeedRepository
 import org.example.project.core.database.IssueSpotDatabase
 import org.example.project.core.data.mappers.toPost
@@ -681,12 +677,6 @@ class FeedRepositoryImpl(
         return localDataSource.observeActiveIssues(postLevel).map { it ?: 0 }
     }
 
-    override fun getPagedSearchPosts(query: String, postLevel: PostLevel): Flow<PagingData<Post>> {
-        return Pager(
-            config = PagingConfig(pageSize = 10, initialLoadSize = 10, prefetchDistance = 5, enablePlaceholders = false),
-            pagingSourceFactory = { SearchPostsPagingSource(homeService, query, postLevel, networkMonitor) }
-        ).flow
-    }
 
     override fun observePosts(postLevel: PostLevel): Flow<List<Post>> {
         return localDataSource.observeNewestPosts(postLevel, 100)

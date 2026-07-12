@@ -1,6 +1,5 @@
 package org.example.project.core.data.repository
 
-import androidx.paging.PagingData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import org.example.project.core.model.home.Post
@@ -26,19 +25,9 @@ interface ProfileRepository {
 
     fun loadMoreProfilePosts()
 
-    /**
-     * Get paged user posts (network PagingSource via Pager).
-     */
-    fun getPagedUserPosts(sort: String = "LATEST"): Flow<PagingData<Post>>
 
-    /**
-     * Get paged liked posts (network PagingSource via Pager).
-     */
-    fun getPagedLikedPosts(sort: String = "LATEST"): Flow<PagingData<Post>>
 
-    fun observeUserPosts(sort: String = "LATEST"): Flow<List<Post>>
 
-    fun observeLikedPosts(sort: String = "LATEST"): Flow<List<Post>>
 
     suspend fun refreshUserPosts(sort: String = "LATEST"): DataState<List<Post>>
 

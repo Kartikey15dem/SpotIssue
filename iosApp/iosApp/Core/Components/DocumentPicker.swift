@@ -42,7 +42,6 @@ struct DocumentPicker: UIViewControllerRepresentable {
                     parent.onDocumentPicked(tempUrl)
                 }
             } catch {
-                print("Error copying document: \(error)")
             }
         }
         

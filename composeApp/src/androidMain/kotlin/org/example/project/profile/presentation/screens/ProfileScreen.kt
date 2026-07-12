@@ -44,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import org.example.project.core.components.CommentsBottomSheet
 import android.content.Intent
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.runtime.key
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.platform.LocalContext
@@ -69,7 +70,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.paging.compose.collectAsLazyPagingItems
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.example.project.R
@@ -175,10 +175,11 @@ fun ProfileScreen(
 
     val currentCommentsFlow = activeCommentsFlow
     if (activePostId != null && currentCommentsFlow != null) {
-        val commentsPagingItems = currentCommentsFlow.collectAsLazyPagingItems()
+        val commentsState by currentCommentsFlow.collectAsState()
 
         CommentsBottomSheet(
-            comments = commentsPagingItems,
+            comments = commentsState,
+            onLoadMore = { viewModel.loadMoreComments(activePostId) },
             onDismiss = { viewModel.onIntent(ProfileIntent.DismissCommentsSheet) },
             onSubmit = { text ->
                 viewModel.onIntent(
@@ -303,7 +304,14 @@ fun ProfileScreenContent(
                     item { Spacer(Modifier.height(spacing.small)) }
 
                     item {
-                        ProfileHeader(profile, onIntent)
+                        ProfileHeader(
+                            imageUrl = profile.imageUrl,
+                            name = profile.name,
+                            location = profile.location,
+                            totalPosts = profile.totalPosts,
+                            acks = profile.acks,
+                            onEditClick = { onIntent(ProfileIntent.EditProfileClicked) }
+                        )
                     }
 
                     item {
@@ -342,7 +350,11 @@ fun ProfileScreenContent(
                     }
 
                     item {
-                        ProfilePostTabsHeader(state, onIntent)
+                        ProfilePostTabsHeader(
+                            isMine = state.isMine,
+                            sort = state.sort,
+                            onIntent = onIntent
+                        )
                     }
 
                     if (profilePostsState.posts.isEmpty() && profilePostsState.isLoading) {
@@ -443,7 +455,7 @@ fun ProfileScreenContent(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(72.dp),
+                                .defaultMinSize(minHeight = 72.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             when {
@@ -527,7 +539,14 @@ fun ProfileScreenContent(
 }
 
 @Composable
-private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
+private fun ProfileHeader(
+    imageUrl: String?,
+    name: String,
+    location: String,
+    totalPosts: Int,
+    acks: Int,
+    onEditClick: () -> Unit
+) {
     val spacing = IssueSpotTheme.spacing
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -538,11 +557,10 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                     .background(IssueSpotColors.Surface),
                 contentAlignment = Alignment.Center
             ) {
-                val imageUrl = profile.imageUrl
                 if (!imageUrl.isNullOrBlank()) {
                     AsyncImage(
                         model = imageUrl.toUri(),
-                        contentDescription = "${profile.name}'s avatar",
+                        contentDescription = "${name}'s avatar",
                         modifier = Modifier
                             .size(60.dp)
                             .clip(CircleShape),
@@ -553,7 +571,7 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                 } else {
                     Image(
                         painter = painterResource(R.drawable.ic_user_avatar),
-                        contentDescription = "${profile.name}'s avatar",
+                        contentDescription = "${name}'s avatar",
                         modifier = Modifier
                             .size(60.dp)
                             .clip(CircleShape),
@@ -566,7 +584,7 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                 modifier = Modifier.weight(1f)
             ){
                 Text(
-                    text = profile.name,
+                    text = name,
                     style = IssueSpotTypography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -574,7 +592,7 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(spacing.extraSmall))
                 Text(
-                    text = profile.location.ifBlank { "No location set" },
+                    text = location.ifBlank { "No location set" },
                     style = IssueSpotTypography.bodyMedium,
                     color = IssueSpotColors.OnSurfaceVariant,
                     maxLines = 2,
@@ -585,7 +603,7 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
                 painter = painterResource(R.drawable.ic_edit),
                 contentDescription = "Edit",
                 modifier = Modifier
-                    .clickable { onIntent(ProfileIntent.EditProfileClicked) }
+                    .clickable { onEditClick() }
                     .size(20.dp)
             )
         }
@@ -594,9 +612,9 @@ private fun ProfileHeader(profile: Profile, onIntent: (ProfileIntent) -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            StatsCard(count = profile.totalPosts, label = "Total Posts", modifier = Modifier.weight(1f))
+            StatsCard(count = totalPosts, label = "Total Posts", modifier = Modifier.weight(1f))
             Spacer(modifier = Modifier.width(spacing.smallMedium))
-            StatsCard(count = profile.acks, label = "Acknowledgements", modifier = Modifier.weight(1f))
+            StatsCard(count = acks, label = "Acknowledgements", modifier = Modifier.weight(1f))
         }
     }
 }
@@ -655,14 +673,15 @@ fun PostByAreaBar(
 
 @Composable
 fun ProfilePostTabsHeader(
-    state: ProfileState,
+    isMine: Boolean,
+    sort: Sort,
     onIntent: (ProfileIntent) -> Unit
 ) {
     val spacing = IssueSpotTheme.spacing
     Column {
         SegmentedControl(
             items = listOf("My Posts", "Liked Posts"),
-            selectedIndex = if (state.isMine) 0 else 1,
+            selectedIndex = if (isMine) 0 else 1,
             onItemSelected = { index ->
                 onIntent(ProfileIntent.TabChanged(isMine = index == 0))
             },
@@ -673,7 +692,7 @@ fun ProfilePostTabsHeader(
 
         SegmentedControlFilter(
             items = listOf("Latest", "Oldest", "Popular"),
-            selectedIndex = when (state.sort) {
+            selectedIndex = when (sort) {
                 Sort.LATEST -> 0
                 Sort.OLDEST -> 1
                 Sort.POPULAR -> 2

@@ -106,7 +106,6 @@ class PostUploadWorker(
             }
 
         } catch (e: Exception) {
-            e.printStackTrace()
             val currentDraft = prefRepository.userData.value.uploadDraftState
             prefRepository.updateUploadDraftState(
                 currentDraft.copy(

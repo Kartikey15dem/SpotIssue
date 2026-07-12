@@ -11,6 +11,4 @@ val DaoModule = module {
     single { get<IssueSpotDatabase>().cacheMetadataDao() }
     single { get<IssueSpotDatabase>().userPostDao() }
     single { get<IssueSpotDatabase>().activeIssuesDao() }
-    single { get<IssueSpotDatabase>().remoteKeysDao() }
-    single { get<IssueSpotDatabase>().mediatorTransactionDao() }
 }

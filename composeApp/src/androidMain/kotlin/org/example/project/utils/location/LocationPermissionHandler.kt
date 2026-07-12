@@ -41,11 +41,9 @@ class LocationPermissionHandler(private val context: Context) {
      */
     fun requestLocationPermission(activity: Activity): Boolean {
         if (hasLocationPermission()) {
-            Log.d("LocationPermissionHandler", "Permissions already granted")
             return true
         }
 
-        Log.d("LocationPermissionHandler", "Requesting location permissions")
         ActivityCompat.requestPermissions(
             activity,
             arrayOf(

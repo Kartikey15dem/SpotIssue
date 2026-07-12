@@ -2,9 +2,6 @@ package org.example.project.feature.home.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingData
-import androidx.paging.cachedIn
-import androidx.paging.insertHeaderItem
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
@@ -26,6 +23,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import org.example.project.core.presentation.FeedState
+import org.example.project.core.presentation.PaginationState
 
 import org.example.project.core.data.repository.FeedRepository
 import org.example.project.core.data.repository.PostRepository
@@ -52,10 +50,8 @@ class HomeViewModel(
     private val _sideEffects = Channel<HomeSideEffect>(Channel.BUFFERED)
     val sideEffects = _sideEffects.receiveAsFlow()
 
-    private val conversationCache = mutableMapOf<String, Flow<PagingData<Comment>>>()
-
-    private val _activeCommentsFlow = MutableStateFlow<Flow<PagingData<Comment>>?>(null)
-    val activeCommentsFlow = _activeCommentsFlow.asStateFlow()
+    private val _activeCommentsFlow = MutableStateFlow<StateFlow<PaginationState<Comment>>?>(null)
+    val activeCommentsFlow: StateFlow<StateFlow<PaginationState<Comment>>?> = _activeCommentsFlow.asStateFlow()
 
     val feedState: StateFlow<FeedState> = feedRepository.feedState
     val searchState: StateFlow<FeedState> = feedRepository.searchState
@@ -132,6 +128,10 @@ class HomeViewModel(
         }
     }
 
+    fun loadMoreComments(postId: String) {
+        postRepository.loadMoreComments(postId)
+    }
+
     fun onIntent(intent: HomeIntent) {
         when (intent) {
             is HomeIntent.SearchQueryChanged -> updateState { it.copy(query = intent.query) }
@@ -196,15 +196,9 @@ class HomeViewModel(
         }
     }
 
-    private fun comments(postId: String): Flow<PagingData<Comment>> {
-        return conversationCache.getOrPut(postId) {
-            postRepository.getPagedComments(postId).cachedIn(viewModelScope)
-        }
-    }
-
     private fun openComments(postId: String) {
-        val cachedFlow = comments(postId)
-        _activeCommentsFlow.value = cachedFlow
+        postRepository.startComments(postId)
+        _activeCommentsFlow.value = postRepository.observeComments(postId)
         updateState { it.copy(showCommentsSheetForPostId = postId) }
     }
 
@@ -214,39 +208,13 @@ class HomeViewModel(
     }
 
     private fun comment(postId: String, comment: String) {
-        val currentFlow = conversationCache[postId]
-        if (currentFlow != null) {
-            val optimisticComment = Comment(
-                id = "temp_${kotlin.random.Random.nextLong()}",
-                postId = postId,
-                text = comment,
-                timeAgo = "Just now",
-                userName = "You",
-                userImageUrl = _uiState.value.currentUserImage ?: ""
-            )
-            
-            val updatedFlow = currentFlow.map { pagingData ->
-                pagingData.insertHeaderItem(item = optimisticComment)
-            }
-            conversationCache[postId] = updatedFlow
-            _activeCommentsFlow.value = updatedFlow
-            
-            viewModelScope.launch {
-                when (val result = postRepository.addComment(postId, comment)) {
-                    is DataState.Error -> {
-                        conversationCache[postId] = currentFlow
-                        _activeCommentsFlow.value = currentFlow
-                        handleError(result.exception)
-                    }
-                    else -> {}
+        viewModelScope.launch {
+            when (val result = postRepository.addComment(postId, comment)) {
+                is DataState.Success -> {
+                    postRepository.refreshComments(postId)
                 }
-            }
-        } else {
-            viewModelScope.launch {
-                when (val result = postRepository.addComment(postId, comment)) {
-                    is DataState.Error -> handleError(result.exception)
-                    else -> {}
-                }
+                is DataState.Error -> handleError(result.exception)
+                else -> Unit
             }
         }
     }

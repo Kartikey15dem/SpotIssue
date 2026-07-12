@@ -35,7 +35,6 @@ inline fun <ResultType, RequestType> networkBoundResourceFlow(
     var hasMore = true
     var hasFetchedForcefully = false
     emit(SyncResult.Loading.Initial())
-    println("[NBR] Loading Initial")
     
     emitAll(
         query().flatMapLatest { data ->
@@ -47,26 +46,20 @@ inline fun <ResultType, RequestType> networkBoundResourceFlow(
                     val isLoadingInitial = data == null || (data is Collection<*> && data.isEmpty())
                     if (isLoadingInitial) {
                         emit(SyncResult.Loading.Initial())
-                        println("[NBR] Loading Initial")
                     } else if (shouldForce) {
                         emit(SyncResult.Loading.Refresh(data))
-                        println("[NBR] Loading Refresh")
                     } else {
                         emit(SyncResult.Loading.Paging(data))
-                        println("[NBR] Loading Paging")
                     }
                     
                     try {
-                        println("[NBR] Fetch")
                         val response = fetch(data, shouldForce)
                         if (shouldForce) {
                             hasFetchedForcefully = true
                         }
                         hasMore = hasMoreData(data, response)
-                        println("[NBR] Save")
                         saveFetchResult(response)
                     } catch (e: Throwable) {
-                        println("[NBR] Error: ${e.message}")
                         onFailure(e)
                         
                         // Ktor Network Exception heuristic or generic offline fallback
@@ -76,12 +69,10 @@ inline fun <ResultType, RequestType> networkBoundResourceFlow(
                             || e.message?.contains("Timeout") == true
                             
                         if (isOffline) {
-                            println("[NBR] Offline")
                         }
                         emit(SyncResult.Error(e, data, isOffline = isOffline))
                     }
                 } else {
-                    println("[NBR] Success")
                     emit(SyncResult.Success(data, hasMore))
                 }
             }

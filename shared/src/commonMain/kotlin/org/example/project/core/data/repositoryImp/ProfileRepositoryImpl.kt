@@ -1,10 +1,6 @@
 package org.example.project.core.data.repositoryImp
 
 import co.touchlab.kermit.Logger
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
-import androidx.paging.PagingData
-import androidx.paging.map
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -16,7 +12,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
-import androidx.paging.ExperimentalPagingApi
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.database.IssueSpotDatabase
 import org.example.project.core.database.entities.toProfile
@@ -32,11 +27,11 @@ import org.example.project.core.data.mappers.toEntity
 import org.example.project.core.data.mappers.toLikedPostEntity
 import org.example.project.core.data.mappers.toUserPostEntity
 import org.example.project.core.network.dto.UpsertProfileRequest
-import org.example.project.core.data.paging.ProfileLikedPostsRemoteMediator
-import org.example.project.core.data.paging.ProfileUserPostsRemoteMediator
 import org.example.project.core.datastore.UserPreferencesRepository
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
+import org.example.project.core.window.WindowEngine
+import org.example.project.core.window.WindowMode
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
@@ -77,10 +72,20 @@ class ProfileRepositoryImpl(
     private val presentationCache = PresentationCache<Post, String> { it.id }
     private val pagingStatesByKey = mutableMapOf<ProfilePostsKey, PagingState>()
     private val automaticRefreshAttemptedKeys = mutableSetOf<ProfilePostsKey>()
-    private var activePostsKey: ProfilePostsKey? = null
+    private val activePostsKeyFlow = MutableStateFlow<ProfilePostsKey?>(null)
+    private var activePostsKey: ProfilePostsKey?
+        get() = activePostsKeyFlow.value
+        set(value) { activePostsKeyFlow.value = value }
     private var pagingState = PagingState()
     private var roomJob: Job? = null
     private var networkJob: Job? = null
+
+    private val windowEnginesByKey = mutableMapOf<ProfilePostsKey, WindowEngine<Post>>()
+    private val windowState = MutableStateFlow(WindowEngine<Post>().getState())
+
+    private fun windowEngineFor(key: ProfilePostsKey): WindowEngine<Post> {
+        return windowEnginesByKey.getOrPut(key) { WindowEngine() }
+    }
 
     private data class ProfilePostsKey(val isMine: Boolean, val sort: String)
 
@@ -120,6 +125,7 @@ class ProfileRepositoryImpl(
                 )
                 presentationCache.clear()
                 activePostsKey = key
+                windowState.value = windowEngineFor(key).getState()
                 shouldRefresh = key !in automaticRefreshAttemptedKeys
                 _profilePostsState.value = FeedState(
                     isLoading = shouldRefresh && cachedCount == 0,
@@ -160,6 +166,7 @@ class ProfileRepositoryImpl(
                     lastFailedAction = null,
                     lastFailedPage = 0
                 )
+                windowState.value = windowEngineFor(key).reset()
                 pagingState.generation
             }
 
@@ -229,8 +236,19 @@ class ProfileRepositoryImpl(
                 if (state.isLoading || state.isRefreshing || state.isAppending || state.isRetrying || !pagingState.hasMore) {
                     return@withLock Triple(false, 0L, 0)
                 }
-                _profilePostsState.update { it.copy(isAppending = true, appendError = null) }
-                Triple(true, pagingState.generation, pagingState.nextPage)
+                
+                val currentState = windowState.value
+                val items = presentationCache.items
+                val anchor = if (items.size > 20) items[items.size - 20] else items.lastOrNull() // 20 is buffer
+                val nextState = windowEngineFor(key).expand(anchor)
+                
+                if (nextState != currentState) {
+                    windowState.value = nextState
+                    _profilePostsState.update { it.copy(isAppending = true, appendError = null) }
+                    Triple(true, pagingState.generation, pagingState.nextPage)
+                } else {
+                    Triple(false, 0L, 0)
+                }
             }
 
             if (!shouldFetch) return@launch
@@ -292,10 +310,10 @@ class ProfileRepositoryImpl(
     private fun restartRoomObservation() {
         roomJob?.cancel()
         roomJob = scope.launch {
-            MutableStateFlow(activePostsKey)
-                .flatMapLatest { key ->
+            combine(activePostsKeyFlow, windowState) { key, window -> Pair(key, window) }
+                .flatMapLatest { (key, window) ->
                     if (key == null) flowOf(emptyList())
-                    else observeProfilePosts(key)
+                    else observeProfilePosts(key, window.anchor?.createdAt, window.anchor?.id, window.limit)
                 }
                 .collect { posts ->
                     presentationCache.update(posts)
@@ -304,8 +322,21 @@ class ProfileRepositoryImpl(
         }
     }
 
-    private fun observeProfilePosts(key: ProfilePostsKey): Flow<List<Post>> {
-        return if (key.isMine) observeUserPosts(key.sort) else observeLikedPosts(key.sort)
+    private fun observeProfilePosts(key: ProfilePostsKey, anchorCreatedAt: Long?, anchorId: String?, limit: Int): Flow<List<Post>> {
+        val flow = if (key.isMine) {
+            if (anchorCreatedAt != null && anchorId != null) {
+                database.userPostDao().observeAfterAnchor(key.sort, anchorCreatedAt, anchorId, limit)
+            } else {
+                database.userPostDao().observeNewest(key.sort, limit)
+            }
+        } else {
+            if (anchorCreatedAt != null && anchorId != null) {
+                database.likedPostDao().observeAfterAnchor(key.sort, anchorCreatedAt, anchorId, limit)
+            } else {
+                database.likedPostDao().observeNewest(key.sort, limit)
+            }
+        }
+        return flow.map { posts -> posts.map { if (it is org.example.project.core.database.entities.UserPostEntity) it.toPost() else (it as org.example.project.core.database.entities.LikedPostEntity).toPost() } }
     }
 
     private suspend fun getCachedPostCount(key: ProfilePostsKey): Int {
@@ -355,69 +386,9 @@ class ProfileRepositoryImpl(
         }
     }
 
-    @OptIn(ExperimentalPagingApi::class, ExperimentalCoroutinesApi::class)
-    override fun getPagedUserPosts(sort: String): Flow<PagingData<Post>> {
-        return Pager(
-            config = PagingConfig(pageSize = 10, initialLoadSize = 10, prefetchDistance = 5, enablePlaceholders = false),
-            remoteMediator = ProfileUserPostsRemoteMediator(
-                profileService = profileService,
-                database = database,
-                localDataSource = localDataSource,
-                sort = sort,
-                networkMonitor = networkMonitor,
-            ),
-            pagingSourceFactory = { 
-                when (sort.uppercase()) {
-                    "OLDEST" -> database.userPostDao().pagingSourceOldest(sort)
-                    "POPULAR" -> database.userPostDao().pagingSourcePopular(sort)
-                    else -> database.userPostDao().pagingSource(sort)
-                }
-            },
-        ).flow.map { pagingData ->
-            pagingData.map { entity -> entity.toPost() }
-        }
-    }
 
-    @OptIn(ExperimentalPagingApi::class, ExperimentalCoroutinesApi::class)
-    override fun getPagedLikedPosts(sort: String): Flow<PagingData<Post>> {
-        return Pager(
-            config = PagingConfig(pageSize = 10, initialLoadSize = 10, prefetchDistance = 5, enablePlaceholders = false),
-            remoteMediator = ProfileLikedPostsRemoteMediator(
-                profileService = profileService,
-                database = database,
-                localDataSource = localDataSource,
-                sort = sort,
-                networkMonitor = networkMonitor,
-            ),
-            pagingSourceFactory = { 
-                when (sort.uppercase()) {
-                    "OLDEST" -> database.likedPostDao().pagingSourceOldest(sort)
-                    "POPULAR" -> database.likedPostDao().pagingSourcePopular(sort)
-                    else -> database.likedPostDao().pagingSource(sort)
-                }
-            },
-        ).flow.map { pagingData ->
-            pagingData.map { entity -> entity.toPost() }
-        }
-    }
 
-    override fun observeUserPosts(sort: String): Flow<List<Post>> {
-        val flow = when (sort.uppercase()) {
-            "OLDEST" -> database.userPostDao().observeUserPostsOldest(sort)
-            "POPULAR" -> database.userPostDao().observeUserPostsPopular(sort)
-            else -> database.userPostDao().observeUserPosts(sort)
-        }
-        return flow.map { posts -> posts.map { it.toPost() } }
-    }
 
-    override fun observeLikedPosts(sort: String): Flow<List<Post>> {
-        val flow = when (sort.uppercase()) {
-            "OLDEST" -> database.likedPostDao().observeLikedPostsOldest(sort)
-            "POPULAR" -> database.likedPostDao().observeLikedPostsPopular(sort)
-            else -> database.likedPostDao().observeLikedPosts(sort)
-        }
-        return flow.map { posts -> posts.map { it.toPost() } }
-    }
 
     override suspend fun refreshUserPosts(sort: String): DataState<List<Post>> =
         safeApiCall(networkMonitor) {

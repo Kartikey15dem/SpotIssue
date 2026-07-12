@@ -16,25 +16,12 @@ struct HomeScreen: View {
     }
 
     var body: some View {
-        let _ = print("""
-        [HOME_RECOMPOSE] HomeScreen BODY
-        [HOME_RECOMPOSE] time=\(Date())
-        [HOME_RECOMPOSE] ========================
-        """)
-        let _ = print("\(PagingDebug.tag)\nHomeScreen BODY")
         Observing(holder.vm.uiState) { (state: HomeState) in
             ZStack(alignment: .top) {
                 IssueSpotColors.background
                     .ignoresSafeArea()
                 
                 Observing(holder.vm.expandedPost) { expandedPost in
-                    let _ = print("""
-                    [HOME_RECOMPOSE] ExpandedPost OBSERVED
-                    [HOME_RECOMPOSE] postId=\(expandedPost?.id ?? "nil")
-                    [HOME_RECOMPOSE] time=\(Date())
-                    [HOME_RECOMPOSE] ========================
-                    """)
-                    let _ = print("\(PagingDebug.tag)\nExpandedPost Changed\npostId: \(expandedPost?.id ?? "nil")")
                     VStack(spacing: 0) {
                         if let expandedPost {
                             let isLiked = expandedPost.isLiked
@@ -74,20 +61,7 @@ struct HomeScreen: View {
                             .zIndex(1)
                         } else {
                             Observing(holder.vm.currentLevel) { currentLevel in
-                                let _ = print("""
-                                [HOME_RECOMPOSE] CurrentLevel OBSERVED
-                                [HOME_RECOMPOSE] \(currentLevel)
-                                [HOME_RECOMPOSE] time=\(Date())
-                                [HOME_RECOMPOSE] ========================
-                                """)
-                                let _ = print("\(PagingDebug.tag)\nCurrentLevel Changed\nlevel: \(currentLevel)")
                                 Observing(holder.vm.activeIssues) { activeIssues in
-                                    let _ = print("""
-                                    [HOME_RECOMPOSE] ActiveIssues OBSERVED
-                                    [HOME_RECOMPOSE] count=\(activeIssues)
-                                    [HOME_RECOMPOSE] time=\(Date())
-                                    [HOME_RECOMPOSE] ========================
-                                    """)
                                     if state.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                         Observing(holder.vm.feedState) { (feedState: FeedState) in
                                             HomeFeedContainer(
@@ -124,12 +98,6 @@ struct HomeScreen: View {
                     // Bottom Navigation Bar
                     if expandedPost == nil {
                         Observing(holder.vm.currentLevel) { currentLevel in
-                            let _ = print("""
-                            [HOME_RECOMPOSE] CurrentLevel OBSERVED
-                            [HOME_RECOMPOSE] \(currentLevel)
-                            [HOME_RECOMPOSE] time=\(Date())
-                            [HOME_RECOMPOSE] ========================
-                            """)
                             VStack {
                                 Spacer()
                                 HomeBottomNavigationBar(
@@ -169,31 +137,16 @@ struct HomeScreen: View {
             )) {
                 if let postId = state.showCommentsSheetForPostId {
                     Observing(holder.vm.activeCommentsFlow) { activeCommentsFlow in
-                        let _ = print("\(PagingDebug.tag)\nComments Flow Changed\npostId: \(postId)")
                         if let activeCommentsFlow {
-                            ObserveErasedPagingItems(
-                                Comment.self,
-                                flow: activeCommentsFlow,
-                                sourceKey: "home-comments:\(postId)"
-                            ) { commentsSnapshot, pagingHolder in
-                                let commentsPresentation = PagingPresentation(
-                                    snapshot: commentsSnapshot,
-                                    endRule: .comments
-                                )
-
+                            ObserveCommentsFlow(flow: activeCommentsFlow) { commentsState in
                                 CommentsBottomSheet(
-                                    pagingHolder: pagingHolder,
-                                    presentation: commentsPresentation,
+                                    commentsState: commentsState,
                                     currentUserImageUrl: state.currentUserImage,
                                     onDismiss: { holder.vm.onIntent(intent: HomeIntentDismissCommentsSheet.shared) },
                                     onSubmit: { text in
                                         holder.vm.onIntent(intent: HomeIntentCommentSubmitted(postId: postId, commentText: text))
                                     },
-                                    onRefresh: pagingHolder.refresh,
-                                    onRetry: pagingHolder.retry,
-                                    onItemAppeared: { index in
-                                        pagingHolder.loadNextPageIfNecessary(index: index)
-                                    }
+                                    onLoadMore: { holder.vm.loadMoreComments(postId: postId) }
                                 )
                             }
                             .id("comments_\(postId)")
@@ -240,11 +193,6 @@ private struct HomeFeedContainer: View {
     let isSearch: Bool
 
     var body: some View {
-        let _ = print("""
-        [HOME_RECOMPOSE] HomeFeedContainer BODY
-        [HOME_RECOMPOSE] time=\(Date())
-        [HOME_RECOMPOSE] ========================
-        """)
         VStack(spacing: 0) {
             HomeHeader(
                 state: state,
@@ -265,8 +213,13 @@ private struct HomeFeedContainer: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .scrollPosition(scrollPosition)
-            .refreshable {
+                        .refreshable {
                 onIntent(isSearch ? HomeIntentRefreshSearchPosts.shared : HomeIntentRefreshCurrentPosts.shared)
+            }
+            .onChange(of: feedState.error?.message) { _, error in
+                if let error, !feedState.posts.isEmpty {
+                    onIntent(HomeIntentShowRefreshErrorSnackbar(message: error))
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -335,18 +288,6 @@ private struct HomePostsList: View {
                 )
             }
         }
-        .overlay(alignment: .top) {
-            if feedState.isRefreshing && !feedState.posts.isEmpty {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: IssueSpotColors.primary))
-                    .padding(.top, IssueSpotSpacing.small)
-            }
-        }
-        .onChange(of: feedState.error?.message) { _, error in
-            if let error, !feedState.posts.isEmpty {
-                onIntent(HomeIntentShowRefreshErrorSnackbar(message: error))
-            }
-        }
     }
 }
 
@@ -357,13 +298,6 @@ struct HomeHeader: View {
     let onIntent: (HomeIntent) -> Void
     
     var body: some View {
-        let _ = print("""
-        [HOME_RECOMPOSE] HomeHeader BODY
-        [HOME_RECOMPOSE] query=\(state.query)
-        [HOME_RECOMPOSE] level=\(currentLevel)
-        [HOME_RECOMPOSE] time=\(Date())
-        [HOME_RECOMPOSE] ========================
-        """)
         VStack(spacing: 0) {
             HStack(alignment: .center) {
                 // Search Field
@@ -463,12 +397,6 @@ struct HomeBottomNavigationBar: View {
     ]
     
     var body: some View {
-        let _ = print("""
-        [HOME_RECOMPOSE] BottomNavigation BODY
-        [HOME_RECOMPOSE] level=\(currentLevel)
-        [HOME_RECOMPOSE] time=\(Date())
-        [HOME_RECOMPOSE] ========================
-        """)
         HStack {
             ForEach(items, id: \.level.name) { item in
                 let isSelected = currentLevel == item.level

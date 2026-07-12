@@ -75,26 +75,37 @@ struct PostDetailScreen: View {
                                 Divider().background(IssueSpotColors.outline)
                             }
                             
-                            if state.comments.isEmpty {
-                                if state.isLoading {
-                                    ProgressView().padding()
-                                } else {
-                                    Text("No comments yet")
-                                        .font(IssueSpotTypography.bodyMedium)
-                                        .foregroundColor(IssueSpotColors.onSurfaceVariant)
-                                        .padding()
-                                }
-                            } else {
-                                ForEach(state.comments, id: \.id) { comment in
-                                    VStack(spacing: 0) {
-                                        CommentItemView(comment: comment)
-                                        Divider().padding(.leading, 64)
+                                                        Observing(holder.vm.commentsFlow) { commentsState in
+                                if commentsState.items.isEmpty {
+                                    if commentsState.isLoading {
+                                        ProgressView().padding()
+                                    } else {
+                                        Text("No comments yet")
+                                            .font(IssueSpotTypography.bodyMedium)
+                                            .foregroundColor(IssueSpotColors.onSurfaceVariant)
+                                            .padding()
                                     }
-                                    .padding(.vertical, IssueSpotSpacing.small)
+                                } else {
+                                    let items = commentsState.items as? [Comment] ?? []
+                                    ForEach(Array(items.enumerated()), id: \.element.id) { index, comment in
+                                        VStack(spacing: 0) {
+                                            CommentItemView(comment: comment)
+                                            Divider().padding(.leading, 64)
+                                        }
+                                        .padding(.vertical, IssueSpotSpacing.small)
+                                        .onAppear {
+                                            if index >= items.count - 3 && commentsState.hasMore && !commentsState.isAppending && !commentsState.isLoading {
+                                                holder.vm.loadMoreComments(postId: post.id)
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                if commentsState.isAppending {
+                                    ProgressView().padding()
                                 }
                             }
-                            
-                            Spacer().frame(height: IssueSpotSpacing.large)
+                                                        Spacer().frame(height: IssueSpotSpacing.large)
                         }
                     }
                     .background(IssueSpotColors.background)

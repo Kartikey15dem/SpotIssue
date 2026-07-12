@@ -5,7 +5,6 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
-import androidx.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
 import org.example.project.core.database.entities.LikedPostEntity
 
@@ -18,32 +17,14 @@ interface LikedPostDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<LikedPostEntity>)
 
-    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY createdAt DESC")
-    fun pagingSource(sort: String): PagingSource<Int, LikedPostEntity>
+    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY createdAt DESC LIMIT :limit")
+    fun observeNewest(sort: String, limit: Int): Flow<List<LikedPostEntity>>
 
-    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY createdAt ASC")
-    fun pagingSourceOldest(sort: String): PagingSource<Int, LikedPostEntity>
-
-    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY likes DESC, createdAt DESC")
-    fun pagingSourcePopular(sort: String): PagingSource<Int, LikedPostEntity>
+    @Query("SELECT * FROM liked_posts WHERE sort = :sort AND (createdAt < :anchorCreatedAt OR (createdAt = :anchorCreatedAt AND id < :anchorId)) ORDER BY createdAt DESC, id DESC LIMIT :limit")
+    fun observeAfterAnchor(sort: String, anchorCreatedAt: Long, anchorId: String, limit: Int): Flow<List<LikedPostEntity>>
 
     @Query("SELECT * FROM liked_posts ORDER BY createdAt DESC")
     suspend fun getLikedPosts(): List<LikedPostEntity>
-
-    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY createdAt DESC")
-    fun observeLikedPosts(sort: String): Flow<List<LikedPostEntity>>
-
-    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY likedAt ASC")
-    fun observeLikedPostsOldest(sort: String): Flow<List<LikedPostEntity>>
-
-    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY likes DESC, createdAt DESC")
-    fun observeLikedPostsPopular(sort: String): Flow<List<LikedPostEntity>>
-
-    @Query("SELECT * FROM liked_posts ORDER BY likedAt ASC")
-    suspend fun getLikedPostsOldest(): List<LikedPostEntity>
-
-    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY likes DESC, createdAt DESC")
-    suspend fun getLikedPostsPopular(sort: String): List<LikedPostEntity>
 
     @Query("SELECT * FROM liked_posts WHERE id = :postId")
     suspend fun getLikedPostById(postId: String): LikedPostEntity?

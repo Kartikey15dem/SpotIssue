@@ -94,7 +94,6 @@ struct ProfileScreen: View {
                                 showScrollToTop: $showScrollToTop,
                                 postToDelete: $postToDelete
                             )
-                            .id("profile:\(state.isMine):\(state.sort.name)")
                         }
                     }
                 }
@@ -131,29 +130,15 @@ struct ProfileScreen: View {
                     Observing(holder.vm.activeCommentsFlow) { activeCommentsFlow in
                         let _ = print("\(PagingDebug.tag)\nComments Flow Changed\npostId: \(postId)")
                         if let activeCommentsFlow {
-                            ObserveErasedPagingItems(
-                                Comment.self,
-                                flow: activeCommentsFlow,
-                                sourceKey: "profile-comments:\(postId)"
-                            ) { commentsSnapshot, pagingHolder in
-                                let commentsPresentation = PagingPresentation(
-                                    snapshot: commentsSnapshot,
-                                    endRule: .comments
-                                )
-
+                            ObserveCommentsFlow(flow: activeCommentsFlow) { commentsState in
                                 CommentsBottomSheet(
-                                    pagingHolder: pagingHolder,
-                                    presentation: commentsPresentation,
+                                    commentsState: commentsState,
                                     currentUserImageUrl: state.profile?.imageUrl,
                                     onDismiss: { holder.vm.onIntent(intent: ProfileIntentDismissCommentsSheet.shared) },
                                     onSubmit: { text in
                                         holder.vm.onIntent(intent: ProfileIntentCommentSubmitted(postId: postId, commentText: text))
                                     },
-                                    onRefresh: pagingHolder.refresh,
-                                    onRetry: pagingHolder.retry,
-                                    onItemAppeared: { index in
-                                        pagingHolder.loadNextPageIfNecessary(index: index)
-                                    }
+                                    onLoadMore: { holder.vm.loadMoreComments(postId: postId) }
                                 )
                             }
                             .id("comments_\(postId)")

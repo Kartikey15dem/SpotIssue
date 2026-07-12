@@ -2,14 +2,11 @@ import SwiftUI
 import Shared
 
 struct CommentsBottomSheet: View {
-    @ObservedObject var pagingHolder: PagingItemsHolder<Comment>
-    let presentation: PagingPresentation<Comment>
+    let commentsState: PaginationState<Comment>?
     let currentUserImageUrl: String?
     let onDismiss: () -> Void
     let onSubmit: (String) -> Void
-    let onRefresh: () -> Void
-    let onRetry: () -> Void
-    var onItemAppeared: ((Int) -> Void)? = nil
+    let onLoadMore: () -> Void
     
     @State private var commentText: String = ""
     
@@ -32,30 +29,44 @@ struct CommentsBottomSheet: View {
             
             // Comments List
             Group {
-                if !presentation.showContent {
-                    PagingInitialStateView(
-                        presentation: presentation,
-                        onRefresh: onRefresh,
-                        emptyMessage: "No comments yet. Be the first to start the discussion!"
-                    )
+                if commentsState == nil {
+                    Spacer()
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: IssueSpotColors.primary))
+                    Spacer()
+                } else if commentsState!.items.isEmpty && !commentsState!.isLoading && !commentsState!.isRefreshing {
+                    Spacer()
+                    Text("No comments yet. Be the first to start the discussion!")
+                        .font(IssueSpotTypography.bodyLarge)
+                        .foregroundColor(IssueSpotColors.onSurfaceVariant)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    Spacer()
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 16) {
-                            ForEach(0..<presentation.itemCount, id: \.self) { index in
-                                if let comment = pagingHolder.items?.get(index: Int32(index)) {
+                            let items = commentsState!.items as? [Comment] ?? []
+                            if true {
+                                ForEach(Array(items.enumerated()), id: \.element.id) { index, comment in
                                     CommentItem(comment: comment)
                                         .id(comment.id)
                                         .onAppear {
-                                            onItemAppeared?(index)
+                                            if index >= items.count - 3 && commentsState!.hasMore && !commentsState!.isAppending && !commentsState!.isLoading {
+                                                onLoadMore()
+                                            }
                                         }
                                 }
                             }
-
-                            PagingFooterView(
-                                state: presentation.footer,
-                                onRetry: onRetry,
-                                endMessage: "No more comments"
-                            )
+                                                        if commentsState!.isAppending || commentsState!.isLoading || commentsState!.isRefreshing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: IssueSpotColors.primary))
+                                    .padding()
+                            } else if !commentsState!.isAppending && !commentsState!.hasMore && !commentsState!.items.isEmpty {
+                                Text("No more comments")
+                                    .font(IssueSpotTypography.bodyMedium)
+                                    .foregroundColor(IssueSpotColors.onBackground)
+                                    .padding()
+                            }
                         }
                         .padding()
                     }

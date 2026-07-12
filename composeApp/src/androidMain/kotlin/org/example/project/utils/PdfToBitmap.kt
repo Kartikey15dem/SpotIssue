@@ -20,7 +20,6 @@ suspend fun pdfToBitmaps(context: Context, uri: Uri): List<Bitmap> {
         val bitmaps = mutableListOf<Bitmap>()
         var tempFile: File? = null
         try {
-            android.util.Log.d("PdfToBitmap", "Loading PDF from URI: $uri, scheme: ${uri.scheme}")
             
             /* WHY THIS CONDITIONAL LOGIC EXISTS:
              * Android's `PdfRenderer` natively requires a seekable `ParcelFileDescriptor`.
@@ -31,7 +30,6 @@ suspend fun pdfToBitmaps(context: Context, uri: Uri): List<Bitmap> {
              */
             val fileDescriptor: ParcelFileDescriptor? = if (uri.scheme == "http" || uri.scheme == "https") {
                 tempFile = File(context.cacheDir, "temp_pdf_${System.currentTimeMillis()}.pdf")
-                android.util.Log.d("PdfToBitmap", "Downloading remote PDF to ${tempFile.absolutePath}")
                 
                 val connection = URL(uri.toString()).openConnection() as java.net.HttpURLConnection
                 connection.connectTimeout = 15000
@@ -39,7 +37,6 @@ suspend fun pdfToBitmaps(context: Context, uri: Uri): List<Bitmap> {
                 connection.connect()
                 
                 if (connection.responseCode != java.net.HttpURLConnection.HTTP_OK) {
-                    android.util.Log.e("PdfToBitmap", "HTTP Error: ${connection.responseCode} ${connection.responseMessage}")
                     throw Exception("HTTP Error ${connection.responseCode}")
                 }
                 
@@ -48,16 +45,13 @@ suspend fun pdfToBitmaps(context: Context, uri: Uri): List<Bitmap> {
                         input.copyTo(output)
                     }
                 }
-                android.util.Log.d("PdfToBitmap", "Download complete. File size: ${tempFile.length()}")
                 ParcelFileDescriptor.open(tempFile, ParcelFileDescriptor.MODE_READ_ONLY)
             } else {
-                android.util.Log.d("PdfToBitmap", "Opening local PDF")
                 context.contentResolver.openFileDescriptor(uri, "r")
             }
 
             fileDescriptor?.use { fd ->
                 val renderer = PdfRenderer(fd)
-                android.util.Log.d("PdfToBitmap", "PDF opened successfully. Page count: ${renderer.pageCount}")
 
                 for (i in 0 until renderer.pageCount) {
                     val page = renderer.openPage(i)
@@ -84,8 +78,6 @@ suspend fun pdfToBitmaps(context: Context, uri: Uri): List<Bitmap> {
                 renderer.close()
             }
         } catch (e: Exception) {
-            android.util.Log.e("PdfToBitmap", "Error rendering PDF: ${e.message}", e)
-            e.printStackTrace()
         } finally {
             /* 
              * Crucial cleanup step. We must delete the temporary file after rendering
@@ -93,7 +85,6 @@ suspend fun pdfToBitmaps(context: Context, uri: Uri): List<Bitmap> {
              */
             try {
                 tempFile?.delete()
-                android.util.Log.d("PdfToBitmap", "Deleted temp file")
             } catch (e: Exception) {
                 // Ignore
             }

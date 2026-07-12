@@ -11,8 +11,23 @@ data class WindowState<T>(
 )
 
 /**
- * Pure state machine that determines what portion of the feed should be visible.
- * It manages expanding, buffering (hysteresis), and sliding the window.
+ * ---------------------------------------------------------------------------
+ * PAGING PIPELINE STEP 2: WINDOW ENGINE (SLIDING WINDOW ALGORITHM)
+ * ---------------------------------------------------------------------------
+ * 
+ * Purpose:
+ * Pure state machine that calculates what portion of the feed should be visible from Room.
+ * When users scroll down deeply into the feed (e.g., thousands of items), querying Room 
+ * for *all* loaded items would consume too much memory and freeze the UI. 
+ * The WindowEngine solves this using a "Sliding Window" algorithm.
+ * 
+ * Flow:
+ * 1. INITIAL: Starts with an initial window limit (e.g. 20 items).
+ * 2. GROWING: As user scrolls, the limit expands (e.g. 40, 60, 80) until it hits maxWindow.
+ * 3. EXPANSION_BUFFER: Prevents abrupt sliding by letting the window overshoot slightly.
+ * 4. SLIDING: Once maxWindow + buffer is reached, it takes an `anchor` (a post ID further down).
+ *    Future queries to Room will start from this anchor and fetch a fixed limit. 
+ *    This effectively "slides" the top of the feed out of memory, keeping RAM usage perfectly flat!
  */
 class WindowEngine<T>(
     private val config: FeedConfig = FeedConfig()
@@ -43,8 +58,6 @@ class WindowEngine<T>(
 
         currentState = newState
         
-        println("[WINDOW] Current Mode: $oldMode Limit: $oldLimit Anchor: $oldAnchor")
-        println("[WINDOW] Next Mode: ${newState.mode} Limit: ${newState.limit} Anchor: ${newState.anchor}")
         
         return currentState
     }

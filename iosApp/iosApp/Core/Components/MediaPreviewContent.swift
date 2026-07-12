@@ -50,6 +50,7 @@ struct ImageGrid: View {
     let images: [SelectedMediaItem]
     let onRemove: (String) -> Void
     let onImageClick: (Int) -> Void
+    var isEditable: Bool = true
 
     var body: some View {
         let count = images.count
@@ -58,34 +59,34 @@ struct ImageGrid: View {
 
         Group {
             if count == 1 {
-                GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fit)
+                GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fit, showRemoveButton: false)
                     .frame(maxWidth: .infinity)
                 // REMOVED fixed height here to let natural image ratio dictate height (like Compose)
             } else if count == 2 {
                 HStack(spacing: spacing) {
-                    GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fill)
-                    GridImageItem(uri: images[1].uri, onRemove: { onRemove(images[1].uri) }, onClick: { onImageClick(1) }, contentMode: .fill)
+                    GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fill, showRemoveButton: false)
+                    GridImageItem(uri: images[1].uri, onRemove: { onRemove(images[1].uri) }, onClick: { onImageClick(1) }, contentMode: .fill, showRemoveButton: false)
                 }
                 .frame(height: gridHeight)
             } else if count == 3 {
                 HStack(spacing: spacing) {
-                    GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fill)
+                    GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fill, showRemoveButton: false)
                     VStack(spacing: spacing) {
-                        GridImageItem(uri: images[1].uri, onRemove: { onRemove(images[1].uri) }, onClick: { onImageClick(1) }, contentMode: .fill)
-                        GridImageItem(uri: images[2].uri, onRemove: { onRemove(images[2].uri) }, onClick: { onImageClick(2) }, contentMode: .fill)
+                        GridImageItem(uri: images[1].uri, onRemove: { onRemove(images[1].uri) }, onClick: { onImageClick(1) }, contentMode: .fill, showRemoveButton: false)
+                        GridImageItem(uri: images[2].uri, onRemove: { onRemove(images[2].uri) }, onClick: { onImageClick(2) }, contentMode: .fill, showRemoveButton: false)
                     }
                 }
                 .frame(height: gridHeight)
             } else {
                 VStack(spacing: spacing) {
                     HStack(spacing: spacing) {
-                        GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fill)
-                        GridImageItem(uri: images[1].uri, onRemove: { onRemove(images[1].uri) }, onClick: { onImageClick(1) }, contentMode: .fill)
+                        GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fill, showRemoveButton: false)
+                        GridImageItem(uri: images[1].uri, onRemove: { onRemove(images[1].uri) }, onClick: { onImageClick(1) }, contentMode: .fill, showRemoveButton: false)
                     }
                     HStack(spacing: spacing) {
-                        GridImageItem(uri: images[2].uri, onRemove: { onRemove(images[2].uri) }, onClick: { onImageClick(2) }, contentMode: .fill)
+                        GridImageItem(uri: images[2].uri, onRemove: { onRemove(images[2].uri) }, onClick: { onImageClick(2) }, contentMode: .fill, showRemoveButton: false)
                         ZStack {
-                            GridImageItem(uri: images[3].uri, onRemove: { onRemove(images[3].uri) }, onClick: { onImageClick(3) }, contentMode: .fill)
+                            GridImageItem(uri: images[3].uri, onRemove: { onRemove(images[3].uri) }, onClick: { onImageClick(3) }, contentMode: .fill, showRemoveButton: false)
                             if count > 4 {
                                 Color.black.opacity(0.5)
                                     .onTapGesture { onImageClick(3) }
@@ -108,6 +109,7 @@ struct GridImageItem: View {
     let onRemove: () -> Void
     let onClick: () -> Void
     var contentMode: ContentMode = .fill
+    var showRemoveButton: Bool = true
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -120,20 +122,22 @@ struct GridImageItem: View {
             } placeholder: {
                 IssueSpotColors.surfaceVariant
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: contentMode == .fit ? nil : .infinity)
             .contentShape(Rectangle())
             .onTapGesture(perform: onClick)
             .clipped()
 
-            Button(action: onRemove) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(5)
-                    .background(Color.black.opacity(0.6))
-                    .clipShape(Circle())
+            if showRemoveButton {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(5)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Circle())
+                }
+                .padding(4)
             }
-            .padding(4)
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }

@@ -96,7 +96,6 @@ class PostUploadWorker {
                                     mediaPaths.append(compressedUrl.path)
                                     preparedTemporaryPaths.append(compressedUrl.path)
                                 } catch {
-                                    print("Failed to write compressed image: \(error)")
                                 }
                             }
                         }
@@ -142,7 +141,6 @@ class PostUploadWorker {
                 }
                 
             } catch {
-                print("Background upload failed: \(error)")
                 let prefRepository = KoinHelper().getUserPreferencesRepository()
                 var currentUserData: Shared.UserData? = nil
                 for await userData in prefRepository.userData {

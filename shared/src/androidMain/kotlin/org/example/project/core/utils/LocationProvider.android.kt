@@ -138,11 +138,6 @@ actual class LocationProvider actual constructor() {
 
         } catch (e: Exception) {
 
-            Log.e(
-                "LocationProvider",
-                "Reverse geocoding failed",
-                e
-            )
 
             UserLocation(
                 address = "$latitude,$longitude",

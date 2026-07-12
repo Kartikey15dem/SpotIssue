@@ -24,13 +24,11 @@ import org.example.project.theme.IssueSpotTheme
 fun HomeFeed(
     listState: LazyListState,
     feedState: org.example.project.core.presentation.FeedState,
-    state: HomeState,
     onIntent: (HomeIntent) -> Unit,
     feedUiState: FeedUiState,
     modifier: Modifier = Modifier,
     header: @Composable () -> Unit
 ) {
-    println("[KMP_PAGING]\nHomePostsList BODY\nitemCount=${feedState.posts.size}\nrefreshing=${feedState.isRefreshing}\nloading=${feedState.isLoading}")
     
     val spacing = IssueSpotTheme.spacing
 
@@ -38,7 +36,6 @@ fun HomeFeed(
         header()
         Spacer(Modifier.height(spacing.small))
         
-        println("[PAGING_TRACE] LazyColumn recomposed | itemCount=${feedState.posts.size} | time=${System.currentTimeMillis()}")
         
         // Threshold check to load more
         LaunchedEffect(listState) {
@@ -82,7 +79,6 @@ fun HomeFeed(
             ) { post ->
                 val isFirstOrLast = post == feedState.posts.firstOrNull() || post == feedState.posts.lastOrNull()
                 if (isFirstOrLast) {
-                    println("[KMP_PAGING]\nROW\npostId=${post.id}")
                 }
                     PostCard(
                         modifier = Modifier

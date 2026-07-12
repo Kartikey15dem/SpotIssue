@@ -5,7 +5,6 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
-import androidx.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
 import org.example.project.core.database.entities.UserPostEntity
 
@@ -18,32 +17,14 @@ interface UserPostDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<UserPostEntity>)
 
-    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY createdAt DESC")
-    fun pagingSource(sort: String): PagingSource<Int, UserPostEntity>
+    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY createdAt DESC LIMIT :limit")
+    fun observeNewest(sort: String, limit: Int): Flow<List<UserPostEntity>>
 
-    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY createdAt ASC")
-    fun pagingSourceOldest(sort: String): PagingSource<Int, UserPostEntity>
-
-    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY likes DESC, createdAt DESC")
-    fun pagingSourcePopular(sort: String): PagingSource<Int, UserPostEntity>
+    @Query("SELECT * FROM user_posts WHERE sort = :sort AND (createdAt < :anchorCreatedAt OR (createdAt = :anchorCreatedAt AND id < :anchorId)) ORDER BY createdAt DESC, id DESC LIMIT :limit")
+    fun observeAfterAnchor(sort: String, anchorCreatedAt: Long, anchorId: String, limit: Int): Flow<List<UserPostEntity>>
 
     @Query("SELECT * FROM user_posts ORDER BY createdAt DESC")
     suspend fun getUserPosts(): List<UserPostEntity>
-
-    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY createdAt DESC")
-    fun observeUserPosts(sort: String): Flow<List<UserPostEntity>>
-
-    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY createdAt ASC")
-    fun observeUserPostsOldest(sort: String): Flow<List<UserPostEntity>>
-
-    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY likes DESC, createdAt DESC")
-    fun observeUserPostsPopular(sort: String): Flow<List<UserPostEntity>>
-
-    @Query("SELECT * FROM user_posts ORDER BY createdAt ASC")
-    suspend fun getUserPostsOldest(): List<UserPostEntity>
-
-    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY likes DESC, createdAt DESC")
-    suspend fun getUserPostsPopular(sort: String): List<UserPostEntity>
 
     @Query("SELECT * FROM user_posts WHERE id = :postId")
     suspend fun getPostById(postId: String): UserPostEntity?

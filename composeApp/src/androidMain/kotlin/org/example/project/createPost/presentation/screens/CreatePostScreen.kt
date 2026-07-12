@@ -582,6 +582,7 @@ fun ImageGrid(
                     onClick = { onImageClick(0) },
                     modifier = Modifier.fillMaxWidth().aspectRatio(singleAspectRatio),
                     contentScale = ContentScale.Fit,
+                    showRemoveButton = false,
                     onSuccess = { state ->
                         val width = state.painter.intrinsicSize.width
                         val height = state.painter.intrinsicSize.height
@@ -654,6 +655,7 @@ fun GridImageItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
+    showRemoveButton: Boolean = true,
     onSuccess: ((coil3.compose.AsyncImagePainter.State.Success) -> Unit)? = null
 ) {
     Box(modifier = modifier.clip(RoundedCornerShape(8.dp))) {
@@ -666,21 +668,23 @@ fun GridImageItem(
             error = painterResource(R.drawable.img_post_placeholder),
             fallback = painterResource(R.drawable.img_post_placeholder)
         )
-        IconButton(
-            onClick = onRemove,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(4.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.6f))
-                .size(24.dp)
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_close),
-                contentDescription = "Remove",
-                modifier = Modifier.size(14.dp),
-                tint = Color.White
-            )
+        if (showRemoveButton) {
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .size(24.dp)
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_close),
+                    contentDescription = "Remove",
+                    modifier = Modifier.size(14.dp),
+                    tint = Color.White
+                )
+            }
         }
     }
 }

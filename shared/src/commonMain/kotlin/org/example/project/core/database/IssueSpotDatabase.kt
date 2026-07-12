@@ -6,9 +6,6 @@ import org.example.project.core.database.dao.CacheMetadataDao
 import org.example.project.core.database.dao.ActiveIssuesDao
 import org.example.project.core.database.dao.UserPostDao
 import org.example.project.core.database.dao.LikedPostDao
-import org.example.project.core.database.dao.RemoteKeysDao
-import org.example.project.core.database.dao.MediatorTransactionDao
-
 
 
 import androidx.room.RoomDatabase
@@ -20,7 +17,5 @@ expect abstract class IssueSpotDatabase : RoomDatabase {
     abstract fun activeIssuesDao(): ActiveIssuesDao
     abstract fun userPostDao(): UserPostDao
     abstract fun likedPostDao(): LikedPostDao
-    abstract fun remoteKeysDao(): RemoteKeysDao
-    abstract fun mediatorTransactionDao(): MediatorTransactionDao
 }
 

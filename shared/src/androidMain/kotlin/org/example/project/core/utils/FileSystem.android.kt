@@ -12,7 +12,6 @@ actual object FileSystem {
                 false
             }
         } catch (e: Exception) {
-            e.printStackTrace()
             false
         }
     }

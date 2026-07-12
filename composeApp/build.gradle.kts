@@ -30,7 +30,6 @@ kotlin {
             implementation(libs.jetbrains.ui.tooling.preview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation(libs.androidx.paging.compose)
             implementation(projects.shared)
             implementation(libs.coil.network.okhttp)
 //            implementation(libs.ktor.client.android)

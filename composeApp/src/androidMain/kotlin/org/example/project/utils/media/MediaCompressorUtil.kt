@@ -21,7 +21,6 @@ object MediaCompressorUtil {
             val compressedImageFile = Compressor.compress(context, file)
             compressedImageFile
         } catch (e: Exception) {
-            e.printStackTrace()
             null
         }
     }
@@ -31,7 +30,6 @@ object MediaCompressorUtil {
             val uri = uriString.toUri()
             copyUriToFile(context, uri)
         } catch (e: Exception) {
-            e.printStackTrace()
             null
         }
     }
@@ -58,7 +56,6 @@ object MediaCompressorUtil {
             }
             return tempFile
         } catch (e: Exception) {
-            e.printStackTrace()
             return null
         }
     }

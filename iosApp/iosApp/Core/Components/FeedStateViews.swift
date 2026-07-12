@@ -70,6 +70,6 @@ struct FeedFooterView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 72)
+        .frame(minHeight: 72)
     }
 }

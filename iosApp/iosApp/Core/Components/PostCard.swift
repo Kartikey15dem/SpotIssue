@@ -23,54 +23,21 @@ struct PostCard: View {
     @State private var showReportDialog = false
     
     var body: some View {
-        let _ = isEdgeItem ? print("""
-        [HOME_RECOMPOSE] PostCard BODY
-        [HOME_RECOMPOSE] id=\(post.id)
-        [HOME_RECOMPOSE] time=\(Date())
-        [HOME_RECOMPOSE] ========================
-        """) : ()
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                Spacer().frame(height: IssueSpotSpacing.small)
-                
-                let locationParts = [post.locality, post.district, post.state, post.country]
-                    .compactMap { $0 }
-                    .filter { !$0.isEmpty }
-                let locationString = locationParts.isEmpty ? "Unknown Location" : locationParts.joined(separator: ", ")
-                
-                PostHeader(
-                    userName: post.userName,
-                    userImageUrl: post.userUrl,
-                    timeAgo: post.timeAgo,
-                    postLevel: post.postLevel,
-                    location: locationString,
-                    isDetailMode: isDetailMode,
-                    onCollapseClick: onCollapseClick
-                )
-                
-                Spacer().frame(height: IssueSpotSpacing.medium)
-                
-                Text(post.postText)
-                    .font(IssueSpotTypography.bodyLarge)
-                    .lineLimit(isDetailMode ? nil : 4)
-                    .foregroundColor(IssueSpotColors.onSurface)
-                
-                Spacer().frame(height: IssueSpotSpacing.smallMedium)
-                
-                if let mediaUrls = post.mediaUrls, !mediaUrls.isEmpty {
-                    PostMediaPreview(post: post)
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                if !isDetailMode {
-                    onPostClick()
-                }
+            if isDetailMode {
+                postContent
+            } else {
+                postContent
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onPostClick()
+                    }
             }
             
             Spacer().frame(height: IssueSpotSpacing.smallMedium)
             
             // Interaction Row
+
             RowView(
                 isLiked: isLiked,
                 likesCount: likesCount,
@@ -95,10 +62,42 @@ struct PostCard: View {
             Button("Cancel", role: .cancel, action: {})
         }
         .onAppear {
-            print("\(PagingDebug.tag)\nPostCard APPEAR\npostId: \(post.id)")
         }
         .onDisappear {
-            print("\(PagingDebug.tag)\nPostCard DISAPPEAR\npostId: \(post.id)")
+        }
+    }
+    
+    private var postContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer().frame(height: IssueSpotSpacing.small)
+            
+            let locationParts = [post.locality, post.district, post.state, post.country]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+            let locationString = locationParts.isEmpty ? "Unknown Location" : locationParts.joined(separator: ", ")
+            
+            PostHeader(
+                userName: post.userName,
+                userImageUrl: post.userUrl,
+                timeAgo: post.timeAgo,
+                postLevel: post.postLevel,
+                location: locationString,
+                isDetailMode: isDetailMode,
+                onCollapseClick: onCollapseClick
+            )
+            
+            Spacer().frame(height: IssueSpotSpacing.medium)
+            
+            Text(post.postText)
+                .font(IssueSpotTypography.bodyLarge)
+                .lineLimit(isDetailMode ? nil : 4)
+                .foregroundColor(IssueSpotColors.onSurface)
+            
+            Spacer().frame(height: IssueSpotSpacing.smallMedium)
+            
+            if let mediaUrls = post.mediaUrls, !mediaUrls.isEmpty {
+                PostMediaPreview(post: post)
+            }
         }
     }
 }
@@ -265,31 +264,15 @@ struct PostMediaPreview: View {
         return AnyView(
             Group {
                 if post.mediaType == .image {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .empty:
-                            ProgressView()
-                                .frame(maxWidth: .infinity, minHeight: 200)
-                                .background(IssueSpotColors.surfaceVariant)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        case .success(let image):
-                            image.resizable()
-                                .scaledToFill()
-                                .frame(maxWidth: .infinity, minHeight: 200, maxHeight: 400)
-                                .clipped()
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .onTapGesture {
-                                    overlayController.show(type: .image, urls: post.mediaUrls ?? [])
-                                }
-                        case .failure:
-                            Image(systemName: "photo")
-                                .frame(maxWidth: .infinity, minHeight: 200)
-                                .background(IssueSpotColors.surfaceVariant)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        @unknown default:
-                            EmptyView()
-                        }
-                    }
+                    let items = mediaUrls.map { SelectedMediaItem(uri: $0, type: .image) }
+                    ImageGrid(
+                        images: items,
+                        onRemove: { _ in },
+                        onImageClick: { index in
+                            overlayController.show(type: .image, urls: mediaUrls, initialIndex: index)
+                        },
+                        isEditable: false
+                    )
                 } else if post.mediaType == .video {
                     ZStack {
                         Rectangle()

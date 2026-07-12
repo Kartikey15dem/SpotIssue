@@ -1,5 +1,7 @@
 package org.example.project.core.data.di
 
+import org.example.project.core.data.local.FeedLocalDataSource
+import org.example.project.core.data.local.ProfileLocalDataSource
 import org.example.project.core.data.repository.AuthRepository
 import org.example.project.core.data.repository.FeedRepository
 import org.example.project.core.data.repository.PostRepository
@@ -23,4 +25,7 @@ val RepositoryModule = module {
 
     // Profile
     single { ProfileRepositoryImpl(get(), get(), get(), get(), get()) } bind ProfileRepository::class
+
+    single { FeedLocalDataSource(get()) }
+    single { ProfileLocalDataSource(get()) }
 }

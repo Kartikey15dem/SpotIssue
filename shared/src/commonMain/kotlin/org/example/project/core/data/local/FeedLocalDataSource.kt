@@ -15,9 +15,18 @@ import org.example.project.core.model.home.PostLevel
 import kotlin.time.Clock
 
 /**
- * Local data source for home/feed feature
- * The single source of truth and only component allowed to access Feed-related DAOs.
- * Does not contain business logic or cache policies.
+ * ---------------------------------------------------------------------------
+ * PAGING PIPELINE STEP 3: DATABASE OBSERVATION (LOCAL CACHE)
+ * ---------------------------------------------------------------------------
+ * 
+ * Local data source for home/feed feature.
+ * This is the single source of truth and only component allowed to access Feed-related DAOs.
+ * 
+ * Role in Pipeline:
+ * - Room is configured to emit continuous updates via Kotlin Flows (`observeNewestPosts`).
+ * - When `FeedRepositoryImpl` inserts network responses via `replacePosts` or `appendPosts`,
+ *   Room immediately fires a new emission for the active query.
+ * - This provides reactive UI updates without manually passing data from Network to UI.
  */
 class FeedLocalDataSource(private val database: IssueSpotDatabase) {
 
@@ -28,21 +37,18 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
     private val maxCacheSize = 1000
 
     fun observeNewestPosts(postLevel: PostLevel, limit: Int): Flow<List<Post>> {
-        println("[LOCAL] Observe (Newest) Limit: $limit")
         return postDao.observeNewestByLevel(postLevel.name, limit).map { entities ->
             entities.map { it.toPost() }
         }
     }
 
     fun observePostsAfterAnchor(postLevel: PostLevel, anchorCreatedAt: Long, anchorId: String, limit: Int): Flow<List<Post>> {
-        println("[LOCAL] Observe (After Anchor) Limit: $limit")
         return postDao.observeAfterAnchorByLevel(postLevel.name, anchorCreatedAt, anchorId, limit).map { entities ->
             entities.map { it.toPost() }
         }
     }
 
     suspend fun replacePosts(postLevel: PostLevel, posts: List<Post>) {
-        println("[LOCAL] Replace")
         database.useWriterConnection { transactor ->
             transactor.immediateTransaction {
                 postDao.deletePostsByLevel(postLevel.name)
@@ -54,7 +60,6 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
     }
 
     suspend fun appendPosts(postLevel: PostLevel, posts: List<Post>) {
-        println("[LOCAL] Append")
         database.useWriterConnection { transactor ->
             transactor.immediateTransaction {
                 postDao.insertPosts(posts.map { it.toEntity(cachedAt = it.createdAt) })
@@ -62,18 +67,11 @@ class FeedLocalDataSource(private val database: IssueSpotDatabase) {
             }
         }
     }
-
-    suspend fun clearPosts(postLevel: PostLevel) {
-        postDao.deletePostsByLevel(postLevel.name)
-    }
-
     suspend fun trimPosts(postLevel: PostLevel) {
-        println("[LOCAL] Trim")
         postDao.trimPostsByLevel(postLevel.name, maxCacheSize)
     }
 
     suspend fun updateMetadata(postLevel: PostLevel) {
-        println("[LOCAL] Metadata")
         val now = Clock.System.now().toEpochMilliseconds()
         val metadata = CacheMetadataEntity(
             cacheKey = CacheMetadataEntity.postsKey(postLevel.name),

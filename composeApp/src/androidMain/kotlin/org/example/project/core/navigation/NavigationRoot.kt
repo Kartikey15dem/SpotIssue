@@ -16,7 +16,6 @@ import org.example.project.auth.presentation.screens.LocationFetchScreenWithPerm
 import org.example.project.createPost.presentation.navigation.CreatePostNavigation
 import org.example.project.home.presentation.navigation.HomeNavigation
 import org.example.project.profile.presentation.navigation.ProfileNavigation
-import org.example.project.home.presentation.screens.PostDetailScreen
 
 @Composable
 fun NavigationRoot(
@@ -28,7 +27,7 @@ fun NavigationRoot(
 //        route = "post_details/{postId}",
 //        arguments = listOf(navArgument("postId") { type = NavType.StringType }),
 //
-//        // 👇 Tell compose to catch incoming URLs that match this pattern
+//
 //        deepLinks = listOf(
 //            navDeepLink {
 //                uriPattern = "https://www.issuespot.com/post/{postId}"

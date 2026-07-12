@@ -1,6 +1,18 @@
 package org.example.project.core.data.repositoryImp
 
 import org.example.project.core.data.repository.PostRepository
+
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import org.example.project.core.presentation.PaginationState
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.example.project.core.network.services.PostService
 import org.example.project.core.model.createPost.CreatePost
 import org.example.project.core.network.dto.CoordinatesDto
@@ -18,9 +30,6 @@ import okio.FileSystem
 import okio.Path.Companion.toPath
 import okio.buffer
 import org.example.project.core.network.dto.PagedResponse
-import androidx.paging.PagingData
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import okio.SYSTEM
@@ -36,7 +45,6 @@ import org.example.project.core.data.mappers.toPost
 import org.example.project.core.data.mappers.toUserPostEntity
 import org.example.project.core.utils.NetworkMonitor
 
-import org.example.project.core.data.paging.CommentPagingSource
 import org.example.project.core.model.home.toComment
 
 private const val DB_TRACE = "[DB_TRACE]"
@@ -46,6 +54,103 @@ class PostRepositoryImpl(
     private val database: IssueSpotDatabase,
     private val networkMonitor: NetworkMonitor,
 ) : PostRepository {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val commentsStateMap = mutableMapOf<String, MutableStateFlow<PaginationState<Comment>>>()
+    private val commentsNextPageMap = mutableMapOf<String, Int?>()
+    private val commentsMutexMap = mutableMapOf<String, Mutex>()
+    
+    override fun observeComments(postId: String): StateFlow<PaginationState<Comment>> {
+        return getOrPutCommentsState(postId).asStateFlow()
+    }
+    
+    private fun getOrPutCommentsState(postId: String): MutableStateFlow<PaginationState<Comment>> {
+        return commentsStateMap.getOrPut(postId) { MutableStateFlow(PaginationState()) }
+    }
+    
+    private fun getOrPutCommentsMutex(postId: String): Mutex {
+        return commentsMutexMap.getOrPut(postId) { Mutex() }
+    }
+
+    override fun startComments(postId: String) {
+        val state = getOrPutCommentsState(postId)
+        if (state.value.items.isEmpty()) {
+            refreshComments(postId)
+        }
+    }
+    
+    override fun stopComments(postId: String) {
+        // Nothing to do for remote-only paging
+    }
+    
+    override fun refreshComments(postId: String) {
+        scope.launch {
+            val state = getOrPutCommentsState(postId)
+            val mutex = getOrPutCommentsMutex(postId)
+            
+            mutex.withLock {
+                state.update { it.copy(isLoading = true, error = null) }
+            }
+            
+            try {
+                val response = postService.getComments(postId, page = 0, limit = 10)
+                val newItems = response.items.map { it.toComment() }
+                commentsNextPageMap[postId] = response.nextKey
+                mutex.withLock {
+                    state.update {
+                        it.copy(
+                            isLoading = false,
+                            items = newItems,
+                            hasMore = response.nextKey != null && newItems.isNotEmpty(),
+                            error = null
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                mutex.withLock {
+                    state.update { it.copy(isLoading = false, error = org.example.project.core.presentation.FeedError.Unknown(e.message ?: "Failed to load comments")) }
+                }
+            }
+        }
+    }
+    
+    override fun loadMoreComments(postId: String) {
+        scope.launch {
+            val state = getOrPutCommentsState(postId)
+            val mutex = getOrPutCommentsMutex(postId)
+            
+            var nextPage: Int? = null
+            mutex.withLock {
+                val current = state.value
+                if (current.isLoading || current.isAppending || !current.hasMore) return@launch
+                nextPage = commentsNextPageMap[postId]
+                state.update { it.copy(isAppending = true, appendError = null) }
+            }
+            
+            val pageToLoad = nextPage ?: return@launch
+            
+            try {
+                val response = postService.getComments(postId, page = pageToLoad, limit = 10)
+                val newItems = response.items.map { it.toComment() }
+                commentsNextPageMap[postId] = response.nextKey
+                mutex.withLock {
+                    state.update {
+                        it.copy(
+                            isAppending = false,
+                            items = it.items + newItems,
+                            hasMore = response.nextKey != null && newItems.isNotEmpty(),
+                            appendError = null
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                mutex.withLock {
+                    state.update { it.copy(isAppending = false, appendError = org.example.project.core.presentation.FeedError.Unknown(e.message ?: "Failed to load more comments")) }
+                }
+            }
+        }
+    }
+
 
     private val logger = Logger.withTag("PostRepository")
 
@@ -63,12 +168,6 @@ class PostRepositoryImpl(
         val newLikesCount = if (newIsLiked) likesCountCurrent + 1 else (likesCountCurrent - 1).coerceAtLeast(0)
         
         // Optimistic Update
-        println("""
-$DB_TRACE updateLikeStatus
-$DB_TRACE postId=$postId
-$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
-$DB_TRACE =========================
-""")
         database.postDao().updateLikeStatus(postId, newLikesCount, newIsLiked)
         database.userPostDao().updatePostLikeStatus(postId, newLikesCount, newIsLiked)
         database.likedPostDao().updatePostLikeStatus(postId, newLikesCount, newIsLiked)
@@ -97,12 +196,6 @@ $DB_TRACE =========================
         val isReportedCurrent = postEntity?.isReported ?: userPostEntity?.isReported ?: likedPostEntity?.isReported ?: false
         
         // Optimistic Update
-        println("""
-$DB_TRACE updateReportStatus
-$DB_TRACE postId=$postId
-$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
-$DB_TRACE =========================
-""")
         database.postDao().updateReportStatus(postId, true)
         database.userPostDao().updateReportStatus(postId, true)
         database.likedPostDao().updateReportStatus(postId, true)
@@ -132,20 +225,6 @@ $DB_TRACE =========================
         postService.getComments(postId, page, limit)
     }
 
-    override fun getPagedComments(postId: String): Flow<PagingData<Comment>> {
-        return Pager(
-            config = PagingConfig(pageSize = 20, enablePlaceholders = false),
-            pagingSourceFactory = { CommentPagingSource(postService, postId, networkMonitor) }
-        ).flow
-    }
-
-    override suspend fun getCommentsList(postId: String): DataState<List<Comment>> {
-        return when (val result = getComments(postId, page = 1, limit = 100)) {
-            is DataState.Success -> DataState.Success(result.data.items.map { it.toComment() })
-            is DataState.Error -> DataState.Error(result.exception)
-            DataState.Loading -> DataState.Loading
-        }
-    }
 
     override suspend fun addComment(postId: String, comment: String): DataState<Unit> {
         logger.d { "Adding comment to post: $postId" }
@@ -158,13 +237,6 @@ $DB_TRACE =========================
         val newCommentsCount = commentsCountCurrent + 1
         
         // Optimistic Update
-        println("""
-$DB_TRACE updateCommentsCount
-$DB_TRACE postId=$postId
-$DB_TRACE comments=$newCommentsCount
-$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
-$DB_TRACE =========================
-""")
         database.postDao().updateCommentsCount(postId, newCommentsCount)
         database.userPostDao().updateCommentsCount(postId, newCommentsCount)
         database.likedPostDao().updateCommentsCount(postId, newCommentsCount)
@@ -262,12 +334,6 @@ $DB_TRACE =========================
         val userPostEntity = database.userPostDao().getPostById(postId)
         val likedPostEntity = database.likedPostDao().getLikedPostById(postId)
         
-        println("""
-$DB_TRACE deletePostById
-$DB_TRACE postId=$postId
-$DB_TRACE time=${kotlin.time.Clock.System.now().toEpochMilliseconds()}
-$DB_TRACE =========================
-""")
         database.postDao().deletePostById(postId)
         if (userPostEntity != null) database.userPostDao().deletePost(postId)
         if (likedPostEntity != null) database.likedPostDao().deleteLikedPost(postId)

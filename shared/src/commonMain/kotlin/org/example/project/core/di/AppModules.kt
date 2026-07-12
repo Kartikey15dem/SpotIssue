@@ -3,8 +3,11 @@ package org.example.project.core.di
 import org.koin.dsl.module
 import org.example.project.core.network.di.networkModule
 import org.example.project.core.data.di.RepositoryModule
+import org.example.project.core.data.local.FeedLocalDataSource
+import org.example.project.core.data.local.ProfileLocalDataSource
 import org.example.project.core.database.di.DaoModule
 import org.example.project.core.datastore.di.preferencesModule
+import org.example.project.core.network.di.platformNetworkModule
 import org.example.project.feature.profile.di.profileModule
 import org.example.project.feature.auth.di.authModule
 import org.example.project.feature.createPost.di.createPostModule
@@ -26,10 +29,8 @@ import org.koin.core.module.Module
  * - Presentation layer (ViewModels)
  */
 val appModules = listOf(
-    coreDataModule,
+   platformNetworkModule,
     networkModule,
-
-    // Core (new pattern)
     RepositoryModule,
     preferencesModule,
     DaoModule,
@@ -37,6 +38,5 @@ val appModules = listOf(
     homeModule,
     profileModule,
     createPostModule
-    // useCaseModule // Commenting out as it seems to be missing or will be removed
 )
 

@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -41,7 +42,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.collectLatest
-import androidx.paging.compose.collectAsLazyPagingItems
 import org.example.project.R
 import org.example.project.core.components.CommentsBottomSheet
 import org.example.project.core.components.PostCard
@@ -65,8 +65,6 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit = {},
     viewModel: HomeViewModel = koinViewModel()
 ) {
-    println("[PAGING_TRACE] HomeScreen recomposed | time=${System.currentTimeMillis()}")
-    println("[KMP_PAGING]\nHomeScreen BODY")
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val currentLevel by viewModel.currentLevel.collectAsStateWithLifecycle()
     val activeIssues by viewModel.activeIssues.collectAsStateWithLifecycle()
@@ -82,13 +80,10 @@ fun HomeScreen(
     val context = LocalContext.current
 
     LaunchedEffect(expandedPost) {
-        println("[KMP_PAGING]\nExpandedPost Changed\npostId: ${expandedPost?.id ?: "nil"}")
     }
     LaunchedEffect(currentLevel) {
-        println("[KMP_PAGING]\nCurrentLevel Changed\nlevel: $currentLevel")
     }
     LaunchedEffect(activeCommentsFlow) {
-        println("[KMP_PAGING]\nComments Flow Changed\npostId: $activePostId")
     }
 
     LaunchedEffect(viewModel) {
@@ -142,10 +137,11 @@ fun HomeScreen(
 
     val currentCommentsFlow = activeCommentsFlow
     if (activePostId != null && currentCommentsFlow != null) {
-        val commentsPagingItems = currentCommentsFlow.collectAsLazyPagingItems()
+        val commentsState by currentCommentsFlow.collectAsState()
         
         CommentsBottomSheet(
-            comments = commentsPagingItems,
+            comments = commentsState,
+            onLoadMore = { viewModel.loadMoreComments(activePostId) },
             onDismiss = { viewModel.onIntent(HomeIntent.DismissCommentsSheet) },
             onSubmit = { text ->
                 viewModel.onIntent(
@@ -238,7 +234,6 @@ fun HomeContent(
     }
 
     LaunchedEffect(feedUiState.isPullRefreshing) {
-        println("[KMP_PAGING]\nPull Refresh\n${feedUiState.isPullRefreshing}")
     }
 
     HomePullRefresh(
@@ -298,7 +293,6 @@ fun HomeContent(
                     HomeFeed(
                         listState = listState,
                         feedState = feedState,
-                        state = state,
                         onIntent = onIntent,
                         feedUiState = feedUiState,
                         modifier = Modifier.fillMaxSize(),

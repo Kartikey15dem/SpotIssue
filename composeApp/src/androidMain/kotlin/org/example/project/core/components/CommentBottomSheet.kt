@@ -3,6 +3,7 @@ package org.example.project.core.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -15,8 +16,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.paging.LoadState
-import androidx.paging.compose.LazyPagingItems
+
+import org.example.project.core.presentation.PaginationState
 import org.example.project.R
 import org.example.project.core.model.home.Comment
 import org.example.project.theme.IssueSpotColors
@@ -30,7 +31,8 @@ import androidx.compose.foundation.Image
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommentsBottomSheet(
-    comments: LazyPagingItems<Comment>?,
+    comments: PaginationState<Comment>?,
+    onLoadMore: () -> Unit,
     onDismiss: () -> Unit,
     onSubmit: (String) -> Unit,
     /* WHY PASS CURRENT USER IMAGE URL:
@@ -42,6 +44,18 @@ fun CommentsBottomSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var commentText by rememberSaveable { mutableStateOf("") }
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(listState, comments) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+            .collect { lastIndex ->
+                if (lastIndex != null && comments != null) {
+                    if (lastIndex >= comments.items.size - 3 && comments.hasMore && !comments.isAppending && !comments.isLoading) {
+                        onLoadMore()
+                    }
+                }
+            }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -74,7 +88,7 @@ fun CommentsBottomSheet(
                         modifier = Modifier.align(Alignment.Center),
                         color = IssueSpotColors.Primary
                     )
-                } else if (comments.itemCount == 0 && comments.loadState.refresh !is LoadState.Loading) {
+                } else if (comments.items.isEmpty() && !comments.isLoading && !comments.isRefreshing) {
                     Text(
                         text = "No comments yet. Be the first to start the discussion!",
                         style = IssueSpotTypography.bodyLarge,
@@ -86,23 +100,24 @@ fun CommentsBottomSheet(
                     )
                 } else {
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        items(comments.itemCount) { index ->
-                            comments[index]?.let { comment ->
+                        items(comments.items.size) { index ->
+                            comments.items.getOrNull(index)?.let { comment ->
                                 CommentItem(comment)
                             }
                         }
                         
-                        if (comments.loadState.append is LoadState.Loading || comments.loadState.refresh is LoadState.Loading) {
+                        if (comments.isAppending || comments.isLoading || comments.isRefreshing) {
                             item {
                                 Box(modifier = Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
                                     CircularProgressIndicator(color = IssueSpotColors.Primary)
                                 }
                             }
-                        } else if (comments.loadState.append is LoadState.NotLoading && comments.loadState.append.endOfPaginationReached && comments.itemCount > 0) {
+                        } else if (!comments.isAppending && !comments.hasMore && comments.items.isNotEmpty()) {
                             item {
                                 Text(
                                     modifier = Modifier.fillMaxWidth().padding(8.dp),

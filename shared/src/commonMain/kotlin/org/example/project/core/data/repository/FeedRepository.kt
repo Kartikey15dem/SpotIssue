@@ -1,6 +1,5 @@
 package org.example.project.core.data.repository
 
-import androidx.paging.PagingData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import org.example.project.core.model.auth.UserLocation
@@ -32,7 +31,6 @@ interface FeedRepository {
     fun loadMoreSearch()
 
     fun observeActiveIssuesCount(postLevel: PostLevel): Flow<Int>
-    fun getPagedSearchPosts(query: String, postLevel: PostLevel): Flow<PagingData<Post>>
     fun observePosts(postLevel: PostLevel): Flow<List<Post>>
     suspend fun searchPosts(query: String, postLevel: PostLevel): DataState<List<Post>>
 

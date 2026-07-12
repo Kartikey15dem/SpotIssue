@@ -2,9 +2,6 @@ package org.example.project.feature.profile.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingData
-import androidx.paging.cachedIn
-import androidx.paging.insertHeaderItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +24,7 @@ import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.data.mappers.Sort
 import org.example.project.core.presentation.FeedRefreshReason
 import org.example.project.core.presentation.FeedState
+import org.example.project.core.presentation.PaginationState
 import org.example.project.core.model.home.Post
 import org.example.project.core.model.home.Comment
 import org.example.project.core.model.profile.Profile
@@ -44,10 +42,8 @@ class ProfileViewModel(
     private val _sideEffects = MutableSharedFlow<ProfileSideEffect>()
     val sideEffects = _sideEffects.asSharedFlow()
 
-    private val conversationCache = mutableMapOf<String, Flow<PagingData<Comment>>>()
-
-    private val _activeCommentsFlow = MutableStateFlow<Flow<PagingData<Comment>>?>(null)
-    val activeCommentsFlow = _activeCommentsFlow.asStateFlow()
+    private val _activeCommentsFlow = MutableStateFlow<StateFlow<PaginationState<Comment>>?>(null)
+    val activeCommentsFlow: StateFlow<StateFlow<PaginationState<Comment>>?> = _activeCommentsFlow.asStateFlow()
 
     val profilePostsState: StateFlow<FeedState> = profileRepository.profilePostsState
 
@@ -151,15 +147,9 @@ class ProfileViewModel(
         }
     }
 
-    private fun comments(postId: String): Flow<PagingData<Comment>> {
-        return conversationCache.getOrPut(postId) {
-            postRepository.getPagedComments(postId).cachedIn(viewModelScope)
-        }
-    }
-
     private fun openComments(postId: String) {
-        val cachedFlow = comments(postId)
-        _activeCommentsFlow.value = cachedFlow
+        postRepository.startComments(postId)
+        _activeCommentsFlow.value = postRepository.observeComments(postId)
         updateState { it.copy(showCommentsSheetForPostId = postId) }
     }
 
@@ -169,40 +159,13 @@ class ProfileViewModel(
     }
 
     private fun comment(postId: String, comment: String) {
-        val currentFlow = conversationCache[postId]
-        if (currentFlow != null) {
-            val optimisticComment = Comment(
-                id = "temp_${kotlin.random.Random.nextLong()}",
-                postId = postId,
-                text = comment,
-                timeAgo = "Just now",
-                userName = "You",
-                userImageUrl = _uiState.value.profile?.imageUrl ?: ""
-            )
-            val updatedFlow = currentFlow.map { pagingData ->
-                pagingData.insertHeaderItem(item = optimisticComment)
-            }
-            conversationCache[postId] = updatedFlow
-            _activeCommentsFlow.value = updatedFlow
-            
-            viewModelScope.launch {
-                when (val result = postRepository.addComment(postId, comment)) {
-                    is DataState.Success -> {}
-                    is DataState.Error -> {
-                        conversationCache[postId] = currentFlow
-                        _activeCommentsFlow.value = currentFlow
-                        handleError(result.exception)
-                    }
-                    else -> Unit
+        viewModelScope.launch {
+            when (val result = postRepository.addComment(postId, comment)) {
+                is DataState.Success -> {
+                    postRepository.refreshComments(postId)
                 }
-            }
-        } else {
-            viewModelScope.launch {
-                when (val result = postRepository.addComment(postId, comment)) {
-                    is DataState.Success -> {}
-                    is DataState.Error -> handleError(result.exception)
-                    else -> Unit
-                }
+                is DataState.Error -> handleError(result.exception)
+                else -> Unit
             }
         }
     }
@@ -242,6 +205,10 @@ class ProfileViewModel(
 
     private fun closePostDetail() {
         updateState { it.copy(expandedPostId = null) }
+    }
+
+    fun loadMoreComments(postId: String) {
+        postRepository.loadMoreComments(postId)
     }
 
     fun onIntent(intent: ProfileIntent) {

@@ -82,8 +82,6 @@ kotlin {
             implementation(libs.ktor.serialization.kotlinx.json)
 
             implementation(libs.androidx.room.runtime)
-            implementation(libs.androidx.room.paging)
-            implementation(libs.androidx.paging.common)
             implementation(libs.androidx.sqlite.bundled)
 
             implementation(libs.auth.kt)
