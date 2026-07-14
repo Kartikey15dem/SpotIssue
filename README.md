@@ -23,6 +23,7 @@ As localized issues gain traction and receive "acknowledgements" from the commun
 * **Advanced Profile Management:** 
     * View isolated feeds of *My Posts* and *Liked Posts*.
     * Deep-sorting capabilities: Sub-sort feeds by *Popular*, *Oldest*, and *Latest*.
+* **Offline-First Architecture:** Built from the ground up to function offline, leveraging **Room Database** to locally cache and reliably serve paged posts even when network connectivity is lost.
 * **High-Performance Offline-First Pagination:** 
     * Custom pagination architecture built from scratch to bypass common Paging3 bugs (e.g., premature pagination termination and list jumping).
     * Implements a custom presentation cache layer (similar to DiffUtil) bridging Compose and SwiftUI to ensure smooth, jitter-free scrolling even on slow networks.
