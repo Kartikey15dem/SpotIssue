@@ -57,6 +57,7 @@ import org.example.project.core.utils.NetworkMonitor
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Clock
 
 class ProfileRepositoryImpl(
     private val profileService: ProfileService,
@@ -313,7 +314,7 @@ class ProfileRepositoryImpl(
             combine(activePostsKeyFlow, windowState) { key, window -> Pair(key, window) }
                 .flatMapLatest { (key, window) ->
                     if (key == null) flowOf(emptyList())
-                    else observeProfilePosts(key, window.anchor?.createdAt, window.anchor?.id, window.limit)
+                    else observeProfilePosts(key, window.anchor?.cachedAt, window.anchor?.id, window.limit)
                 }
                 .collect { posts ->
                     presentationCache.update(posts)
@@ -322,16 +323,16 @@ class ProfileRepositoryImpl(
         }
     }
 
-    private fun observeProfilePosts(key: ProfilePostsKey, anchorCreatedAt: Long?, anchorId: String?, limit: Int): Flow<List<Post>> {
+    private fun observeProfilePosts(key: ProfilePostsKey, anchorCachedAt: Long?, anchorId: String?, limit: Int): Flow<List<Post>> {
         val flow = if (key.isMine) {
-            if (anchorCreatedAt != null && anchorId != null) {
-                database.userPostDao().observeAfterAnchor(key.sort, anchorCreatedAt, anchorId, limit)
+            if (anchorCachedAt != null && anchorId != null) {
+                database.userPostDao().observeAfterAnchor(key.sort, anchorCachedAt, anchorId, limit)
             } else {
                 database.userPostDao().observeNewest(key.sort, limit)
             }
         } else {
-            if (anchorCreatedAt != null && anchorId != null) {
-                database.likedPostDao().observeAfterAnchor(key.sort, anchorCreatedAt, anchorId, limit)
+            if (anchorCachedAt != null && anchorId != null) {
+                database.likedPostDao().observeAfterAnchor(key.sort, anchorCachedAt, anchorId, limit)
             } else {
                 database.likedPostDao().observeNewest(key.sort, limit)
             }
@@ -356,20 +357,27 @@ class ProfileRepositoryImpl(
     }
 
     private suspend fun replaceProfilePosts(key: ProfilePostsKey, posts: List<Post>) {
+        val baseTime = Clock.System.now().toEpochMilliseconds()
         if (key.isMine) {
             database.userPostDao().deleteAllUserPosts(key.sort)
-            database.userPostDao().insertPosts(posts.map { it.toUserPostEntity(sort = key.sort) })
+            database.userPostDao().insertPosts(posts.mapIndexed { index, post -> post.toUserPostEntity(sort = key.sort, cachedAt = baseTime - index) })
         } else {
             database.likedPostDao().deleteAllLikedPosts(key.sort)
-            database.likedPostDao().insertPosts(posts.map { it.toLikedPostEntity(sort = key.sort) })
+            database.likedPostDao().insertPosts(posts.mapIndexed { index, post -> post.toLikedPostEntity(sort = key.sort, cachedAt = baseTime - index) })
         }
     }
 
     private suspend fun appendProfilePosts(key: ProfilePostsKey, posts: List<Post>) {
-        if (key.isMine) {
-            database.userPostDao().insertPosts(posts.map { it.toUserPostEntity(sort = key.sort) })
+        val minCachedAt = if (key.isMine) {
+            database.userPostDao().getMinCachedAt(key.sort) ?: Clock.System.now().toEpochMilliseconds()
         } else {
-            database.likedPostDao().insertPosts(posts.map { it.toLikedPostEntity(sort = key.sort) })
+            database.likedPostDao().getMinCachedAt(key.sort) ?: Clock.System.now().toEpochMilliseconds()
+        }
+        
+        if (key.isMine) {
+            database.userPostDao().insertPosts(posts.mapIndexed { index, post -> post.toUserPostEntity(sort = key.sort, cachedAt = minCachedAt - 1 - index) })
+        } else {
+            database.likedPostDao().insertPosts(posts.mapIndexed { index, post -> post.toLikedPostEntity(sort = key.sort, cachedAt = minCachedAt - 1 - index) })
         }
     }
 

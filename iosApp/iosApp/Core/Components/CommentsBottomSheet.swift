@@ -156,11 +156,5 @@ private struct CommentItem: View {
                     .foregroundColor(IssueSpotColors.onSurface)
             }
         }
-        .onAppear {
-            print("\(PagingDebug.tag)\nComments PagingHolder CREATED")
-        }
-        .onDisappear {
-            print("\(PagingDebug.tag)\nComments PagingHolder DESTROYED")
-        }
     }
 }

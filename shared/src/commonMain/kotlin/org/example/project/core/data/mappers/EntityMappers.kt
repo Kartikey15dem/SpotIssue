@@ -41,7 +41,8 @@ fun PostWithProfileDto.toPost(): Post {
         coordinates = coordinates?.let { Coordinates(it.latitude, it.longitude) },
         isLiked = isLiked,
         isReported = isReported,
-        createdAt = parsedCreatedAt
+        createdAt = parsedCreatedAt,
+        cachedAt = parsedCreatedAt
     )
 }
 

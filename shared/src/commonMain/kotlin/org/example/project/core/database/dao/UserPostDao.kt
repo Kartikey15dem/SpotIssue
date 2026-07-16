@@ -17,13 +17,16 @@ interface UserPostDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<UserPostEntity>)
 
-    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY createdAt DESC LIMIT :limit")
+    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY cachedAt DESC LIMIT :limit")
     fun observeNewest(sort: String, limit: Int): Flow<List<UserPostEntity>>
 
-    @Query("SELECT * FROM user_posts WHERE sort = :sort AND (createdAt < :anchorCreatedAt OR (createdAt = :anchorCreatedAt AND id < :anchorId)) ORDER BY createdAt DESC, id DESC LIMIT :limit")
-    fun observeAfterAnchor(sort: String, anchorCreatedAt: Long, anchorId: String, limit: Int): Flow<List<UserPostEntity>>
+    @Query("SELECT * FROM user_posts WHERE sort = :sort AND (cachedAt < :anchorCachedAt OR (cachedAt = :anchorCachedAt AND id < :anchorId)) ORDER BY cachedAt DESC, id DESC LIMIT :limit")
+    fun observeAfterAnchor(sort: String, anchorCachedAt: Long, anchorId: String, limit: Int): Flow<List<UserPostEntity>>
 
-    @Query("SELECT * FROM user_posts ORDER BY createdAt DESC")
+    @Query("SELECT MIN(cachedAt) FROM user_posts WHERE sort = :sort")
+    suspend fun getMinCachedAt(sort: String): Long?
+
+    @Query("SELECT * FROM user_posts ORDER BY cachedAt DESC")
     suspend fun getUserPosts(): List<UserPostEntity>
 
     @Query("SELECT * FROM user_posts WHERE id = :postId")
@@ -38,7 +41,7 @@ interface UserPostDao {
     @Query("DELETE FROM user_posts")
     suspend fun clearAll()
 
-    @Query("DELETE FROM user_posts WHERE sort = :sort AND id NOT IN (SELECT id FROM user_posts WHERE sort = :sort ORDER BY createdAt DESC LIMIT :maxPosts)")
+    @Query("DELETE FROM user_posts WHERE sort = :sort AND id NOT IN (SELECT id FROM user_posts WHERE sort = :sort ORDER BY cachedAt DESC LIMIT :maxPosts)")
     suspend fun trimUserPosts(maxPosts: Int, sort: String)
 
     @Query("UPDATE user_posts SET likes = :likes, isLiked = :isLiked WHERE id = :postId")

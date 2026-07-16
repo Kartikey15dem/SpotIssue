@@ -17,13 +17,16 @@ interface LikedPostDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<LikedPostEntity>)
 
-    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY createdAt DESC LIMIT :limit")
+    @Query("SELECT * FROM liked_posts WHERE sort = :sort ORDER BY cachedAt DESC LIMIT :limit")
     fun observeNewest(sort: String, limit: Int): Flow<List<LikedPostEntity>>
 
-    @Query("SELECT * FROM liked_posts WHERE sort = :sort AND (createdAt < :anchorCreatedAt OR (createdAt = :anchorCreatedAt AND id < :anchorId)) ORDER BY createdAt DESC, id DESC LIMIT :limit")
-    fun observeAfterAnchor(sort: String, anchorCreatedAt: Long, anchorId: String, limit: Int): Flow<List<LikedPostEntity>>
+    @Query("SELECT * FROM liked_posts WHERE sort = :sort AND (cachedAt < :anchorCachedAt OR (cachedAt = :anchorCachedAt AND id < :anchorId)) ORDER BY cachedAt DESC, id DESC LIMIT :limit")
+    fun observeAfterAnchor(sort: String, anchorCachedAt: Long, anchorId: String, limit: Int): Flow<List<LikedPostEntity>>
 
-    @Query("SELECT * FROM liked_posts ORDER BY createdAt DESC")
+    @Query("SELECT MIN(cachedAt) FROM liked_posts WHERE sort = :sort")
+    suspend fun getMinCachedAt(sort: String): Long?
+
+    @Query("SELECT * FROM liked_posts ORDER BY cachedAt DESC")
     suspend fun getLikedPosts(): List<LikedPostEntity>
 
     @Query("SELECT * FROM liked_posts WHERE id = :postId")
@@ -38,7 +41,7 @@ interface LikedPostDao {
     @Query("DELETE FROM liked_posts")
     suspend fun clearAll()
 
-    @Query("DELETE FROM liked_posts WHERE sort = :sort AND id NOT IN (SELECT id FROM liked_posts WHERE sort = :sort ORDER BY createdAt DESC LIMIT :maxPosts)")
+    @Query("DELETE FROM liked_posts WHERE sort = :sort AND id NOT IN (SELECT id FROM liked_posts WHERE sort = :sort ORDER BY cachedAt DESC LIMIT :maxPosts)")
     suspend fun trimLikedPosts(maxPosts: Int, sort: String)
 
     @Query("UPDATE liked_posts SET likes = :likes, isLiked = :isLiked WHERE id = :postId")

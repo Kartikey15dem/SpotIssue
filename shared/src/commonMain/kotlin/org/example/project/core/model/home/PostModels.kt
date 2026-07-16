@@ -26,7 +26,8 @@ data class Post(
     val coordinates: Coordinates? = null,
     val isLiked: Boolean = false,
     val isReported: Boolean = false,
-    val createdAt: Long = 0L
+    val createdAt: Long = 0L,
+    val cachedAt: Long = 0L
 )
 @Serializable
 enum class MediaType {

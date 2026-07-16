@@ -52,6 +52,8 @@ class HomeViewModel(
 
     private val _activeCommentsFlow = MutableStateFlow<StateFlow<PaginationState<Comment>>?>(null)
     val activeCommentsFlow: StateFlow<StateFlow<PaginationState<Comment>>?> = _activeCommentsFlow.asStateFlow()
+    
+    private val _optimisticComments = MutableStateFlow<Map<String, List<Comment>>>(emptyMap())
 
     val feedState: StateFlow<FeedState> = feedRepository.feedState
     val searchState: StateFlow<FeedState> = feedRepository.searchState
@@ -198,7 +200,22 @@ class HomeViewModel(
 
     private fun openComments(postId: String) {
         postRepository.startComments(postId)
-        _activeCommentsFlow.value = postRepository.observeComments(postId)
+        val repoFlow = postRepository.observeComments(postId)
+        
+        val combinedFlow = combine(repoFlow, _optimisticComments) { state, optimisticMap ->
+            val optimisticList = optimisticMap[postId] ?: emptyList()
+            if (optimisticList.isEmpty()) {
+                state
+            } else {
+                state.copy(items = optimisticList + state.items)
+            }
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = PaginationState()
+        )
+        
+        _activeCommentsFlow.value = combinedFlow
         updateState { it.copy(showCommentsSheetForPostId = postId) }
     }
 
@@ -207,13 +224,38 @@ class HomeViewModel(
         updateState { it.copy(showCommentsSheetForPostId = null) }
     }
 
-    private fun comment(postId: String, comment: String) {
+    private fun comment(postId: String, commentText: String) {
+        val tempId = "temp_${kotlinx.datetime.Clock.System.now().toEpochMilliseconds()}"
+        val newComment = Comment(
+            id = tempId,
+            postId = postId,
+            text = commentText,
+            timeAgo = "Just now",
+            userName = "You",
+            userImageUrl = _uiState.value.currentUserImage
+        )
+        
+        _optimisticComments.update { map ->
+            val list = map[postId] ?: emptyList()
+            map + (postId to (listOf(newComment) + list))
+        }
+        
         viewModelScope.launch {
-            when (val result = postRepository.addComment(postId, comment)) {
+            when (val result = postRepository.addComment(postId, commentText)) {
                 is DataState.Success -> {
                     postRepository.refreshComments(postId)
+                    _optimisticComments.update { map ->
+                        val list = map[postId] ?: emptyList()
+                        map + (postId to list.filterNot { it.id == tempId })
+                    }
                 }
-                is DataState.Error -> handleError(result.exception)
+                is DataState.Error -> {
+                    _optimisticComments.update { map ->
+                        val list = map[postId] ?: emptyList()
+                        map + (postId to list.filterNot { it.id == tempId })
+                    }
+                    handleError(result.exception)
+                }
                 else -> Unit
             }
         }

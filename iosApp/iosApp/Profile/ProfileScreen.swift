@@ -128,7 +128,6 @@ struct ProfileScreen: View {
             )) {
                 if let postId = state.showCommentsSheetForPostId {
                     Observing(holder.vm.activeCommentsFlow) { activeCommentsFlow in
-                        let _ = print("\(PagingDebug.tag)\nComments Flow Changed\npostId: \(postId)")
                         if let activeCommentsFlow {
                             ObserveCommentsFlow(flow: activeCommentsFlow) { commentsState in
                                 CommentsBottomSheet(
