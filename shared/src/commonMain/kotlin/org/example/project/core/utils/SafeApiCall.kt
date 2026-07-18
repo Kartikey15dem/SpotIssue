@@ -16,7 +16,7 @@ import kotlinx.serialization.json.Json
 import org.example.project.core.network.dto.ErrorResponseDto
 
 const val NETWORK_ERROR_MESSAGE = "Check network connection"
-private const val FALLBACK_ERROR_MESSAGE = "An error occurred"
+private const val FALLBACK_ERROR_MESSAGE = "An error occurred.\n\nPlease try again."
 
 private val safeApiCallLogger = Logger.withTag("SafeApiCall")
 
@@ -45,7 +45,7 @@ suspend fun <T> safeApiCall(
             handleResponseException(e)
         } catch (e: IOException) {
             safeApiCallLogger.e { "Network error: ${e.message ?: e::class.simpleName}" }
-            DataState.Error(Exception(NETWORK_ERROR_MESSAGE))
+            DataState.Error(Exception(FALLBACK_ERROR_MESSAGE))
         } catch (e: Exception) {
             safeApiCallLogger.e { "Unexpected API error: ${e.message ?: e::class.simpleName}" }
             DataState.Error(Exception(FALLBACK_ERROR_MESSAGE, e))

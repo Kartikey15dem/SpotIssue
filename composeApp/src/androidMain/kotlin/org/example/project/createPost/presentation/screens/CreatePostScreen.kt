@@ -46,6 +46,11 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import org.example.project.core.components.AppErrorDialog
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -102,6 +107,8 @@ fun CreatePostScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var errorDialogMessage by remember { mutableStateOf<String?>(null) }
+
     val context = LocalContext.current
 
     val mediaPickerLauncher = rememberLauncherForActivityResult(
@@ -136,7 +143,7 @@ fun CreatePostScreen(
                     pdfPickerLauncher.launch(arrayOf("application/pdf"))
                 }
                 is CreatePostSideEffect.ShowError -> {
-                    snackbarHostState.showSnackbar(effect.message)
+                    errorDialogMessage = effect.message
                 }
                 is CreatePostSideEffect.PostCreated -> {
                     // Do nothing
@@ -147,6 +154,14 @@ fun CreatePostScreen(
                 }
             }
         }
+    }
+
+    
+    errorDialogMessage?.let { message ->
+        AppErrorDialog(
+            message = message,
+            onDismiss = { errorDialogMessage = null }
+        )
     }
 
     Scaffold(

@@ -306,7 +306,7 @@ class PostRepositoryImpl(
 
         if (result is DataState.Success) {
             val createdPost = result.data
-            database.userPostDao().insertPosts(listOf(createdPost.toUserPostEntity(sort = "LATEST")))
+            database.userPostDao().insertPosts(listOf(createdPost.toUserPostEntity()))
             
             val profile = database.profileDao().getProfile()
             if (profile != null) {

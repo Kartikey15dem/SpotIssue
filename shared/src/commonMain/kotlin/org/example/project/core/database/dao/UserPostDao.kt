@@ -17,14 +17,24 @@ interface UserPostDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<UserPostEntity>)
 
-    @Query("SELECT * FROM user_posts WHERE sort = :sort ORDER BY cachedAt DESC LIMIT :limit")
+    @Query("""SELECT * FROM user_posts ORDER BY 
+        CASE WHEN :sort = 'latest' THEN createdAt END DESC,
+        CASE WHEN :sort = 'oldest' THEN createdAt END ASC,
+        CASE WHEN :sort = 'popular' THEN likes END DESC,
+        cachedAt DESC LIMIT :limit""")
     fun observeNewest(sort: String, limit: Int): Flow<List<UserPostEntity>>
 
-    @Query("SELECT * FROM user_posts WHERE sort = :sort AND (cachedAt < :anchorCachedAt OR (cachedAt = :anchorCachedAt AND id < :anchorId)) ORDER BY cachedAt DESC, id DESC LIMIT :limit")
+    @Query("""SELECT * FROM user_posts 
+        WHERE (cachedAt < :anchorCachedAt OR (cachedAt = :anchorCachedAt AND id < :anchorId)) 
+        ORDER BY 
+        CASE WHEN :sort = 'latest' THEN createdAt END DESC,
+        CASE WHEN :sort = 'oldest' THEN createdAt END ASC,
+        CASE WHEN :sort = 'popular' THEN likes END DESC,
+        cachedAt DESC LIMIT :limit""")
     fun observeAfterAnchor(sort: String, anchorCachedAt: Long, anchorId: String, limit: Int): Flow<List<UserPostEntity>>
 
-    @Query("SELECT MIN(cachedAt) FROM user_posts WHERE sort = :sort")
-    suspend fun getMinCachedAt(sort: String): Long?
+    @Query("SELECT MIN(cachedAt) FROM user_posts")
+    suspend fun getMinCachedAt(): Long?
 
     @Query("SELECT * FROM user_posts ORDER BY cachedAt DESC")
     suspend fun getUserPosts(): List<UserPostEntity>
@@ -35,14 +45,14 @@ interface UserPostDao {
     @Query("DELETE FROM user_posts WHERE id = :postId")
     suspend fun deletePost(postId: String)
 
-    @Query("DELETE FROM user_posts WHERE sort = :sort")
-    suspend fun deleteAllUserPosts(sort: String)
+    @Query("DELETE FROM user_posts")
+    suspend fun deleteAllUserPosts()
 
     @Query("DELETE FROM user_posts")
     suspend fun clearAll()
 
-    @Query("DELETE FROM user_posts WHERE sort = :sort AND id NOT IN (SELECT id FROM user_posts WHERE sort = :sort ORDER BY cachedAt DESC LIMIT :maxPosts)")
-    suspend fun trimUserPosts(maxPosts: Int, sort: String)
+    @Query("DELETE FROM user_posts WHERE id NOT IN (SELECT id FROM user_posts ORDER BY cachedAt DESC LIMIT :maxPosts)")
+    suspend fun trimUserPosts(maxPosts: Int)
 
     @Query("UPDATE user_posts SET likes = :likes, isLiked = :isLiked WHERE id = :postId")
     suspend fun updatePostLikeStatus(postId: String, likes: Int, isLiked: Boolean)
@@ -56,6 +66,6 @@ interface UserPostDao {
     @Query("UPDATE user_posts SET userName = :name, userAvatar = :avatar WHERE userId = :ownerId")
     suspend fun updateUserInfo(ownerId: String, name: String, avatar: String?)
 
-    @Query("SELECT COUNT(*) FROM user_posts WHERE sort = :sort")
-    suspend fun getUserPostCount(sort: String): Int
+    @Query("SELECT COUNT(*) FROM user_posts")
+    suspend fun getUserPostCount(): Int
 }

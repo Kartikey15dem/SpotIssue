@@ -6,10 +6,10 @@ import org.example.project.feature.profile.viewmodel.ProfileViewModel
 import org.koin.dsl.module
 
 val profileModule = module {
-    single {
+    factory {
         EditProfileViewModel(get())
     }
-    single {
+    factory {
         ProfileViewModel(get(), get())
     }
     factory {

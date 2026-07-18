@@ -19,6 +19,8 @@ interface ProfileRepository {
 
     fun stopProfilePosts()
 
+    fun clearRefreshState()
+
     fun refreshProfilePosts(reason: FeedRefreshReason)
 
     fun retryProfilePosts()

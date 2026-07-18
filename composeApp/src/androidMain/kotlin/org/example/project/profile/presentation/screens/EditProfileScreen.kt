@@ -30,12 +30,15 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import org.example.project.core.components.AppErrorDialog
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -79,7 +82,6 @@ import org.example.project.utils.media.MediaCompressorUtil
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
-import androidx.compose.material3.Snackbar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,7 +91,8 @@ fun EditProfileScreen(
     viewModel: EditProfileViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
+    var errorDialogMessage by remember { mutableStateOf<String?>(null) }
+
 
     val context = LocalContext.current
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
@@ -103,7 +106,7 @@ fun EditProfileScreen(
             viewModel.onIntent(EditProfileIntent.CaptureFromCameraClicked)
         } else {
             coroutineScope.launch {
-                snackbarHostState.showSnackbar("Camera permission denied")
+                errorDialogMessage = "Camera permission denied"
             }
         }
     }
@@ -140,10 +143,10 @@ fun EditProfileScreen(
         viewModel.sideEffects.collectLatest { effect ->
             when (effect) {
                 is EditProfileSideEffect.ShowError -> {
-                    snackbarHostState.showSnackbar(effect.message)
+                    errorDialogMessage = effect.message
                 }
-                is EditProfileSideEffect.ShowSnackbar -> {
-                    snackbarHostState.showSnackbar(effect.message)
+                is EditProfileSideEffect.ShowDialog -> {
+                    errorDialogMessage = effect.message
                 }
                 EditProfileSideEffect.ProfileSaved ,EditProfileSideEffect.BackPreseed -> {
                     onNavigateBack()
@@ -180,6 +183,14 @@ fun EditProfileScreen(
         )
     }
 
+    
+    errorDialogMessage?.let { message ->
+        AppErrorDialog(
+            message = message,
+            onDismiss = { errorDialogMessage = null }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -207,16 +218,6 @@ fun EditProfileScreen(
                     titleContentColor = IssueSpotColors.OnSurface
                 )
             )
-        },
-        snackbarHost = { 
-            SnackbarHost(snackbarHostState) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = Color(0xFF323232),
-                    contentColor = Color.White,
-                    actionColor = Color(0xFF4A6CF7)
-                )
-            } 
         },
         containerColor = Color.White
     ) { paddingValues ->
@@ -392,21 +393,23 @@ fun EditProfileContent(
         ) {
             OutlinedTextField(
                 value = state.email,
-                onValueChange = { onIntent(EditProfileIntent.EmailChanged(it)) },
+                onValueChange = {},
                 modifier = Modifier.weight(1f),
+                enabled = false,
+                readOnly = true,
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = Color.White,
-                    focusedContainerColor = Color.White,
-                    unfocusedBorderColor = IssueSpotColors.Outline,
-                    focusedBorderColor = IssueSpotColors.Primary
+                    disabledContainerColor = IssueSpotColors.SurfaceVariant,
+                    disabledTextColor = IssueSpotColors.OnSurfaceVariant,
+                    disabledBorderColor = IssueSpotColors.Outline
                 )
             )
 
             Button(
                 onClick = { onIntent(EditProfileIntent.ShowEmailChangeDialogClicked) },
                 shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.height(56.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = IssueSpotColors.Primary.copy(alpha = 0.1f),
                     contentColor = IssueSpotColors.Primary

@@ -3,7 +3,7 @@ import Shared
 
 struct PostDetailScreen: View {
     @StateObject private var holder: ViewModelHolder<PostDetailViewModel>
-    @EnvironmentObject var router: Router
+    @EnvironmentObject var router: MainRouter
     
     init(postId: String) {
         _holder = StateObject(wrappedValue: KoinHelper().holder { $0.getPostDetailViewModel(postId: postId) })

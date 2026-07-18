@@ -5,7 +5,7 @@ import org.koin.dsl.module
 
 
 val createPostModule = module {
-    single {
+    factory {
         CreatePostViewModel(get(), get(), get())
     }
 }

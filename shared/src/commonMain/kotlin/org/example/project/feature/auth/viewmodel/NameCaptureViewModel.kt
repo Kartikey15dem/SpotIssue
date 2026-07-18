@@ -19,7 +19,7 @@ import kotlinx.coroutines.IO
 import org.example.project.core.utils.FileSystem
 
 sealed class NameCaptureEffect {
-    data class ShowSnackbar(val message: String) : NameCaptureEffect()
+    data class ShowDialog(val message: String) : NameCaptureEffect()
     data object ShowImagePicker : NameCaptureEffect()
     data object ShowCamera : NameCaptureEffect()
 }
@@ -86,7 +86,7 @@ class NameCaptureViewModel(
         val currentImageUrl = _uiState.value.imageUrl
 
         if (currentName.isEmpty()) {
-            showError("Please enter your name")
+            showError("Name is required\n\nPlease enter your name.")
             return
         }
 
@@ -131,7 +131,7 @@ class NameCaptureViewModel(
 
     private fun showError(message: String) {
         viewModelScope.launch {
-            _effect.send(NameCaptureEffect.ShowSnackbar(message))
+            _effect.send(NameCaptureEffect.ShowDialog(message))
         }
     }
 }

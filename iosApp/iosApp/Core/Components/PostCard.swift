@@ -25,7 +25,9 @@ struct PostCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if isDetailMode {
-                postContent
+                ScrollView {
+                    postContent
+                }
             } else {
                 postContent
                     .contentShape(Rectangle())
@@ -55,6 +57,10 @@ struct PostCard: View {
         .padding(IssueSpotSpacing.medium)
         .background(IssueSpotColors.cardBackground)
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(IssueSpotColors.outline.opacity(0.5), lineWidth: isDetailMode ? 1 : 0)
+        )
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
         .alert("Report Post", isPresented: $showReportDialog) {
             Button("Spam", action: { onReportClick("Spam") })
@@ -149,7 +155,7 @@ private struct RowView: View {
             // Report
             if canReport {
                 Button(action: onReportClick) {
-                    Image(systemName: isReported ? "exclamationmark.triangle.fill" : "exclamationmark.triangle")
+                    Image(systemName: isReported ? "flag.fill" : "flag")
                         .foregroundColor(isReported ? IssueSpotColors.error : IssueSpotColors.onSurfaceVariant)
                 }
                 .disabled(isReported)
@@ -274,37 +280,13 @@ struct PostMediaPreview: View {
                         isEditable: false
                     )
                 } else if post.mediaType == .video {
-                    ZStack {
-                        Rectangle()
-                            .fill(Color.black.opacity(0.8))
-                            .frame(height: 200)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                        Image(systemName: "play.circle.fill")
-                            .resizable()
-                            .frame(width: 48, height: 48)
-                            .foregroundColor(.white)
-                    }
-                    .onTapGesture {
+                    VideoPreview(uri: firstUrl, forceAspectRatio: false) {
                         overlayController.show(type: .video, urls: post.mediaUrls ?? [])
                     }
+                    .frame(height: 300)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else if post.mediaType == .pdf {
-                    ZStack {
-                        Rectangle()
-                            .fill(IssueSpotColors.surfaceVariant)
-                            .frame(height: 120)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                        VStack {
-                            Image(systemName: "doc.fill")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(height: 32)
-                                .foregroundColor(IssueSpotColors.primary)
-                            Text("View PDF")
-                                .font(IssueSpotTypography.bodyMedium)
-                                .foregroundColor(IssueSpotColors.onSurfaceVariant)
-                        }
-                    }
-                    .onTapGesture {
+                    PdfPreview(uri: firstUrl) {
                         overlayController.show(type: .pdf, urls: post.mediaUrls ?? [])
                     }
                 }

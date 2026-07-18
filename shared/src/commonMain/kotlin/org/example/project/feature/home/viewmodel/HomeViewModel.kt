@@ -35,6 +35,7 @@ import org.example.project.core.model.home.PostLevel
 import org.example.project.core.utils.DataState
 import org.example.project.core.model.auth.UserLocation
 import org.example.project.feature.home.CurrentLevelManager
+import kotlin.time.Clock
 
 class HomeViewModel(
     private val feedRepository: FeedRepository,
@@ -149,8 +150,8 @@ class HomeViewModel(
             HomeIntent.DismissPost -> closePostDetail()
             HomeIntent.ErrorShown -> clearError()
             is HomeIntent.ChangeLevel -> changeLevel(intent.level)
-            is HomeIntent.ShowRefreshErrorSnackbar -> {
-                viewModelScope.launch { _sideEffects.send(HomeSideEffect.ShowSnackbar(intent.message)) }
+            is HomeIntent.ShowRefreshErrorDialog -> {
+                viewModelScope.launch { _sideEffects.send(HomeSideEffect.ShowDialog(intent.message)) }
             }
             HomeIntent.LoadMorePosts -> feedRepository.loadMore()
             is HomeIntent.RefreshPosts,
@@ -220,12 +221,16 @@ class HomeViewModel(
     }
 
     private fun dismissComments() {
+        val postId = _uiState.value.showCommentsSheetForPostId
+        if (postId != null) {
+            _optimisticComments.update { map -> map - postId }
+        }
         _activeCommentsFlow.value = null
         updateState { it.copy(showCommentsSheetForPostId = null) }
     }
 
     private fun comment(postId: String, commentText: String) {
-        val tempId = "temp_${kotlinx.datetime.Clock.System.now().toEpochMilliseconds()}"
+        val tempId = "temp_${Clock.System.now().toEpochMilliseconds()}"
         val newComment = Comment(
             id = tempId,
             postId = postId,
@@ -243,11 +248,7 @@ class HomeViewModel(
         viewModelScope.launch {
             when (val result = postRepository.addComment(postId, commentText)) {
                 is DataState.Success -> {
-                    postRepository.refreshComments(postId)
-                    _optimisticComments.update { map ->
-                        val list = map[postId] ?: emptyList()
-                        map + (postId to list.filterNot { it.id == tempId })
-                    }
+                    // Do nothing, leave it in optimistic comments. It will be cleared when the sheet is dismissed.
                 }
                 is DataState.Error -> {
                     _optimisticComments.update { map ->
@@ -274,7 +275,7 @@ class HomeViewModel(
     }
 
     private suspend fun handleError(error: Throwable) {
-        val message = error.message ?: "Something went wrong"
+        val message = error.message ?: "Something went wrong.\n\nPlease try again."
         updateState { it.copy(error = message) }
         _sideEffects.send(HomeSideEffect.ShowError(message))
     }
@@ -289,7 +290,7 @@ class HomeViewModel(
 }
 
 sealed interface HomeIntent {
-    data class ShowRefreshErrorSnackbar(val message: String) : HomeIntent
+    data class ShowRefreshErrorDialog(val message: String) : HomeIntent
     data class SearchQueryChanged(val query: String) : HomeIntent
     data object CreatePostClicked : HomeIntent
     data object ProfileClicked : HomeIntent
@@ -325,6 +326,6 @@ sealed interface HomeSideEffect {
     data object NavigateToCreatePost : HomeSideEffect
     data object NavigateToProfile : HomeSideEffect
     data class ShowError(val message: String) : HomeSideEffect
-    data class ShowSnackbar(val message: String) : HomeSideEffect
+    data class ShowDialog(val message: String) : HomeSideEffect
     data class SharePost(val text: String) : HomeSideEffect
 }

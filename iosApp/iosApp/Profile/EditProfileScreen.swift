@@ -5,7 +5,7 @@ import UIKit
 
 struct EditProfileScreen: View {
     @StateObject private var holder = KoinHelper().holder { $0.getEditProfileViewModel() }
-    @EnvironmentObject var router: Router
+    @EnvironmentObject var router: MainRouter
     
     @State private var selectedItem: PhotosPickerItem? = nil
     @State private var otpCode: String = ""
@@ -20,14 +20,18 @@ struct EditProfileScreen: View {
 private struct EditProfileMainView: View {
     let state: EditProfileState
     let vm: EditProfileViewModel
-    let router: Router
+    let router: MainRouter
     @Binding var selectedItem: PhotosPickerItem?
     @Binding var otpCode: String
     @State private var isCameraPresented = false
     
+    @State private var showRequestAlert = false
+    @State private var showVerifyAlert = false
+    
     var body: some View {
-        VStack(spacing: 0) {
-            header
+        ZStack {
+            VStack(spacing: 0) {
+                header
             
             if state.isSaving {
                 ProgressView().progressViewStyle(LinearProgressViewStyle(tint: IssueSpotColors.primary))
@@ -53,7 +57,7 @@ private struct EditProfileMainView: View {
                     if let url = url {
                         Task {
                             let preparedUrl = await prepareProfileImage(from: url)
-                            vm.onIntent(intent: EditProfileIntentImageUrlChanged(url: preparedUrl.path))
+                            vm.onIntent(intent: EditProfileIntentImageUrlChanged(url: preparedUrl.absoluteString))
                         }
                     }
                 }
@@ -62,13 +66,92 @@ private struct EditProfileMainView: View {
         .onChange(of: selectedItem) { _, newItem in
             handlePhotoSelection(newItem)
         }
-        .alert("Email Change", isPresented: emailDialogBinding) {
-            emailDialogButtons
-        } message: {
-            emailDialogMessage
-        }
         .task {
             await observeSideEffects()
+        }
+        
+        if state.showEmailChangeDialog {
+            Color.black.opacity(0.4)
+                .edgesIgnoringSafeArea(.all)
+                .onTapGesture {
+                    if !state.isEmailUpdating {
+                        vm.onIntent(intent: EditProfileIntentDismissEmailChangeDialog.shared)
+                    }
+                }
+            
+            VStack(spacing: IssueSpotSpacing.medium) {
+                Text(state.emailChangeStep == .request ? "Change Email" : "Verify Email")
+                    .font(IssueSpotTypography.titleMedium)
+                    .fontWeight(.bold)
+                
+                Text(state.emailChangeStep == .request ? "Enter your new email address. We will send a verification code to it." : "Enter the 6-digit code sent to \(state.newEmail)")
+                    .font(IssueSpotTypography.bodyMedium)
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(IssueSpotColors.onSurfaceVariant)
+                
+                if state.emailChangeStep == .request {
+                    TextField("New Email", text: Binding(get: { state.newEmail }, set: { vm.onIntent(intent: EditProfileIntentNewEmailChanged(email: $0)) }))
+                        .keyboardType(.emailAddress)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                        .padding()
+                        .frame(height: 56)
+                        .background(IssueSpotColors.surfaceVariant)
+                        .cornerRadius(12)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(IssueSpotColors.outline, lineWidth: 1))
+                } else {
+                    TextField("6-digit code", text: Binding(
+                        get: { otpCode },
+                        set: { otpCode = String($0.prefix(6)) }
+                    ))
+                    .keyboardType(.numberPad)
+                    .padding()
+                    .frame(height: 56)
+                    .background(IssueSpotColors.surfaceVariant)
+                    .cornerRadius(12)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(IssueSpotColors.outline, lineWidth: 1))
+                }
+                
+                HStack(spacing: IssueSpotSpacing.small) {
+                    Button(action: {
+                        vm.onIntent(intent: EditProfileIntentDismissEmailChangeDialog.shared)
+                    }) {
+                        Text("Cancel")
+                            .frame(maxWidth: .infinity, minHeight: 56)
+                            .background(Color.clear)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(IssueSpotColors.outline, lineWidth: 1))
+                            .foregroundColor(IssueSpotColors.primary)
+                    }
+                    .disabled(state.isEmailUpdating)
+                    
+                    Button(action: {
+                        if state.emailChangeStep == .request {
+                            vm.onIntent(intent: EditProfileIntentRequestEmailChangeClicked.shared)
+                        } else {
+                            vm.onIntent(intent: EditProfileIntentVerifyEmailChangeClicked(otp: otpCode))
+                        }
+                    }) {
+                        HStack {
+                            if state.isEmailUpdating {
+                                ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Text(state.emailChangeStep == .request ? "Send OTP" : "Verify")
+                            }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 56)
+                        .background((state.isEmailUpdating || (state.emailChangeStep == .request ? state.newEmail.isEmpty : otpCode.count != 6)) ? IssueSpotColors.onSurface.opacity(0.12) : IssueSpotColors.primary)
+                        .foregroundColor((state.isEmailUpdating || (state.emailChangeStep == .request ? state.newEmail.isEmpty : otpCode.count != 6)) ? IssueSpotColors.onSurface.opacity(0.38) : .white)
+                        .cornerRadius(12)
+                    }
+                    .disabled(state.isEmailUpdating || (state.emailChangeStep == .request ? state.newEmail.isEmpty : otpCode.count != 6))
+                }
+            }
+            .padding(IssueSpotSpacing.medium)
+            .background(IssueSpotColors.surface)
+            .cornerRadius(16)
+            .padding(.horizontal, IssueSpotSpacing.large)
+            .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
+        }
         }
     }
     
@@ -140,16 +223,23 @@ private struct EditProfileMainView: View {
         HStack(spacing: IssueSpotSpacing.small) {
             PhotosPicker(selection: $selectedItem, matching: .images) {
                 HStack { Image(systemName: "photo"); Text("Gallery") }
-                .frame(maxWidth: .infinity).padding(.vertical, 8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(IssueSpotColors.outline, lineWidth: 1))
+                .frame(maxWidth: .infinity).frame(height: 56)
+                .background(Color.clear)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(state.isLoadingImage ? IssueSpotColors.onSurface.opacity(0.12) : IssueSpotColors.outline, lineWidth: 1))
+                .cornerRadius(12)
             }
+            .disabled(state.isLoadingImage)
+            
             Button(action: { vm.onIntent(intent: EditProfileIntentCaptureFromCameraClicked.shared) }) {
                 HStack { Image(systemName: "camera"); Text("Camera") }
-                .frame(maxWidth: .infinity).padding(.vertical, 8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(IssueSpotColors.outline, lineWidth: 1))
+                .frame(maxWidth: .infinity).frame(height: 56)
+                .background(Color.clear)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(state.isLoadingImage ? IssueSpotColors.onSurface.opacity(0.12) : IssueSpotColors.outline, lineWidth: 1))
+                .cornerRadius(12)
             }
+            .disabled(state.isLoadingImage)
         }
-        .foregroundColor(IssueSpotColors.primary)
+        .foregroundColor(state.isLoadingImage ? IssueSpotColors.onSurface.opacity(0.38) : IssueSpotColors.primary)
         .font(IssueSpotTypography.labelMedium)
     }
     
@@ -157,14 +247,22 @@ private struct EditProfileMainView: View {
         Group {
             Text("Full Name").font(IssueSpotTypography.bodyMedium).fontWeight(.bold)
             TextField("Name", text: Binding(get: { state.name }, set: { vm.onIntent(intent: EditProfileIntentNameChanged(name: $0)) }))
-                .padding().background(RoundedRectangle(cornerRadius: 12).stroke(IssueSpotColors.outline, lineWidth: 1))
+                .padding().frame(height: 56).background(RoundedRectangle(cornerRadius: 12).stroke(IssueSpotColors.outline, lineWidth: 1))
             
             Text("Email Address").font(IssueSpotTypography.bodyMedium).fontWeight(.bold)
-            HStack {
-                TextField("Email", text: Binding(get: { state.email }, set: { vm.onIntent(intent: EditProfileIntentEmailChanged(email: $0)) }))
-                    .disabled(true).padding().background(RoundedRectangle(cornerRadius: 12).stroke(IssueSpotColors.outline, lineWidth: 1))
+            HStack(spacing: IssueSpotSpacing.small) {
+                TextField("Email", text: .constant(state.email))
+                    .disabled(true)
+                    .foregroundColor(IssueSpotColors.onSurfaceVariant)
+                    .padding()
+                    .frame(height: 56)
+                    .background(IssueSpotColors.surfaceVariant)
+                    .cornerRadius(12)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(IssueSpotColors.outline, lineWidth: 1))
+                
                 Button("Update") { vm.onIntent(intent: EditProfileIntentShowEmailChangeDialogClicked.shared) }
-                    .font(IssueSpotTypography.labelLarge).padding(.horizontal).padding(.vertical, 10)
+                    .font(IssueSpotTypography.labelLarge)
+                    .frame(width: 100, height: 56)
                     .background(IssueSpotColors.primary.opacity(0.1)).foregroundColor(IssueSpotColors.primary).cornerRadius(12)
             }
         }
@@ -174,50 +272,28 @@ private struct EditProfileMainView: View {
         HStack(spacing: IssueSpotSpacing.small) {
             Button(action: { vm.onIntent(intent: EditProfileIntentResetClicked.shared) }) {
                 HStack { Image(systemName: "xmark"); Text("Reset") }
-                .frame(maxWidth: .infinity).padding()
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(IssueSpotColors.outline, lineWidth: 1))
-                .foregroundColor(IssueSpotColors.onSurface)
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .background(Color.clear)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(state.isSaving ? IssueSpotColors.onSurface.opacity(0.12) : IssueSpotColors.outline, lineWidth: 1))
+                .foregroundColor(state.isSaving ? IssueSpotColors.onSurface.opacity(0.38) : IssueSpotColors.primary)
             }
+            .disabled(state.isSaving)
+            
             Button(action: { vm.onIntent(intent: EditProfileIntentSaveChangesClicked.shared) }) {
                 HStack {
                     if state.isSaving { ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white)) }
                     else { Image(systemName: "pencil"); Text("Save Changes") }
                 }
-                .frame(maxWidth: .infinity).padding().background(IssueSpotColors.primary).foregroundColor(.white).cornerRadius(12)
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .background((state.isSaving || state.name.trimmingCharacters(in: .whitespaces).isEmpty) ? IssueSpotColors.onSurface.opacity(0.12) : IssueSpotColors.primary)
+                .foregroundColor((state.isSaving || state.name.trimmingCharacters(in: .whitespaces).isEmpty) ? IssueSpotColors.onSurface.opacity(0.38) : .white)
+                .cornerRadius(12)
             }
             .disabled(state.isSaving || state.name.trimmingCharacters(in: .whitespaces).isEmpty)
         }
     }
-    
-    private var emailDialogBinding: Binding<Bool> {
-        Binding(get: { state.showEmailChangeDialog }, set: { if !$0 { vm.onIntent(intent: EditProfileIntentDismissEmailChangeDialog.shared) } })
-    }
-    
-    @ViewBuilder
-    private var emailDialogButtons: some View {
-        if state.emailChangeStep == .request {
-            TextField("New Email", text: Binding(get: { state.newEmail }, set: { vm.onIntent(intent: EditProfileIntentNewEmailChanged(email: $0)) }))
-            Button("Send OTP") { vm.onIntent(intent: EditProfileIntentRequestEmailChangeClicked.shared) }
-                .disabled(state.isEmailUpdating || state.newEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            Button("Cancel", role: .cancel) { vm.onIntent(intent: EditProfileIntentDismissEmailChangeDialog.shared) }
-                .disabled(state.isEmailUpdating)
-        } else {
-            TextField("6-digit code", text: Binding(
-                get: { otpCode },
-                set: { otpCode = String($0.prefix(6)) }
-            ))
-            .keyboardType(.numberPad)
-            Button("Verify") { vm.onIntent(intent: EditProfileIntentVerifyEmailChangeClicked(otp: otpCode)) }
-                .disabled(state.isEmailUpdating || otpCode.count != 6)
-            Button("Cancel", role: .cancel) { vm.onIntent(intent: EditProfileIntentDismissEmailChangeDialog.shared) }
-                .disabled(state.isEmailUpdating)
-        }
-    }
-    
-    private var emailDialogMessage: Text {
-        if state.emailChangeStep == .request { return Text("Enter your new email address. We will send a verification code to it.") }
-        else { return Text("Enter the 6-digit code sent to \(state.newEmail)") }
-    }
+
+
     
     private func handlePhotoSelection(_ item: PhotosPickerItem?) {
         if let item = item {
@@ -226,7 +302,7 @@ private struct EditProfileMainView: View {
                     let tempUrl = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
                     try? data.write(to: tempUrl)
                     let preparedUrl = await prepareProfileImage(from: tempUrl)
-                    vm.onIntent(intent: EditProfileIntentImageUrlChanged(url: preparedUrl.path))
+                    vm.onIntent(intent: EditProfileIntentImageUrlChanged(url: preparedUrl.absoluteString))
                 }
             }
         }
@@ -273,9 +349,9 @@ private struct EditProfileMainView: View {
             case is EditProfileSideEffectShowCamera:
                 isCameraPresented = true
             case let errorEffect as EditProfileSideEffectShowError:
-                SnackbarManager.shared.show(errorEffect.message)
-            case let snackbarEffect as EditProfileSideEffectShowSnackbar:
-                SnackbarManager.shared.show(snackbarEffect.message)
+                AppDialogManager.shared.show(errorEffect.message)
+            case let dialogEffect as EditProfileSideEffectShowDialog:
+                AppDialogManager.shared.show(dialogEffect.message)
             default: break
             }
         }

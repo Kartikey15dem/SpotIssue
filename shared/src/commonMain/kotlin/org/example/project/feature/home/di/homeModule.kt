@@ -8,7 +8,7 @@ import org.koin.dsl.module
 
 val homeModule = module {
     single { CurrentLevelManager() }
-    single {
+    factory {
         HomeViewModel(get(), get(), get(), get(), get())
     }
     factory { (postId: String) ->

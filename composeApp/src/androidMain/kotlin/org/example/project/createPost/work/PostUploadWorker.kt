@@ -48,21 +48,6 @@ class PostUploadWorker(
                 return@withContext Result.success()
             }
 
-            var totalSizeBytes: Long = 0
-
-            for (mediaItem in draft.selectedMedia.orEmpty()) {
-                appContext.contentResolver.openAssetFileDescriptor(mediaItem.uri.toUri(), "r")?.use {
-                    totalSizeBytes += it.length
-                }
-            }
-            
-            if (totalSizeBytes > 50 * 1024 * 1024) {
-                prefRepository.updateUploadDraftState(
-                    draft.copy(status = UploadStatus.ERROR, errorMessage = "Total media size exceeds 50MB limit.")
-                )
-                return@withContext Result.failure()
-            }
-
             // 1. Compress and Prepare Files
             if (!draft.selectedMedia.isNullOrEmpty()) {
                 for (mediaItem in draft.selectedMedia) {
@@ -74,6 +59,21 @@ class PostUploadWorker(
                     }
                     compressedFile?.let { compressedPaths.add(it.absolutePath) }
                 }
+            }
+            
+            var totalCompressedSizeBytes: Long = 0
+            for (path in compressedPaths) {
+                val file = File(path)
+                if (file.exists()) {
+                    totalCompressedSizeBytes += file.length()
+                }
+            }
+
+            if (totalCompressedSizeBytes > 50 * 1024 * 1024) {
+                prefRepository.updateUploadDraftState(
+                    draft.copy(status = UploadStatus.ERROR, errorMessage = "The media size is too large.\n\nPlease choose a smaller file.")
+                )
+                return@withContext Result.failure()
             }
 
             // 2. Submit to Backend (Multipart)

@@ -87,7 +87,6 @@ class EditProfileViewModel(
             when (val res = profileRepository.requestEmailChange(newEmail)) {
                 is DataState.Success -> {
                     _uiState.update { it.copy(isEmailUpdating = false, emailChangeStep = EmailChangeStep.Verify) }
-                    _sideEffects.send(EditProfileSideEffect.ShowSnackbar("OTP sent to your new email"))
                 }
                 is DataState.Error -> {
                     handleError(res.exception)
@@ -116,7 +115,7 @@ class EditProfileViewModel(
                             newEmail = ""
                         ) 
                     }
-                    _sideEffects.send(EditProfileSideEffect.ShowSnackbar("Email updated successfully"))
+                    _sideEffects.send(EditProfileSideEffect.ShowDialog("Email updated successfully"))
                     _sideEffects.send(EditProfileSideEffect.EmailChanged)
                 }
                 is DataState.Error -> {
@@ -206,7 +205,7 @@ class EditProfileViewModel(
 
             // Validation
             if (currentState.name.isBlank()) {
-                _sideEffects.send(EditProfileSideEffect.ShowError("Name cannot be empty"))
+                _sideEffects.send(EditProfileSideEffect.ShowError("Name cannot be empty\n\nPlease enter your name."))
                 return@launch
             }
 
@@ -225,7 +224,7 @@ class EditProfileViewModel(
                     is DataState.Success -> {
                         _uiState.update { it.copy(isSaving = false, originalProfile = updatedProfile) }
                         _sideEffects.send(EditProfileSideEffect.ProfileSaved)
-                        _sideEffects.send(EditProfileSideEffect.ShowSnackbar("Profile updated successfully"))
+                        _sideEffects.send(EditProfileSideEffect.ShowDialog("Profile updated successfully"))
                     }
                     is DataState.Error -> {
                         handleError(res.exception)
@@ -265,7 +264,7 @@ class EditProfileViewModel(
     }
 
     private suspend fun handleError(error: Throwable) {
-        val message = error.message ?: "Something went wrong"
+        val message = error.message ?: "Something went wrong.\n\nPlease try again."
         _uiState.update { it.copy(error = message) }
         _sideEffects.send(EditProfileSideEffect.ShowError(message))
     }
@@ -317,7 +316,7 @@ data class EditProfileState(
 
 sealed interface EditProfileSideEffect {
     data class ShowError(val message: String) : EditProfileSideEffect
-    data class ShowSnackbar(val message: String) : EditProfileSideEffect
+    data class ShowDialog(val message: String) : EditProfileSideEffect
     data object ProfileSaved : EditProfileSideEffect
     data object BackPreseed : EditProfileSideEffect
     data object ShowImagePicker : EditProfileSideEffect

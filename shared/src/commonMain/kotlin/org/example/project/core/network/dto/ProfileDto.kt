@@ -23,7 +23,7 @@ data class ProfileDto(
     @SerialName("acks")
     val acks: Int,
 
-    @SerialName("postByArea")
+    @SerialName("posts_by_level")
     val postByArea: List<Int>? = null,
 )
 

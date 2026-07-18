@@ -5,16 +5,69 @@ import PDFKit
 
 struct PDFKitView: UIViewRepresentable {
     let url: URL
+    @Binding var currentPage: Int
+    @Binding var totalPages: Int
+    
+    class Coordinator: NSObject {
+        var parent: PDFKitView
+        init(_ parent: PDFKitView) {
+            self.parent = parent
+        }
+        @objc func pageChanged(_ notification: Notification) {
+            if let pdfView = notification.object as? PDFView,
+               let current = pdfView.currentPage,
+               let doc = pdfView.document {
+                let index = doc.index(for: current)
+                DispatchQueue.main.async {
+                    self.parent.currentPage = index
+                }
+            }
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
 
     func makeUIView(context: Context) -> PDFView {
         let pdfView = PDFView()
-        pdfView.document = PDFDocument(url: url)
         pdfView.autoScales = true
+        pdfView.displayMode = .singlePage
+        pdfView.displayDirection = .horizontal
+        pdfView.usePageViewController(true)
+        pdfView.backgroundColor = .clear
+        
+        NotificationCenter.default.addObserver(context.coordinator, selector: #selector(Coordinator.pageChanged(_:)), name: .PDFViewPageChanged, object: pdfView)
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let document = PDFDocument(url: url) {
+                DispatchQueue.main.async {
+                    pdfView.document = document
+                    self.totalPages = document.pageCount
+                }
+            }
+        }
+        
         return pdfView
     }
 
     func updateUIView(_ pdfView: PDFView, context: Context) {
-        pdfView.document = PDFDocument(url: url)
+        if pdfView.document?.documentURL != url {
+            DispatchQueue.global(qos: .userInitiated).async {
+                if let document = PDFDocument(url: url) {
+                    DispatchQueue.main.async {
+                        pdfView.document = document
+                        self.totalPages = document.pageCount
+                    }
+                }
+            }
+        } else if let doc = pdfView.document, doc.pageCount > 0 {
+            if currentPage >= 0 && currentPage < doc.pageCount {
+                if let targetPage = doc.page(at: currentPage), pdfView.currentPage != targetPage {
+                    pdfView.go(to: targetPage)
+                }
+            }
+        }
     }
 }
 
@@ -194,27 +247,38 @@ struct ZoomablePdfView: View {
 
     @State private var scale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
+    @State private var currentPage: Int = 0
+    @State private var totalPages: Int = 0
 
     var body: some View {
-        PDFKitView(url: url)
-            .scaleEffect(scale)
-            .offset(offset)
-            .gesture(
-                MagnificationGesture()
-                .onChanged { value in
-                    let newScale = min(max(value.magnitude, 1.0), 4.0)
-                    scale = newScale
-                    currentScale = newScale
-                }
-                .onEnded { _ in
-                    if scale == 1.0 { offset = .zero }
-                }
-                .simultaneously(with: DragGesture()
+        ZStack {
+            PDFKitView(url: url, currentPage: $currentPage, totalPages: $totalPages)
+                .scaleEffect(scale)
+                .offset(offset)
+                .gesture(
+                    MagnificationGesture()
                     .onChanged { value in
-                        if scale > 1.0 { offset = value.translation }
+                        let newScale = min(max(value.magnitude, 1.0), 4.0)
+                        scale = newScale
+                        currentScale = newScale
                     }
+                    .onEnded { _ in
+                        if scale == 1.0 { offset = .zero }
+                    }
+                    .simultaneously(with: DragGesture()
+                        .onChanged { value in
+                            if scale > 1.0 { offset = value.translation }
+                        }
+                    )
                 )
-            )
+                
+            if scale == 1.0 && totalPages > 1 {
+                OverlayNavigationControls(
+                    currentIndex: $currentPage,
+                    totalCount: totalPages
+                )
+            }
+        }
     }
 }
 
@@ -230,7 +294,8 @@ struct FullScreenVideoPlayer: View {
 
             if let player = player {
                 // Reusing the CustomVideoPlayer from MediaPreviewContent
-                CustomVideoPlayer(player: player)
+                CustomVideoPlayer(player: player, videoGravity: .resizeAspect)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .edgesIgnoringSafeArea(.all)
             }
 
@@ -258,3 +323,4 @@ struct FullScreenVideoPlayer: View {
         }
     }
 }
+import PDFKit

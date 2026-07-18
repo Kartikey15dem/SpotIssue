@@ -4,7 +4,7 @@ import PhotosUI
 
 struct CreatePostScreen: View {
     @StateObject private var holder = KoinHelper().holder { $0.getCreatePostViewModel() }
-    @EnvironmentObject var router: Router
+    @EnvironmentObject var router: MainRouter
 
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var showDocumentPicker = false
@@ -62,10 +62,10 @@ struct CreatePostScreen: View {
                         // Post Button
                         Button(action: { holder.vm.onIntent(intent: CreatePostIntentPostIssueClicked.shared) }) {
                             Text("Post")
-                                .font(IssueSpotTypography.labelMedium)
-                                .fontWeight(.semibold)
-                                .padding(.horizontal, IssueSpotSpacing.medium)
-                                .padding(.vertical, IssueSpotSpacing.small)
+                                .font(IssueSpotTypography.bodyLarge)
+                                .fontWeight(.bold)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
                                 .foregroundColor(IssueSpotColors.postButtonText)
                                 .background(IssueSpotColors.postButtonBackground)
                                 .cornerRadius(20)
@@ -198,7 +198,7 @@ struct CreatePostScreen: View {
                     case is CreatePostSideEffectNavigateBack:
                         router.goBack()
                     case let errorEffect as CreatePostSideEffectShowError:
-                        SnackbarManager.shared.show(errorEffect.message)
+                        AppDialogManager.shared.show(errorEffect.message)
                     case is CreatePostSideEffectStartBackgroundUpload:
                         PostUploadWorker.shared.enqueue()
                     default:

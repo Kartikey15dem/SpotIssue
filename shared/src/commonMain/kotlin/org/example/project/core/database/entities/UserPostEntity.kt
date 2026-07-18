@@ -6,10 +6,10 @@ import androidx.room.PrimaryKey
 /**
  * Room entity for storing user's own posts locally
  */
-@Entity(tableName = "user_posts", primaryKeys = ["id", "sort"])
+@Entity(tableName = "user_posts")
 data class UserPostEntity(
+    @PrimaryKey
     val id: String,
-    val sort: String,
     val userId: String,
     val userName: String,
     val userAvatar: String? = null,

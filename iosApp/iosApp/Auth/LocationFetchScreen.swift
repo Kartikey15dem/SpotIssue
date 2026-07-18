@@ -4,7 +4,7 @@ import CoreLocation
 
 struct LocationFetchScreen: View {
     @StateObject private var holder = KoinHelper().holder { $0.getLocationFetchViewModel() }
-    @EnvironmentObject var router: Router
+    @EnvironmentObject var router: MainRouter
     @State private var showRationaleDialog = false
 
     var body: some View {

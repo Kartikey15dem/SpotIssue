@@ -59,14 +59,11 @@ fun ProfileDto.toEntity(userId: String = "current_user"): ProfileEntity {
     )
 }
 
-fun Post.toUserPostEntity(
-    sort: String,
-    cachedAt: Long = 0L
-): UserPostEntity {
+fun Post.toUserPostEntity(cachedAt: Long = 0L): UserPostEntity {
     val now = Clock.System.now().toEpochMilliseconds()
     return UserPostEntity(
         id = id,
-        sort = sort,
+        
         userId = userId,
         userName = userName,
         userAvatar = userUrl,
@@ -89,14 +86,11 @@ fun Post.toUserPostEntity(
     )
 }
 
-fun Post.toLikedPostEntity(
-    sort: String,
-    cachedAt: Long = 0L
-): LikedPostEntity {
+fun Post.toLikedPostEntity(cachedAt: Long = 0L): LikedPostEntity {
     val now = Clock.System.now().toEpochMilliseconds()
     return LikedPostEntity(
         id = id,
-        sort = sort,
+        
         userId = userId,
         userName = userName,
         userAvatar = userUrl,

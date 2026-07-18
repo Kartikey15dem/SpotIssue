@@ -5,6 +5,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -79,7 +81,8 @@ fun PostCard(
                 ),
             colors = CardDefaults.cardColors(containerColor = IssueSpotColors.CardBackground),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-            shape = shapes.medium
+            shape = shapes.medium,
+            border = if (isDetailMode) BorderStroke(1.dp, IssueSpotColors.Outline.copy(alpha = 0.5f)) else null
         ) {
             Box(modifier = Modifier.fillMaxWidth().then(if (isDetailMode) Modifier.fillMaxHeight() else Modifier)) {
                 Column(
@@ -89,7 +92,7 @@ fun PostCard(
                 ) {
                     Column(
                         modifier = Modifier
-                            .then(if (isDetailMode) Modifier.weight(1f) else Modifier)
+                            .then(if (isDetailMode) Modifier.weight(1f).verticalScroll(rememberScrollState()) else Modifier)
                             .clickable(enabled = !isDetailMode) {
                                 onPostClick()
                             }

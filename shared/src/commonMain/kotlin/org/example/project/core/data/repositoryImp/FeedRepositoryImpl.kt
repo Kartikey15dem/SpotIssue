@@ -396,7 +396,7 @@ class FeedRepositoryImpl(
             msg.contains("401") -> FeedError.Authentication()
             msg.contains("50") -> FeedError.Server()
             msg.contains("Timeout") -> FeedError.Timeout()
-            msg.contains("resolve host") || msg.contains("Failed to connect") -> FeedError.Offline()
+            msg.contains("resolve host") || msg.contains("Failed to connect") -> FeedError.Server("An error occurred")
             msg.contains("Serialization") || msg.contains("JSON") -> FeedError.Parsing()
             e is io.ktor.utils.io.errors.IOException -> FeedError.Network()
             else -> FeedError.Unknown(msg)

@@ -64,8 +64,6 @@ inline fun <ResultType, RequestType> networkBoundResourceFlow(
                         
                         // Ktor Network Exception heuristic or generic offline fallback
                         val isOffline = e is IOException 
-                            || e.message?.contains("Unable to resolve host") == true 
-                            || e.message?.contains("Failed to connect") == true
                             || e.message?.contains("Timeout") == true
                             
                         if (isOffline) {

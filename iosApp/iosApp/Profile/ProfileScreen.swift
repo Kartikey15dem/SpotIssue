@@ -3,7 +3,7 @@ import Shared
 
 struct ProfileScreen: View {
     @StateObject private var holder: ViewModelHolder<ProfileViewModel>
-    @EnvironmentObject var router: Router
+    @EnvironmentObject var router: MainRouter
     
     @State private var postToDelete: String? = nil
     @State private var showScrollToTop = false
@@ -46,59 +46,59 @@ struct ProfileScreen: View {
                     }
                     .padding()
                 } else {
-                    Observing(holder.vm.expandedPost) { expandedPost in
-                        if let expandedPost {
-                        let isLiked = expandedPost.isLiked
-                        let resolvedLikes = Int(expandedPost.likes)
-                        let resolvedComments = Int(expandedPost.comments)
-                        let isReported = expandedPost.isReported
-                        
-                        PostCard(
-                            post: expandedPost,
-                            isLiked: isLiked,
-                            likesCount: resolvedLikes,
-                            commentsCount: resolvedComments,
-                            isReported: isReported,
-                            canDelete: state.isMine,
-                            canReport: !state.isMine,
-                            isDetailMode: true,
-                            onLikeClick: {
-                                holder.vm.onIntent(intent: ProfileIntentLikeClicked(postId: expandedPost.id))
-                            },
-                            onCommentIconClick: {
-                                holder.vm.onIntent(intent: ProfileIntentCommentsIconClicked(postId: expandedPost.id))
-                            },
-                            onShareClick: {
-                                holder.vm.onIntent(intent: ProfileIntentShareClicked(post: expandedPost))
-                            },
-                            onReportClick: { reason in
-                                holder.vm.onIntent(intent: ProfileIntentReportClicked(postId: expandedPost.id, reason: reason))
-                            },
-                            onDeleteClick: {
-                                postToDelete = expandedPost.id
-                            },
-                            onPostClick: {},
-                            onCollapseClick: {
-                                holder.vm.onIntent(intent: ProfileIntentDismissPost.shared)
-                            }
-                        )
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .transition(.move(edge: .bottom))
-                        .zIndex(1)
-                    } else {
-                        Observing(holder.vm.profilePostsState) { (profilePostsState: FeedState) in
-                            ProfileFeedContainer(
-                                state: state,
-                                holder: holder,
-                                profilePostsState: profilePostsState,
-                                showScrollToTop: $showScrollToTop,
-                                postToDelete: $postToDelete
+                    Group {
+                        if let expandedPost = state.expandedPost {
+                            let isLiked = expandedPost.isLiked
+                            let resolvedLikes = Int(expandedPost.likes)
+                            let resolvedComments = Int(expandedPost.comments)
+                            let isReported = expandedPost.isReported
+                            
+                            PostCard(
+                                post: expandedPost,
+                                isLiked: isLiked,
+                                likesCount: resolvedLikes,
+                                commentsCount: resolvedComments,
+                                isReported: isReported,
+                                canDelete: state.isMine,
+                                canReport: !state.isMine,
+                                isDetailMode: true,
+                                onLikeClick: {
+                                    holder.vm.onIntent(intent: ProfileIntentLikeClicked(postId: expandedPost.id))
+                                },
+                                onCommentIconClick: {
+                                    holder.vm.onIntent(intent: ProfileIntentCommentsIconClicked(postId: expandedPost.id))
+                                },
+                                onShareClick: {
+                                    holder.vm.onIntent(intent: ProfileIntentShareClicked(post: expandedPost))
+                                },
+                                onReportClick: { reason in
+                                    holder.vm.onIntent(intent: ProfileIntentReportClicked(postId: expandedPost.id, reason: reason))
+                                },
+                                onDeleteClick: {
+                                    postToDelete = expandedPost.id
+                                },
+                                onPostClick: {},
+                                onCollapseClick: {
+                                    holder.vm.onIntent(intent: ProfileIntentDismissPost.shared)
+                                }
                             )
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                            .transition(.move(edge: .bottom))
+                            .zIndex(1)
+                        } else {
+                            Observing(holder.vm.profilePostsState) { (profilePostsState: FeedState) in
+                                ProfileFeedContainer(
+                                    state: state,
+                                    holder: holder,
+                                    profilePostsState: profilePostsState,
+                                    showScrollToTop: $showScrollToTop,
+                                    postToDelete: $postToDelete
+                                )
+                            }
                         }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            }
             }
             .navigationBarHidden(false)
             .navigationTitle("Profile")
@@ -113,10 +113,10 @@ struct ProfileScreen: View {
                         router.navigate(to: .editProfile)
                     case let shareEffect as ProfileSideEffectSharePost:
                         shareContent(text: shareEffect.text)
-                    case let snackbarEffect as ProfileSideEffectShowSnackbar:
-                        SnackbarManager.shared.show(snackbarEffect.message)
+                    case let dialogEffect as ProfileSideEffectShowDialog:
+                        AppDialogManager.shared.show(dialogEffect.message)
                     case let errorEffect as ProfileSideEffectShowError:
-                        SnackbarManager.shared.show(errorEffect.message)
+                        AppDialogManager.shared.show(errorEffect.message)
                     default:
                         break
                     }
@@ -339,17 +339,10 @@ private struct ProfilePostsListView: View {
                 )
             }
         }
-        .overlay(alignment: .top) {
-            if feedState.isRefreshing && !feedState.posts.isEmpty {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: IssueSpotColors.primary))
-                    .padding(.top, IssueSpotSpacing.small)
-            }
-        }
         .onChange(of: feedState.error?.message) { _, error in
             if let error, !feedState.posts.isEmpty {
                 holder.vm.onIntent(
-                    intent: ProfileIntentShowRefreshErrorSnackbar(message: error)
+                    intent: ProfileIntentShowRefreshErrorDialog(message: error)
                 )
             }
         }

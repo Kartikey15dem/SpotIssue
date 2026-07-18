@@ -26,11 +26,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import org.example.project.home.presentation.screens.HomePullRefresh
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -48,9 +49,13 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.runtime.key
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material3.Snackbar
 
 import androidx.compose.runtime.Composable
+import org.example.project.core.components.AppErrorDialog
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.collectAsState
@@ -100,9 +105,10 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val expandedPost by viewModel.expandedPost.collectAsStateWithLifecycle()
+    val expandedPost = state.expandedPost
     val profilePostsState by viewModel.profilePostsState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
+    var errorDialogMessage by remember { mutableStateOf<String?>(null) }
+
 
     val activeCommentsFlow by viewModel.activeCommentsFlow.collectAsStateWithLifecycle()
     val activePostId = state.showCommentsSheetForPostId
@@ -119,10 +125,10 @@ fun ProfileScreen(
                 ProfileSideEffect.NavigateToEditProfile -> onNavigateToEditProfile()
                 is ProfileSideEffect.NavigateToPost -> onNavigateToPost(effect.postId)
                 is ProfileSideEffect.ShowError -> {
-                    snackbarHostState.showSnackbar(effect.message)
+                    errorDialogMessage = effect.message
                 }
-                is ProfileSideEffect.ShowSnackbar -> {
-                    snackbarHostState.showSnackbar(effect.message)
+                is ProfileSideEffect.ShowDialog -> {
+                    errorDialogMessage = effect.message
                 }
                 is ProfileSideEffect.SharePost -> {
                     val sendIntent = Intent().apply {
@@ -139,17 +145,15 @@ fun ProfileScreen(
         }
     }
 
+    
+    errorDialogMessage?.let { message ->
+        AppErrorDialog(
+            message = message,
+            onDismiss = { errorDialogMessage = null }
+        )
+    }
+
     Scaffold(
-        snackbarHost = { 
-            SnackbarHost(snackbarHostState) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = Color(0xFF323232),
-                    contentColor = Color.White,
-                    actionColor = Color(0xFF4A6CF7)
-                )
-            }
-        },
         floatingActionButton = {
             if (showFab && expandedPost == null) {
                 SmallFloatingActionButton(
@@ -213,7 +217,7 @@ fun ProfileScreenContent(
 
     LaunchedEffect(refreshError) {
         if (refreshError != null && profilePostsState.posts.isNotEmpty()) {
-            onIntent(ProfileIntent.ShowRefreshErrorSnackbar(refreshError.message))
+            onIntent(ProfileIntent.ShowRefreshErrorDialog(refreshError.message))
         }
     }
 
@@ -295,12 +299,17 @@ fun ProfileScreenContent(
                     isDetailMode = true
                 )
             } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = spacing.medium)
+                HomePullRefresh(
+                    isRefreshing = profilePostsState.isRefreshing,
+                    onRefresh = { onIntent(ProfileIntent.RefreshPosts) },
+                    modifier = Modifier.fillMaxSize()
                 ) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = spacing.medium)
+                    ) {
                     item { Spacer(Modifier.height(spacing.small)) }
 
                     item {
@@ -312,6 +321,8 @@ fun ProfileScreenContent(
                             acks = profile.acks,
                             onEditClick = { onIntent(ProfileIntent.EditProfileClicked) }
                         )
+
+                        Spacer(modifier = Modifier.height(6.dp))
                     }
 
                     item {
@@ -394,10 +405,7 @@ fun ProfileScreenContent(
                             }
                         }
                     } else if (
-                        profilePostsState.posts.isEmpty() &&
-                        !profilePostsState.isLoading &&
-                        !profilePostsState.isRefreshing &&
-                        profilePostsState.error == null
+                        profilePostsState.posts.isEmpty() && !profilePostsState.isRefreshing && profilePostsState.error == null
                     ) {
                         item {
                             Box(
@@ -506,6 +514,7 @@ fun ProfileScreenContent(
                     }
                     
                     item { Spacer(Modifier.height(spacing.medium)) }
+                }
                 }
             }
         }

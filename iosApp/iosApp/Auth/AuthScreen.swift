@@ -3,7 +3,7 @@ import Shared
 
 struct AuthScreen: View {
     @StateObject private var holder = KoinHelper().holder { $0.getAuthViewModel() }
-    @EnvironmentObject var router: Router
+    @EnvironmentObject var router: AuthRouter
     
     var body: some View {
         Observing(holder.vm.uiState) { state in
@@ -85,8 +85,8 @@ struct AuthScreen: View {
                         router.navigate(to: .otp)
                     case let nav as AuthEffect.NavigateToNameCaptureScreen:
                         router.navigate(to: .nameCapture(nav.email))
-                    case let errorEffect as AuthEffect.ShowSnackbar:
-                        SnackbarManager.shared.show(errorEffect.message)
+                    case let errorEffect as AuthEffect.ShowDialog:
+                        AppDialogManager.shared.show(errorEffect.message)
                     default:
                         break
                     }

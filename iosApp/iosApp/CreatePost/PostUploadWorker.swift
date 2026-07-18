@@ -39,33 +39,12 @@ class PostUploadWorker {
                     return
                 }
                 
-                // Validate size
-                var totalSize: Int64 = 0
-                let selectedMedia = draft.selectedMedia ?? []
-                
-                for mediaItem in selectedMedia {
-                    if let url = URL(string: mediaItem.uri), url.isFileURL {
-                        if let attrs = try? fileManager.attributesOfItem(atPath: url.path) {
-                            totalSize += attrs[.size] as? Int64 ?? 0
-                        }
-                    }
-                }
-                
-                if totalSize > 50 * 1024 * 1024 {
-                    let updated = Shared.UploadDraftState(
-                        status: .error,
-                        postText: draft.postText,
-                        selectedMedia: draft.selectedMedia,
-                        errorMessage: "Total media size exceeds 50MB limit."
-                    )
-                    try await prefRepository.updateUploadDraftState(state: updated)
-                    await MainActor.run { UIApplication.shared.endBackgroundTask(backgroundTask) }
-                    return
-                }
+
                 
                 // Compress / Prepare paths natively
                 var mediaPaths: [String] = []
                 let mediaType = draft.selectedMedia?.first?.type ?? Shared.MediaType.image
+                let selectedMedia = draft.selectedMedia ?? []
                 
                 for mediaItem in selectedMedia {
                     guard let url = URL(string: mediaItem.uri) else { continue }
@@ -102,6 +81,26 @@ class PostUploadWorker {
                     } else {
                         mediaPaths.append(url.path)
                     }
+                }
+                
+                // Validate size after compression
+                var totalCompressedSize: Int64 = 0
+                for path in mediaPaths {
+                    if let attrs = try? fileManager.attributesOfItem(atPath: path) {
+                        totalCompressedSize += attrs[.size] as? Int64 ?? 0
+                    }
+                }
+                
+                if totalCompressedSize > 50 * 1024 * 1024 {
+                    let updated = Shared.UploadDraftState(
+                        status: .error,
+                        postText: draft.postText,
+                        selectedMedia: draft.selectedMedia,
+                        errorMessage: "The media size is too large.\n\nPlease choose a smaller file."
+                    )
+                    try await prefRepository.updateUploadDraftState(state: updated)
+                    await MainActor.run { UIApplication.shared.endBackgroundTask(backgroundTask) }
+                    return
                 }
                 
                 let createPost = Shared.CreatePost(

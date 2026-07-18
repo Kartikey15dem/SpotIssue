@@ -17,7 +17,7 @@ import org.example.project.core.datastore.UserPreferencesRepository
 sealed class AuthEffect {
     data class NavigateToOtpScreen(val email: String) : AuthEffect()
     data class NavigateToNameCaptureScreen(val email: String) : AuthEffect()
-    data class ShowSnackbar(val message: String) : AuthEffect()
+    data class ShowDialog(val message: String) : AuthEffect()
 }
 
 data class AuthUiState(
@@ -67,7 +67,7 @@ class AuthViewModel(
         val email = _uiState.value.email
 
         if (!email.contains("@") || !email.contains(".")) {
-            showError("Please enter a valid email address")
+            showError("Invalid email\n\nPlease ensure you have entered a correct and valid email address.")
             return
         }
 
@@ -81,7 +81,7 @@ class AuthViewModel(
                 }
                 is DataState.Error -> {
                     hideLoading()
-                    showError(result.exception.message ?: "An unexpected error occurred")
+                    showError(result.exception.message ?: "An unexpected error occurred\n\nPlease try again.")
                 }
                 DataState.Loading -> {
                     showLoading()
@@ -95,7 +95,7 @@ class AuthViewModel(
         val otp = _uiState.value.otp
 
         if (otp.length != 6) {
-            showError("Please enter a valid 6-digit OTP")
+            showError("Invalid OTP\n\nPlease enter a valid 6-digit OTP.")
             return
         }
 
@@ -109,7 +109,7 @@ class AuthViewModel(
                     else {
                         when(val res = profileRepository.refreshProfile()){
                             is DataState.Error -> {
-                                showError(res.exception.message ?: "An unexpected error occurred")
+                                showError(res.exception.message ?: "An unexpected error occurred\n\nPlease try again.")
                             }
                             DataState.Loading -> {
                                 showLoading()
@@ -125,7 +125,7 @@ class AuthViewModel(
                 }
                 is DataState.Error -> {
                     hideLoading()
-                    showError(result.exception.message ?: "An unexpected error occurred")
+                    showError(result.exception.message ?: "An unexpected error occurred\n\nPlease try again.")
                 }
                 DataState.Loading -> {
                     showLoading()
@@ -145,7 +145,7 @@ class AuthViewModel(
 
     private fun showError(message: String) {
         viewModelScope.launch {
-            _effect.send(AuthEffect.ShowSnackbar(message))
+            _effect.send(AuthEffect.ShowDialog(message))
         }
     }
 }

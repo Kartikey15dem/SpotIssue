@@ -3,7 +3,7 @@ import Shared
 
 struct HomeScreen: View {
     @StateObject private var holder: ViewModelHolder<HomeViewModel>
-    @EnvironmentObject var router: Router
+    @EnvironmentObject var router: MainRouter
 
     @State private var localityScrollPosition = ScrollPosition(idType: String.self)
     @State private var districtScrollPosition = ScrollPosition(idType: String.self)
@@ -62,6 +62,13 @@ struct HomeScreen: View {
                         } else {
                             Observing(holder.vm.currentLevel) { currentLevel in
                                 Observing(holder.vm.activeIssues) { activeIssues in
+                                    HomeHeader(
+                                        state: state,
+                                        currentLevel: currentLevel,
+                                        activeIssues: activeIssues,
+                                        onIntent: holder.vm.onIntent
+                                    )
+
                                     if state.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                         Observing(holder.vm.feedState) { (feedState: FeedState) in
                                             HomeFeedContainer(
@@ -121,9 +128,9 @@ struct HomeScreen: View {
                     case is HomeSideEffectNavigateToProfile:
                         router.navigate(to: .profile)
                     case let errorEffect as HomeSideEffectShowError:
-                        SnackbarManager.shared.show(errorEffect.message)
-                    case let snackbarEffect as HomeSideEffectShowSnackbar:
-                        SnackbarManager.shared.show(snackbarEffect.message)
+                        AppDialogManager.shared.show(errorEffect.message)
+                    case let dialogEffect as HomeSideEffectShowDialog:
+                        AppDialogManager.shared.show(dialogEffect.message)
                     case let shareEffect as HomeSideEffectSharePost:
                         shareContent(text: shareEffect.text)
                     default:
@@ -194,13 +201,6 @@ private struct HomeFeedContainer: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HomeHeader(
-                state: state,
-                currentLevel: currentLevel,
-                activeIssues: activeIssues,
-                onIntent: onIntent
-            )
-
             ScrollView {
                 LazyVStack(spacing: IssueSpotSpacing.smallMedium) {
                     Spacer().frame(height: IssueSpotSpacing.small)
@@ -218,7 +218,7 @@ private struct HomeFeedContainer: View {
             }
             .onChange(of: feedState.error?.message) { _, error in
                 if let error, !feedState.posts.isEmpty {
-                    onIntent(HomeIntentShowRefreshErrorSnackbar(message: error))
+                    onIntent(HomeIntentShowRefreshErrorDialog(message: error))
                 }
             }
         }
@@ -312,11 +312,11 @@ struct HomeHeader: View {
                     .foregroundColor(IssueSpotColors.onSurface)
                 }
                 .padding(.horizontal, IssueSpotSpacing.smallMedium)
-                .frame(height: 48)
+                .frame(height: 42)
                 .background(IssueSpotColors.surfaceVariant)
                 .cornerRadius(12)
                 
-                Spacer().frame(width: IssueSpotSpacing.small)
+                Spacer().frame(width: 12)
                 
                 // Post Button
                 Button(action: { onIntent(HomeIntentCreatePostClicked.shared) }) {
@@ -326,22 +326,23 @@ struct HomeHeader: View {
                         Text("Post")
                             .font(IssueSpotTypography.bodyLarge)
                     }
-                    .padding(.horizontal, IssueSpotSpacing.smallMedium)
-                    .padding(.vertical, IssueSpotSpacing.small)
+                    .padding(.horizontal, 16)
+                    .frame(height: 42)
                     .foregroundColor(IssueSpotColors.postButtonText)
                     .background(IssueSpotColors.postButtonBackground)
                     .cornerRadius(12)
                 }
                 
-                Spacer().frame(width: IssueSpotSpacing.small)
+                Spacer().frame(width: 16)
                 
                 // Profile Button
                 Button(action: { onIntent(HomeIntentProfileClicked.shared) }) {
-                    Image(systemName: "person.circle")
+                    Image(systemName: "person")
                         .resizable()
-                        .frame(width: 28, height: 28)
+                        .frame(width: 20, height: 20)
                         .foregroundColor(IssueSpotColors.onSurface)
                 }
+                .padding(.trailing, 8)
             }
             .padding(.horizontal, IssueSpotSpacing.smallMedium)
             .padding(.vertical, IssueSpotSpacing.small)

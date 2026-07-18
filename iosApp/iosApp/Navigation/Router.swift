@@ -1,10 +1,13 @@
 import SwiftUI
 import Shared
 
-enum Route: Hashable {
+enum AuthRoute: Hashable {
     case auth
     case otp
     case nameCapture(String)
+}
+
+enum MainRoute: Hashable {
     case locationFetch
     case home
     case createPost
@@ -13,24 +16,25 @@ enum Route: Hashable {
     case postDetail(String)
 }
 
-class Router: ObservableObject {
+class AuthRouter: ObservableObject {
     @Published var path = NavigationPath()
     
-    func navigate(to route: Route) {
+    func navigate(to route: AuthRoute) { path.append(route) }
+    func goBack() { if !path.isEmpty { path.removeLast() } }
+    func popToRoot() { path.removeLast(path.count) }
+    func clearAndNavigate(to route: AuthRoute) {
+        path.removeLast(path.count)
         path.append(route)
     }
+}
 
-    func goBack() {
-        if !path.isEmpty {
-            path.removeLast()
-        }
-    }
-
-    func popToRoot() {
-        path.removeLast(path.count)
-    }
+class MainRouter: ObservableObject {
+    @Published var path = NavigationPath()
     
-    func clearAndNavigate(to route: Route) {
+    func navigate(to route: MainRoute) { path.append(route) }
+    func goBack() { if !path.isEmpty { path.removeLast() } }
+    func popToRoot() { path.removeLast(path.count) }
+    func clearAndNavigate(to route: MainRoute) {
         path.removeLast(path.count)
         path.append(route)
     }

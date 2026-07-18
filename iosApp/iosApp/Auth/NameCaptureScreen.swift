@@ -4,7 +4,7 @@ import PhotosUI
 
 struct NameCaptureScreen: View {
     @StateObject private var holder: ViewModelHolder<NameCaptureViewModel>
-    @EnvironmentObject var router: Router
+    @EnvironmentObject var router: AuthRouter
     
     init(email: String) {
         _holder = StateObject(wrappedValue: KoinHelper().holder { $0.getNameCaptureViewModel(email: email) })
@@ -177,8 +177,8 @@ struct NameCaptureScreen: View {
                         break
                     case is NameCaptureEffect.ShowCamera:
                         isCameraPresented = true
-                    case let error as NameCaptureEffect.ShowSnackbar:
-                        SnackbarManager.shared.show(error.message)
+                    case let error as NameCaptureEffect.ShowDialog:
+                        AppDialogManager.shared.show(error.message)
                     default:
                         break
                     }

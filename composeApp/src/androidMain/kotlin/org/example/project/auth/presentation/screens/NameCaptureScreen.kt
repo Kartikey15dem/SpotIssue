@@ -1,6 +1,11 @@
 package org.example.project.auth.presentation.screens
 
-import androidx.compose.material3.Snackbar
+import org.example.project.core.components.AppErrorDialog
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
@@ -53,7 +58,8 @@ fun NameCaptureScreen(
     viewModel: NameCaptureViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
+    var errorDialogMessage by remember { mutableStateOf<String?>(null) }
+
     val context = LocalContext.current
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
     var cameraFilePath by remember { mutableStateOf<String?>(null) }
@@ -98,8 +104,8 @@ fun NameCaptureScreen(
     LaunchedEffect(viewModel) {
         viewModel.effect.collectLatest { effect ->
             when (effect) {
-                is NameCaptureEffect.ShowSnackbar -> {
-                    snackbarHostState.showSnackbar(effect.message)
+                is NameCaptureEffect.ShowDialog -> {
+                    errorDialogMessage = effect.message
                 }
                 NameCaptureEffect.ShowImagePicker -> {
                     imagePickerLauncher.launch(
@@ -121,17 +127,15 @@ fun NameCaptureScreen(
         }
     }
 
+    
+    errorDialogMessage?.let { message ->
+        AppErrorDialog(
+            message = message,
+            onDismiss = { errorDialogMessage = null }
+        )
+    }
+
     Scaffold(
-        snackbarHost = {
-            SnackbarHost(snackbarHostState) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = Color(0xFF323232),
-                    contentColor = Color.White,
-                    actionColor = Color(0xFF4A6CF7)
-                )
-            }
-        },
         containerColor = Color.White
     ) { padding ->
         Box(

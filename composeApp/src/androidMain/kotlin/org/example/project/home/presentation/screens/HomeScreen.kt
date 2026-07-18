@@ -24,11 +24,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import org.example.project.core.components.AppErrorDialog
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
@@ -63,6 +65,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onNavigateToCreatePost: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
+    onExpandedPostChange: (Boolean) -> Unit = {},
     viewModel: HomeViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -76,10 +79,12 @@ fun HomeScreen(
     val activeCommentsFlow by viewModel.activeCommentsFlow.collectAsStateWithLifecycle()
     val activePostId = state.showCommentsSheetForPostId
     
-    val snackbarHostState = remember { SnackbarHostState() }
+    var errorDialogMessage by remember { mutableStateOf<String?>(null) }
+
     val context = LocalContext.current
 
     LaunchedEffect(expandedPost) {
+        onExpandedPostChange(expandedPost != null)
     }
     LaunchedEffect(currentLevel) {
     }
@@ -92,10 +97,10 @@ fun HomeScreen(
                 is HomeSideEffect.NavigateToCreatePost -> onNavigateToCreatePost()
                 is HomeSideEffect.NavigateToProfile -> onNavigateToProfile()
                 is HomeSideEffect.ShowError -> {
-                    snackbarHostState.showSnackbar(effect.message)
+                    errorDialogMessage = effect.message
                 }
-                is HomeSideEffect.ShowSnackbar -> {
-                    snackbarHostState.showSnackbar(effect.message)
+                is HomeSideEffect.ShowDialog -> {
+                    errorDialogMessage = effect.message
                 }
                 is HomeSideEffect.SharePost -> {
                     val sendIntent = Intent().apply {
@@ -110,17 +115,15 @@ fun HomeScreen(
         }
     }
 
+    
+    errorDialogMessage?.let { message ->
+        AppErrorDialog(
+            message = message,
+            onDismiss = { errorDialogMessage = null }
+        )
+    }
+
     Scaffold(
-        snackbarHost = {
-            SnackbarHost(snackbarHostState) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = Color(0xFF323232),
-                    contentColor = Color.White,
-                    actionColor = Color(0xFF4A6CF7)
-                )
-            }
-        },
         containerColor = IssueSpotColors.Background
     ) { padding ->
         HomeContent(
@@ -229,7 +232,7 @@ fun HomeContent(
 
     LaunchedEffect(feedUiState.refreshError) {
         if (feedUiState.refreshError != null && feedState.posts.isNotEmpty()) {
-            onIntent(HomeIntent.ShowRefreshErrorSnackbar(feedUiState.refreshError.message ?: "An error occurred"))
+            onIntent(HomeIntent.ShowRefreshErrorDialog(feedUiState.refreshError.message ?: "An error occurred"))
         }
     }
 
@@ -274,20 +277,20 @@ fun HomeContent(
                 )
 
             } else {
+                HomeHeader(
+                    modifier = Modifier.fillMaxWidth(),
+                    state = state,
+                    currentLevel = currentLevel,
+                    activeIssues = activeIssues,
+                    onIntent = onIntent
+                )
+                
                 if (state.query.isNotBlank()) {
                     HomeSearchFeed(
                         searchState = searchState,
                         onIntent = onIntent,
                         modifier = Modifier.fillMaxSize(),
-                        header = {
-                            HomeHeader(
-                                modifier = Modifier.fillMaxWidth(),
-                                state = state,
-                                currentLevel = currentLevel,
-                                activeIssues = activeIssues,
-                                onIntent = onIntent
-                            )
-                        }
+                        header = {}
                     )
                 } else {
                     HomeFeed(
@@ -296,15 +299,7 @@ fun HomeContent(
                         onIntent = onIntent,
                         feedUiState = feedUiState,
                         modifier = Modifier.fillMaxSize(),
-                        header = {
-                            HomeHeader(
-                                modifier = Modifier.fillMaxWidth(),
-                                state = state,
-                                currentLevel = currentLevel,
-                                activeIssues = activeIssues,
-                                onIntent = onIntent
-                            )
-                        }
+                        header = {}
                     )
                 }
             }

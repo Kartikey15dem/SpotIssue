@@ -27,7 +27,7 @@ struct MediaPreviewContent: View {
                             overlayController.show(type: .image, urls: mediaItems.map { $0.uri }, initialIndex: index)
                         }
                     case .video:
-                        VideoPreview(uri: first.uri) {
+                        VideoPreview(uri: first.uri, forceAspectRatio: true) {
                             overlayController.show(type: .video, urls: mediaItems.map { $0.uri })
                         }
                     case .pdf:
@@ -60,42 +60,47 @@ struct ImageGrid: View {
         Group {
             if count == 1 {
                 GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fit, showRemoveButton: false)
-                    .frame(maxWidth: .infinity)
-                // REMOVED fixed height here to let natural image ratio dictate height (like Compose)
+                    .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.width)
             } else if count == 2 {
                 HStack(spacing: spacing) {
-                    GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fill, showRemoveButton: false)
-                    GridImageItem(uri: images[1].uri, onRemove: { onRemove(images[1].uri) }, onClick: { onImageClick(1) }, contentMode: .fill, showRemoveButton: false)
+                    GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fill, showRemoveButton: isEditable)
+                    GridImageItem(uri: images[1].uri, onRemove: { onRemove(images[1].uri) }, onClick: { onImageClick(1) }, contentMode: .fill, showRemoveButton: isEditable)
                 }
                 .frame(height: gridHeight)
             } else if count == 3 {
                 HStack(spacing: spacing) {
-                    GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fill, showRemoveButton: false)
+                    GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fill, showRemoveButton: isEditable)
                     VStack(spacing: spacing) {
-                        GridImageItem(uri: images[1].uri, onRemove: { onRemove(images[1].uri) }, onClick: { onImageClick(1) }, contentMode: .fill, showRemoveButton: false)
-                        GridImageItem(uri: images[2].uri, onRemove: { onRemove(images[2].uri) }, onClick: { onImageClick(2) }, contentMode: .fill, showRemoveButton: false)
+                        GridImageItem(uri: images[1].uri, onRemove: { onRemove(images[1].uri) }, onClick: { onImageClick(1) }, contentMode: .fill, showRemoveButton: isEditable)
+                        GridImageItem(uri: images[2].uri, onRemove: { onRemove(images[2].uri) }, onClick: { onImageClick(2) }, contentMode: .fill, showRemoveButton: isEditable)
                     }
                 }
                 .frame(height: gridHeight)
             } else {
                 VStack(spacing: spacing) {
                     HStack(spacing: spacing) {
-                        GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fill, showRemoveButton: false)
-                        GridImageItem(uri: images[1].uri, onRemove: { onRemove(images[1].uri) }, onClick: { onImageClick(1) }, contentMode: .fill, showRemoveButton: false)
+                        GridImageItem(uri: images[0].uri, onRemove: { onRemove(images[0].uri) }, onClick: { onImageClick(0) }, contentMode: .fill, showRemoveButton: isEditable)
+                        GridImageItem(uri: images[1].uri, onRemove: { onRemove(images[1].uri) }, onClick: { onImageClick(1) }, contentMode: .fill, showRemoveButton: isEditable)
                     }
                     HStack(spacing: spacing) {
-                        GridImageItem(uri: images[2].uri, onRemove: { onRemove(images[2].uri) }, onClick: { onImageClick(2) }, contentMode: .fill, showRemoveButton: false)
-                        ZStack {
-                            GridImageItem(uri: images[3].uri, onRemove: { onRemove(images[3].uri) }, onClick: { onImageClick(3) }, contentMode: .fill, showRemoveButton: false)
-                            if count > 4 {
-                                Color.black.opacity(0.5)
-                                    .onTapGesture { onImageClick(3) }
-                                Text("+\(count - 4)")
-                                    .font(IssueSpotTypography.headlineMedium)
-                                    .foregroundColor(.white)
-                                    .fontWeight(.bold)
-                            }
-                        }
+                        GridImageItem(uri: images[2].uri, onRemove: { onRemove(images[2].uri) }, onClick: { onImageClick(2) }, contentMode: .fill, showRemoveButton: isEditable)
+                        
+                        GridImageItem(uri: images[3].uri, onRemove: { onRemove(images[3].uri) }, onClick: { onImageClick(3) }, contentMode: .fill, showRemoveButton: isEditable)
+                            .overlay(
+                                Group {
+                                    if count > 4 {
+                                        ZStack {
+                                            Color.black.opacity(0.5)
+                                                .contentShape(Rectangle())
+                                            Text("+\(count - 4)")
+                                                .font(IssueSpotTypography.headlineMedium)
+                                                .foregroundColor(.white)
+                                                .fontWeight(.bold)
+                                        }
+                                        .onTapGesture { onImageClick(3) }
+                                    }
+                                }
+                            )
                     }
                 }
                 .frame(height: gridHeight)
@@ -122,7 +127,7 @@ struct GridImageItem: View {
             } placeholder: {
                 IssueSpotColors.surfaceVariant
             }
-            .frame(maxWidth: .infinity, maxHeight: contentMode == .fit ? nil : .infinity)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: contentMode == .fit ? nil : .infinity)
             .contentShape(Rectangle())
             .onTapGesture(perform: onClick)
             .clipped()
@@ -139,6 +144,7 @@ struct GridImageItem: View {
                 .padding(4)
             }
         }
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: contentMode == .fit ? nil : .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
@@ -146,13 +152,14 @@ struct GridImageItem: View {
 // MARK: - Video Preview
 struct VideoPreview: View {
     let uri: String
-    let onClick: () -> Void
+    var forceAspectRatio: Bool = true
+    let onFullscreenClick: () -> Void
 
     @State private var player: AVPlayer?
     @State private var isPlaying = false
     @State private var isMuted = false
     @State private var showControls = true
-    @State private var videoAspectRatio: CGFloat = 1.0 // Tracks ratio like Compose
+    @State private var videoAspectRatio: CGFloat = 1.0
 
     var body: some View {
         ZStack {
@@ -160,6 +167,7 @@ struct VideoPreview: View {
 
             if let player = player {
                 CustomVideoPlayer(player: player)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onTapGesture {
                         withAnimation { showControls.toggle() }
                     }
@@ -196,7 +204,7 @@ struct VideoPreview: View {
 
                     Spacer()
 
-                    Button(action: onClick) {
+                    Button(action: onFullscreenClick) {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                             .font(.system(size: 20))
                             .foregroundColor(.white)
@@ -209,7 +217,8 @@ struct VideoPreview: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .aspectRatio(videoAspectRatio, contentMode: .fit) // Dynamic sizing matching Android
+        .modifier(OptionalAspectRatio(ratio: videoAspectRatio, isEnabled: forceAspectRatio))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .onAppear {
             if let url = URL(string: uri) {
                 let avPlayer = AVPlayer(url: url)
@@ -218,8 +227,12 @@ struct VideoPreview: View {
                 // Extract intrinsic video size to calculate ratio
                 Task {
                     if let track = try? await avPlayer.currentItem?.asset.loadTracks(withMediaType: .video).first,
-                       let size = try? await track.load(.naturalSize) {
-                        let ratio = size.width / size.height
+                       let size = try? await track.load(.naturalSize),
+                       let transform = try? await track.load(.preferredTransform) {
+                        let videoSize = size.applying(transform)
+                        let width = abs(videoSize.width)
+                        let height = abs(videoSize.height)
+                        let ratio = width / height
                         await MainActor.run {
                             self.videoAspectRatio = max(ratio, 1.0)
                         }
@@ -248,13 +261,29 @@ struct VideoPreview: View {
     }
 }
 
+// Helper modifier to conditionally apply aspect ratio
+struct OptionalAspectRatio: ViewModifier {
+    let ratio: CGFloat
+    let isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content.aspectRatio(ratio, contentMode: .fit)
+        } else {
+            content
+        }
+    }
+}
+
 // Wrapper for AVPlayerLayer to hide native iOS video controls
 struct CustomVideoPlayer: UIViewRepresentable {
     var player: AVPlayer
+    var videoGravity: AVLayerVideoGravity = .resizeAspect
 
     func makeUIView(context: Context) -> UIView {
         let view = PlayerView()
         view.player = player
+        view.playerLayer.videoGravity = videoGravity
         return view
     }
 

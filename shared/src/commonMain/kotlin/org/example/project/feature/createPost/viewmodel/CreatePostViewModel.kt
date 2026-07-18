@@ -52,7 +52,7 @@ class CreatePostViewModel(
                         ) }
                         _sideEffects.send(
                             CreatePostSideEffect.ShowError(
-                                draft.errorMessage ?: "Upload failed. Draft restored."
+                                draft.errorMessage ?: "Upload failed\n\nDraft restored. Please try again."
                             )
                         )
                         // Reset status to IDLE so we don't keep showing the error
@@ -115,7 +115,7 @@ class CreatePostViewModel(
     private fun createPost() {
         viewModelScope.launch {
             if (_uiState.value.description.isBlank()) {
-                _sideEffects.send(CreatePostSideEffect.ShowError("Please describe the issue"))
+                _sideEffects.send(CreatePostSideEffect.ShowError("Description missing\n\nPlease describe the issue."))
                 return@launch
             }
 
@@ -139,7 +139,7 @@ class CreatePostViewModel(
                     }
                     is DataState.Error -> {
                         _uiState.update { it.copy(isLoading = false) }
-                        emitError(result.exception.message ?: "Failed to create post")
+                        emitError(result.exception.message ?: "Failed to create post\n\nAn unexpected error occurred. Please try again.")
                     }
                     else -> Unit
                 }
@@ -187,13 +187,13 @@ class CreatePostViewModel(
 
         when {
             videosCount > 1 -> {
-                emitError("You can only select 1 video per post.")
+                emitError("Too many videos\n\nYou can only select 1 video per post.")
             }
             videosCount == 1 && imagesCount > 0 -> {
-                emitError("You cannot mix images and video. Please select one or the other.")
+                emitError("Mixed media types\n\nYou cannot mix images and video. Please select one or the other.")
             }
             processedItems.size > maxItems -> {
-                emitError("You can only select up to $maxItems items.")
+                emitError("Too many items\n\nYou can only select up to $maxItems items.")
             }
             processedItems.isNotEmpty() -> {
                 // Rules passed! Replace the existing selection with the new one
@@ -204,7 +204,7 @@ class CreatePostViewModel(
 
     fun setDocumentUrl(uri: String) {
         if (!validateMedia("application/pdf")) {
-            emitError("PDF format is not supported")
+            emitError("Unsupported format\n\nPDF format is not supported.")
             return
         }
         _uiState.value = _uiState.value.copy(

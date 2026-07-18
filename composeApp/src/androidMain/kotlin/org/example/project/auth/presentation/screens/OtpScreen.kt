@@ -1,5 +1,11 @@
 package org.example.project.auth.presentation.screens
 
+import org.example.project.core.components.AppErrorDialog
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -37,22 +43,30 @@ fun OTPScreen(
     viewModel: AuthViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
+    var errorDialogMessage by remember { mutableStateOf<String?>(null) }
+
 
     LaunchedEffect(Unit) {
         viewModel.effect.collect { effect ->
             when (effect) {
                 is AuthEffect.NavigateToNameCaptureScreen -> navigateToNameCapture(effect.email)
-                is AuthEffect.ShowSnackbar -> {
-                    snackbarHostState.showSnackbar(effect.message)
+                is AuthEffect.ShowDialog -> {
+                    errorDialogMessage = effect.message
                 }
                 else -> Unit
             }
         }
     }
 
+    
+    errorDialogMessage?.let { message ->
+        AppErrorDialog(
+            message = message,
+            onDismiss = { errorDialogMessage = null }
+        )
+    }
+
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color.White
     ) { padding ->
         Box(

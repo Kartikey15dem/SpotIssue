@@ -148,6 +148,11 @@ class ProfileRepositoryImpl(
         roomJob?.cancel()
     }
 
+    override fun clearRefreshState() {
+        automaticRefreshAttemptedKeys.clear()
+        activePostsKey = null
+    }
+
     override fun refreshProfilePosts(reason: FeedRefreshReason) {
         val key = activePostsKey ?: return
         if ((reason == FeedRefreshReason.LEVEL_CHANGED || reason == FeedRefreshReason.NETWORK_RESTORED) &&
@@ -341,8 +346,8 @@ class ProfileRepositoryImpl(
     }
 
     private suspend fun getCachedPostCount(key: ProfilePostsKey): Int {
-        return if (key.isMine) database.userPostDao().getUserPostCount(key.sort)
-        else database.likedPostDao().getLikedPostCount(key.sort)
+        return if (key.isMine) database.userPostDao().getUserPostCount()
+        else database.likedPostDao().getLikedPostCount()
     }
 
     private suspend fun fetchProfilePage(
@@ -350,34 +355,34 @@ class ProfileRepositoryImpl(
         page: Int
     ): PagedResponse<PostWithProfileDto> {
         return if (key.isMine) {
-            profileService.getMyPosts(page = page, limit = 20, sort = key.sort)
+            profileService.getMyPosts(page = page, limit = 20, sort = key.sort.lowercase())
         } else {
-            profileService.getMyLikedPosts(page = page, limit = 20, sort = key.sort)
+            profileService.getMyLikedPosts(page = page, limit = 20, sort = key.sort.lowercase())
         }
     }
 
     private suspend fun replaceProfilePosts(key: ProfilePostsKey, posts: List<Post>) {
         val baseTime = Clock.System.now().toEpochMilliseconds()
         if (key.isMine) {
-            database.userPostDao().deleteAllUserPosts(key.sort)
-            database.userPostDao().insertPosts(posts.mapIndexed { index, post -> post.toUserPostEntity(sort = key.sort, cachedAt = baseTime - index) })
+            database.userPostDao().deleteAllUserPosts()
+            database.userPostDao().insertPosts(posts.mapIndexed { index, post -> post.toUserPostEntity(cachedAt = baseTime - index) })
         } else {
-            database.likedPostDao().deleteAllLikedPosts(key.sort)
-            database.likedPostDao().insertPosts(posts.mapIndexed { index, post -> post.toLikedPostEntity(sort = key.sort, cachedAt = baseTime - index) })
+            database.likedPostDao().deleteAllLikedPosts()
+            database.likedPostDao().insertPosts(posts.mapIndexed { index, post -> post.toLikedPostEntity(cachedAt = baseTime - index) })
         }
     }
 
     private suspend fun appendProfilePosts(key: ProfilePostsKey, posts: List<Post>) {
         val minCachedAt = if (key.isMine) {
-            database.userPostDao().getMinCachedAt(key.sort) ?: Clock.System.now().toEpochMilliseconds()
+            database.userPostDao().getMinCachedAt() ?: Clock.System.now().toEpochMilliseconds()
         } else {
-            database.likedPostDao().getMinCachedAt(key.sort) ?: Clock.System.now().toEpochMilliseconds()
+            database.likedPostDao().getMinCachedAt() ?: Clock.System.now().toEpochMilliseconds()
         }
         
         if (key.isMine) {
-            database.userPostDao().insertPosts(posts.mapIndexed { index, post -> post.toUserPostEntity(sort = key.sort, cachedAt = minCachedAt - 1 - index) })
+            database.userPostDao().insertPosts(posts.mapIndexed { index, post -> post.toUserPostEntity(cachedAt = minCachedAt - 1 - index) })
         } else {
-            database.likedPostDao().insertPosts(posts.mapIndexed { index, post -> post.toLikedPostEntity(sort = key.sort, cachedAt = minCachedAt - 1 - index) })
+            database.likedPostDao().insertPosts(posts.mapIndexed { index, post -> post.toLikedPostEntity(cachedAt = minCachedAt - 1 - index) })
         }
     }
 
@@ -387,7 +392,7 @@ class ProfileRepositoryImpl(
             msg.contains("401") -> FeedError.Authentication()
             msg.contains("50") -> FeedError.Server()
             msg.contains("Timeout") -> FeedError.Timeout()
-            msg.contains("resolve host") || msg.contains("Failed to connect") -> FeedError.Offline()
+            msg.contains("resolve host") || msg.contains("Failed to connect") -> FeedError.Server("An error occurred")
             msg.contains("Serialization") || msg.contains("JSON") -> FeedError.Parsing()
             e is io.ktor.utils.io.errors.IOException -> FeedError.Network()
             else -> FeedError.Unknown(msg)
@@ -400,19 +405,19 @@ class ProfileRepositoryImpl(
 
     override suspend fun refreshUserPosts(sort: String): DataState<List<Post>> =
         safeApiCall(networkMonitor) {
-            val posts = profileService.getMyPosts(page = 1, limit = 100, sort = sort)
+            val posts = profileService.getMyPosts(page = 1, limit = 100, sort = sort.lowercase())
                 .items
                 .map { it.toPost() }
-            database.userPostDao().insertPosts(posts.map { it.toUserPostEntity(sort = sort) })
+            database.userPostDao().insertPosts(posts.map { it.toUserPostEntity() })
             posts
         }
 
     override suspend fun refreshLikedPosts(sort: String): DataState<List<Post>> =
         safeApiCall(networkMonitor) {
-            val posts = profileService.getMyLikedPosts(page = 1, limit = 100, sort = sort)
+            val posts = profileService.getMyLikedPosts(page = 1, limit = 100, sort = sort.lowercase())
                 .items
                 .map { it.toPost() }
-            database.likedPostDao().insertPosts(posts.map { it.toLikedPostEntity(sort = sort) })
+            database.likedPostDao().insertPosts(posts.map { it.toLikedPostEntity() })
             posts
         }
 
