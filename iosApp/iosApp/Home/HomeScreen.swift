@@ -127,8 +127,7 @@ struct HomeScreen: View {
                         router.navigate(to: .createPost)
                     case is HomeSideEffectNavigateToProfile:
                         router.navigate(to: .profile)
-                    case let errorEffect as HomeSideEffectShowError:
-                        AppDialogManager.shared.show(errorEffect.message)
+
                     case let dialogEffect as HomeSideEffectShowDialog:
                         AppDialogManager.shared.show(dialogEffect.message)
                     case let shareEffect as HomeSideEffectSharePost:

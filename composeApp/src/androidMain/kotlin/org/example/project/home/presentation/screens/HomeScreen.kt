@@ -2,7 +2,6 @@ package org.example.project.home.presentation.screens
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -35,7 +34,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,9 +46,10 @@ import org.example.project.R
 import org.example.project.core.components.CommentsBottomSheet
 import org.example.project.core.components.PostCard
 import org.example.project.core.components.PostLevelChip
-import org.example.project.core.model.home.Comment
 import org.example.project.core.model.home.Post
+import org.example.project.core.model.home.PostLevel
 import org.example.project.core.model.home.getText
+import org.example.project.core.presentation.FeedState
 import org.example.project.feature.home.viewmodel.HomeIntent
 import org.example.project.feature.home.viewmodel.HomeSideEffect
 import org.example.project.feature.home.viewmodel.HomeState
@@ -86,19 +85,13 @@ fun HomeScreen(
     LaunchedEffect(expandedPost) {
         onExpandedPostChange(expandedPost != null)
     }
-    LaunchedEffect(currentLevel) {
-    }
-    LaunchedEffect(activeCommentsFlow) {
-    }
 
     LaunchedEffect(viewModel) {
         viewModel.sideEffects.collectLatest { effect ->
             when (effect) {
                 is HomeSideEffect.NavigateToCreatePost -> onNavigateToCreatePost()
                 is HomeSideEffect.NavigateToProfile -> onNavigateToProfile()
-                is HomeSideEffect.ShowError -> {
-                    errorDialogMessage = effect.message
-                }
+
                 is HomeSideEffect.ShowDialog -> {
                     errorDialogMessage = effect.message
                 }
@@ -172,7 +165,7 @@ data class FeedUiState(
 
 @Composable
 fun rememberFeedUiState(
-    feedState: org.example.project.core.presentation.FeedState,
+    feedState: FeedState,
 ): FeedUiState {
     val itemCount = feedState.posts.size
     val showInitialLoading = itemCount == 0 && feedState.isLoading
@@ -209,11 +202,11 @@ fun rememberFeedUiState(
 fun HomeContent(
     modifier: Modifier = Modifier,
     state: HomeState,
-    currentLevel: org.example.project.core.model.home.PostLevel,
+    currentLevel: PostLevel,
     activeIssues: Int,
     expandedPost: Post?,
-    feedState: org.example.project.core.presentation.FeedState,
-    searchState: org.example.project.core.presentation.FeedState,
+    feedState: FeedState,
+    searchState: FeedState,
     onIntent: (HomeIntent) -> Unit,
 ) {
     val localityState = rememberLazyListState()
@@ -222,10 +215,10 @@ fun HomeContent(
     val nationalState = rememberLazyListState()
 
     val listState = when (currentLevel) {
-        org.example.project.core.model.home.PostLevel.LOCALITY -> localityState
-        org.example.project.core.model.home.PostLevel.DISTRICT -> districtState
-        org.example.project.core.model.home.PostLevel.STATE -> stateState
-        org.example.project.core.model.home.PostLevel.NATIONAL -> nationalState
+        PostLevel.LOCALITY -> localityState
+        PostLevel.DISTRICT -> districtState
+        PostLevel.STATE -> stateState
+        PostLevel.NATIONAL -> nationalState
     }
     
     val feedUiState = rememberFeedUiState(feedState)
@@ -236,8 +229,6 @@ fun HomeContent(
         }
     }
 
-    LaunchedEffect(feedUiState.isPullRefreshing) {
-    }
 
     HomePullRefresh(
         isRefreshing = feedUiState.isPullRefreshing,
@@ -311,7 +302,7 @@ fun HomeContent(
 fun HomeHeader(
     modifier: Modifier = Modifier,
     state: HomeState,
-    currentLevel: org.example.project.core.model.home.PostLevel,
+    currentLevel: PostLevel,
     activeIssues: Int,
     onIntent: (HomeIntent) -> Unit,
 ) {

@@ -8,9 +8,11 @@ import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
+import org.example.project.core.utils.LocationProvider
+
 /**
  * Handles location permission requests and checks.
- * Use this before calling [org.example.project.core.utils.LocationProvider.getCurrentLocation].
+ * Use this before calling [LocationProvider.getCurrentLocation].
  */
 class LocationPermissionHandler(private val context: Context) {
 

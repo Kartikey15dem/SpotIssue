@@ -78,7 +78,9 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.example.project.R
+import org.example.project.core.window.FeedConfig
 import org.example.project.core.components.PostCard
+import org.example.project.core.components.InfiniteScrollHandler
 import org.example.project.core.components.PostLevelChip
 import org.example.project.core.data.mappers.Sort
 import org.example.project.core.model.home.Comment
@@ -95,6 +97,7 @@ import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.ui.text.style.TextOverflow
+import org.example.project.core.model.home.Post
 
 @Composable
 fun ProfileScreen(
@@ -124,9 +127,7 @@ fun ProfileScreen(
                 ProfileSideEffect.NavigateToCreatePost -> onNavigateToCreatePost()
                 ProfileSideEffect.NavigateToEditProfile -> onNavigateToEditProfile()
                 is ProfileSideEffect.NavigateToPost -> onNavigateToPost(effect.postId)
-                is ProfileSideEffect.ShowError -> {
-                    errorDialogMessage = effect.message
-                }
+
                 is ProfileSideEffect.ShowDialog -> {
                     errorDialogMessage = effect.message
                 }
@@ -205,7 +206,7 @@ fun ProfileScreen(
 fun ProfileScreenContent(
     modifier: Modifier = Modifier,
     state: ProfileState,
-    expandedPost: org.example.project.core.model.home.Post?,
+    expandedPost: Post?,
     profilePostsState: FeedState,
     onIntent: (ProfileIntent) -> Unit,
     listState: LazyListState
@@ -221,18 +222,8 @@ fun ProfileScreenContent(
         }
     }
 
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
-            .distinctUntilChanged()
-            .collect { lastVisibleItem ->
-                val totalItems = listState.layoutInfo.totalItemsCount
-                if (lastVisibleItem != null &&
-                    totalItems > 0 &&
-                    lastVisibleItem >= totalItems - org.example.project.core.window.FeedConfig.LOAD_MORE_THRESHOLD
-                ) {
-                    onIntent(ProfileIntent.LoadMorePosts)
-                }
-            }
+    InfiniteScrollHandler(listState = listState) {
+        onIntent(ProfileIntent.LoadMorePosts)
     }
 
     if (state.profile == null) {

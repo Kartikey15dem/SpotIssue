@@ -48,12 +48,28 @@ class FeedRepositoryImpl(
 
     private val scope = CoroutineScope(Dispatchers.IO)
     
+    // ---------------------------------------------------------
+    // COMPLEXITY EXPLANATION: Why all these maps and mutexes?
+    // ---------------------------------------------------------
+    // Pagination isn't just about loading a list. If a user rapidly swipes through tabs
+    // (Locality -> State -> National), we need to ensure network responses for 'Locality'
+    // don't accidentally get appended to the 'National' feed. 
+    //
+    // - presentationCache: Caches UI models to prevent unnecessary heavy UI recompositions.
+    // - pagingMutex: Prevents race conditions. If `refresh` and `loadMore` are called exactly
+    //   at the same millisecond, they could corrupt the database. Mutex locks the thread so they queue up safely.
+    // - pagingStatesByLevel: Saves the user's scroll depth. If they scroll down in 'State', go to 'National', 
+    //   and come back to 'State', they shouldn't lose their place!
     private val presentationCache = PresentationCache<Post, String> { it.id }
     private val pagingMutex = Mutex()
     private val pagingStatesByLevel = mutableMapOf<PostLevel, PagingState>()
     private val windowEnginesByLevel = mutableMapOf<PostLevel, WindowEngine<Post>>()
     private val automaticRefreshAttemptedLevels = mutableSetOf<PostLevel>()
 
+    // State class to keep track of pagination details for a specific post level.
+    // nextPage: The index/key for the next page to fetch from the API.
+    // hasMore: Boolean flag indicating if there are more items to be fetched.
+    // generation: A counter to handle concurrency and discard outdated network responses.
     private data class PagingState(
         val nextPage: Int = 0,
         val hasMore: Boolean = true,
@@ -96,17 +112,27 @@ class FeedRepositoryImpl(
         }
     }
     
+    // ---------------------------------------------------------
+    // OBSERVERS
+    // ---------------------------------------------------------
+
     init {
         observeNetwork()
     }
 
+    // Continuously monitors device network status.
+    // If the device comes back online, we trigger a background refresh to catch up
+    // on missed posts, UNLESS we've already done so for the current level.
     private fun observeNetwork() {
         networkMonitorJob = scope.launch {
             networkMonitor.isOnline.collect { online ->
                 val wasOffline = !isOnline
                 isOnline = online
+                // Update the UI state so it can show a "No Internet" banner if needed.
                 _feedState.update { it.copy(isOffline = !online) }
+                
                 val currentLevel = levelFlow.value
+                // If we just regained connection, silently fetch the latest items.
                 if (online && wasOffline && currentLevel != null && currentLevel !in automaticRefreshAttemptedLevels) {
                     refresh(FeedRefreshReason.NETWORK_RESTORED)
                 }
@@ -114,7 +140,14 @@ class FeedRepositoryImpl(
         }
     }
 
-    override fun start(postLevel: PostLevel, userLocation: UserLocation) {
+    // ---------------------------------------------------------
+    // CORE INITIALIZATION
+    // ---------------------------------------------------------
+    
+    // We renamed this from `start` to `initializeFeedForLevel` because `start` is too generic.
+    // This is called by the ViewModel when the user changes the location or post level (e.g. from Locality -> District).
+    // It resets pagination state, clears the presentation cache, and starts observing the local database for the new level.
+    override fun initializeFeedForLevel(postLevel: PostLevel, userLocation: UserLocation) {
         val levelChanged = levelFlow.value != postLevel
         currentLocation = userLocation
         
@@ -160,11 +193,18 @@ class FeedRepositoryImpl(
         }
     }
     
-    override fun stop() {
+    // Renamed from `stop` to `stopFeedObservation`. Used to clean up jobs if the repository lifecycle ends.
+    override fun stopFeedObservation() {
         networkJob?.cancel()
         roomJob?.cancel()
     }
 
+    // ---------------------------------------------------------
+    // SEARCH PAGINATION
+    // ---------------------------------------------------------
+
+    // Initiates a new search. If the query is identical to the active one, it does nothing.
+    // Otherwise, it resets the search state to page 0 and fetches fresh results.
     override fun startSearch(query: String, postLevel: PostLevel) {
         val normalizedQuery = query.trim()
         if (normalizedQuery.isBlank()) {
@@ -176,12 +216,15 @@ class FeedRepositoryImpl(
         if (activeSearchKey == key) return
 
         activeSearchKey = key
-        searchJob?.cancel()
+        searchJob?.cancel() // Cancel any ongoing, outdated search requests
+        
+        // Bump generation to discard outdated network responses.
         searchPagingState = PagingState(generation = searchPagingState.generation + 1)
         _searchState.value = FeedState(isLoading = true, hasMore = true, isOffline = !isOnline)
-        refreshSearch()
+        refreshSearch() // Fetch page 0
     }
 
+    // Clears the search state entirely. Called when user clears the search bar.
     override fun clearSearch() {
         activeSearchKey = null
         searchJob?.cancel()
@@ -338,6 +381,13 @@ class FeedRepositoryImpl(
         )
     }
 
+    // ---------------------------------------------------------
+    // ROOM DATABASE OBSERVATION
+    // ---------------------------------------------------------
+
+    // Creates a reactive pipeline from the Database to the UI State.
+    // Instead of manually updating the UI after a network call, we update the DB.
+    // Room automatically emits the new data through `observeNewestPosts`.
     private fun restartRoomObservation() {
         roomJob?.cancel()
         roomJob = scope.launch {
@@ -351,12 +401,20 @@ class FeedRepositoryImpl(
                     }
                 }
                 .collect { roomPosts ->
+                    // Update our in-memory cache to prevent UI stutters on list redraws.
                     presentationCache.update(roomPosts)
                     _feedState.update { it.copy(posts = presentationCache.items.toList()) }
                 }
         }
     }
 
+    // ---------------------------------------------------------
+    // NETWORK UTILS
+    // ---------------------------------------------------------
+
+    // A robust fetching mechanism with exponential backoff.
+    // If the server flakes or the user has a spotty connection (Timeout/Network errors),
+    // we wait 1s, then 2s, then 4s, up to 4 attempts before finally failing.
     private suspend fun fetchPageWithRetry(page: Int): PagedResponse<PostWithProfileDto> {
         var attempt = 1
         var delayMs = 1000L
@@ -376,16 +434,17 @@ class FeedRepositoryImpl(
                     limit = 20
                 )
             } catch (e: CancellationException) {
+                // Never swallow CancellationException, it breaks coroutines
                 throw e
             } catch (e: Exception) {
                 val error = mapToFeedError(e)
                 val isRetryable = error is FeedError.Server || error is FeedError.Network || error is FeedError.Timeout
                 if (!isRetryable || attempt >= 4) {
-                    throw e
+                    throw e // Give up
                 }
                 delay(delayMs)
                 attempt++
-                delayMs *= 2
+                delayMs *= 2 // Exponential backoff
             }
         }
     }
@@ -420,6 +479,8 @@ class FeedRepositoryImpl(
             val count = levelFlow.value?.let { localDataSource.getCachedPostCount(it) } ?: 0
             val isBackground = (reason == FeedRefreshReason.APP_RESUMED || reason == FeedRefreshReason.NETWORK_RESTORED) && count > 0
 
+            // Create a new paging request generation to invalidate any ongoing requests.
+            // Reset nextPage to 0 for a fresh start.
             val requestGeneration = pagingMutex.withLock {
                 pagingState = pagingState.copy(
                     nextPage = 0,
@@ -469,14 +530,17 @@ class FeedRepositoryImpl(
                 var hasMoreAfterRefresh = true
                 
                 pagingMutex.withLock {
+                    // Check if the generation matches to avoid processing stale data.
                     if (requestGeneration != pagingState.generation) return@launch
                     val level = levelFlow.value ?: return@launch
                     val posts = response.items.map { it.toPost() }
+                    // Store the newly fetched posts in the local database (Source of Truth).
                     localDataSource.replacePosts(level, posts)
                     response.activeIssuesCount?.let { count ->
                         localDataSource.cacheActiveIssues(level, count)
                     }
                     
+                    // Update paging state with the next page index and hasMore flag based on API response.
                     pagingState = pagingState.copy(
                         nextPage = 1,
                         hasMore = response.nextKey != null && posts.isNotEmpty()
@@ -525,11 +589,13 @@ class FeedRepositoryImpl(
         if (!isOnline) return
         
         scope.launch {
+            // Determine if we should fetch more items based on current state and hasMore flag.
             val (shouldFetch, requestGeneration, pageToLoad) = pagingMutex.withLock {
                 if (_feedState.value.isLoading || _feedState.value.isRefreshing || _feedState.value.isAppending || _feedState.value.isRetrying || _feedState.value.isBackgroundRefreshing || !pagingState.hasMore) {
                     return@withLock Triple(false, 0L, 0)
                 }
                 
+                // Calculate window expansion to load more items from the local DB.
                 val currentState = windowState.value
                 val items = presentationCache.items
                 val anchor = if (items.size > FeedConfig.LOAD_MORE_THRESHOLD) items[items.size - FeedConfig.LOAD_MORE_THRESHOLD] else items.lastOrNull()
@@ -538,6 +604,7 @@ class FeedRepositoryImpl(
                 
                 if (nextState != currentState) {
                     windowState.value = nextState
+                    // Mark state as appending (loading more).
                     _feedState.update { it.copy(isAppending = true, appendError = null) }
                     Triple(true, pagingState.generation, pagingState.nextPage)
                 } else {
@@ -552,6 +619,7 @@ class FeedRepositoryImpl(
                 var hasMoreAfterAppend = true
                 
                 pagingMutex.withLock {
+                    // Append fetched data to the local database.
                     if (requestGeneration != pagingState.generation) return@launch
                     val level = levelFlow.value ?: return@launch
                     val posts = response.items.map { it.toPost() }
@@ -560,6 +628,7 @@ class FeedRepositoryImpl(
                         localDataSource.cacheActiveIssues(level, count)
                     }
                     
+                    // Increment the nextPage index and update hasMore flag.
                     pagingState = pagingState.copy(
                         nextPage = pageToLoad + 1,
                         hasMore = response.nextKey != null && posts.isNotEmpty()
@@ -675,23 +744,5 @@ class FeedRepositoryImpl(
 
     override fun observeActiveIssuesCount(postLevel: PostLevel): Flow<Int> {
         return localDataSource.observeActiveIssues(postLevel).map { it ?: 0 }
-    }
-
-
-    override fun observePosts(postLevel: PostLevel): Flow<List<Post>> {
-        return localDataSource.observeNewestPosts(postLevel, 100)
-    }
-
-    override suspend fun searchPosts(query: String, postLevel: PostLevel): DataState<List<Post>> =
-        safeApiCall(networkMonitor) {
-            homeService.searchPosts(query, postLevel.name, page = 0, limit = 100).items.map { it.toPost() }
-        }
-
-    override suspend fun updateLikeStatus(postId: String, likesCount: Int, isLiked: Boolean) {
-        database.postDao().updateLikeStatus(postId, likesCount, isLiked)
-    }
-
-    override suspend fun updateReportStatus(postId: String, isReported: Boolean) {
-        database.postDao().updateReportStatus(postId, isReported)
     }
 }

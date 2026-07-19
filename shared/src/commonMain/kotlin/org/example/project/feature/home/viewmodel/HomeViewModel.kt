@@ -1,7 +1,9 @@
+
 package org.example.project.feature.home.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import org.example.project.core.presentation.FeedRefreshReason
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
@@ -37,6 +39,7 @@ import org.example.project.core.model.auth.UserLocation
 import org.example.project.feature.home.CurrentLevelManager
 import kotlin.time.Clock
 
+@OptIn(FlowPreview::class)
 class HomeViewModel(
     private val feedRepository: FeedRepository,
     private val postRepository: PostRepository,
@@ -67,20 +70,27 @@ class HomeViewModel(
             ) { level, location ->
                 Pair(level, location)
             }.collect { (level, location) ->
-                feedRepository.start(level, location)
+                feedRepository.initializeFeedForLevel(level, location)
             }
         }
 
+        // PAGING PIPELINE STEP 4: VIEWMODEL DEBOUNCER
+        // This block handles search pagination logic efficiently.
+        // As the user types into the search bar, the UI updates `uiState.query`.
+        // To prevent spamming the network on every single keystroke, we apply a debounce of 300ms.
         viewModelScope.launch {
             combine(
                 currentLevelManager.currentLevel,
+                // Wait 300ms after the user stops typing. If the query is distinct, proceed.
                 _uiState.map { it.query }.debounce(300).distinctUntilChanged()
             ) { level, query ->
                 Pair(level, query)
             }.collect { (level, query) ->
                 if (query.isBlank()) {
+                    // Stop search pagination and clear the search state
                     feedRepository.clearSearch()
                 } else {
+                    // Trigger the first page of search results for the given query
                     feedRepository.startSearch(query, level)
                 }
             }
@@ -155,7 +165,7 @@ class HomeViewModel(
             }
             HomeIntent.LoadMorePosts -> feedRepository.loadMore()
             is HomeIntent.RefreshPosts,
-            HomeIntent.RefreshCurrentPosts -> feedRepository.refresh(org.example.project.core.presentation.FeedRefreshReason.PULL_TO_REFRESH)
+            HomeIntent.RefreshCurrentPosts -> feedRepository.refresh(FeedRefreshReason.PULL_TO_REFRESH)
             HomeIntent.RetryPosts -> feedRepository.retry()
             HomeIntent.LoadMoreSearchPosts -> feedRepository.loadMoreSearch()
             HomeIntent.RefreshSearchPosts -> feedRepository.refreshSearch()
@@ -277,7 +287,7 @@ class HomeViewModel(
     private suspend fun handleError(error: Throwable) {
         val message = error.message ?: "Something went wrong.\n\nPlease try again."
         updateState { it.copy(error = message) }
-        _sideEffects.send(HomeSideEffect.ShowError(message))
+        _sideEffects.send(HomeSideEffect.ShowDialog(message))
     }
 
     private fun showPostDetail(postId: String) {
@@ -325,7 +335,6 @@ data class HomeState(
 sealed interface HomeSideEffect {
     data object NavigateToCreatePost : HomeSideEffect
     data object NavigateToProfile : HomeSideEffect
-    data class ShowError(val message: String) : HomeSideEffect
     data class ShowDialog(val message: String) : HomeSideEffect
     data class SharePost(val text: String) : HomeSideEffect
 }

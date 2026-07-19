@@ -348,8 +348,7 @@ private struct EditProfileMainView: View {
                 router.goBack()
             case is EditProfileSideEffectShowCamera:
                 isCameraPresented = true
-            case let errorEffect as EditProfileSideEffectShowError:
-                AppDialogManager.shared.show(errorEffect.message)
+
             case let dialogEffect as EditProfileSideEffectShowDialog:
                 AppDialogManager.shared.show(dialogEffect.message)
             default: break

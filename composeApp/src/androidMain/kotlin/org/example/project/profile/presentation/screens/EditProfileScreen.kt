@@ -142,9 +142,7 @@ fun EditProfileScreen(
     LaunchedEffect(viewModel) {
         viewModel.sideEffects.collectLatest { effect ->
             when (effect) {
-                is EditProfileSideEffect.ShowError -> {
-                    errorDialogMessage = effect.message
-                }
+
                 is EditProfileSideEffect.ShowDialog -> {
                     errorDialogMessage = effect.message
                 }

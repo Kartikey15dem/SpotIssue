@@ -17,8 +17,8 @@ interface FeedRepository {
     val feedState: StateFlow<FeedState>
     val searchState: StateFlow<FeedState>
 
-    fun start(postLevel: PostLevel, userLocation: UserLocation)
-    fun stop()
+    fun initializeFeedForLevel(postLevel: PostLevel, userLocation: UserLocation)
+    fun stopFeedObservation()
     
     fun refresh(reason: FeedRefreshReason)
     fun retry()
@@ -31,9 +31,4 @@ interface FeedRepository {
     fun loadMoreSearch()
 
     fun observeActiveIssuesCount(postLevel: PostLevel): Flow<Int>
-    fun observePosts(postLevel: PostLevel): Flow<List<Post>>
-    suspend fun searchPosts(query: String, postLevel: PostLevel): DataState<List<Post>>
-
-    suspend fun updateLikeStatus(postId: String, likesCount: Int, isLiked: Boolean)
-    suspend fun updateReportStatus(postId: String, isReported: Boolean)
 }

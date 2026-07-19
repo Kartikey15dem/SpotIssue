@@ -1,6 +1,8 @@
+
 package org.example.project.home.presentation.screens
 
 import androidx.compose.foundation.layout.Column
+import org.example.project.core.window.FeedConfig
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,8 +16,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import org.example.project.core.components.InfiniteScrollHandler
 import org.example.project.core.components.PostCard
 import org.example.project.core.model.home.Post
+import org.example.project.core.presentation.FeedState
 import org.example.project.feature.home.viewmodel.HomeIntent
 import org.example.project.feature.home.viewmodel.HomeState
 import org.example.project.theme.IssueSpotTheme
@@ -23,7 +27,7 @@ import org.example.project.theme.IssueSpotTheme
 @Composable
 fun HomeFeed(
     listState: LazyListState,
-    feedState: org.example.project.core.presentation.FeedState,
+    feedState: FeedState,
     onIntent: (HomeIntent) -> Unit,
     feedUiState: FeedUiState,
     modifier: Modifier = Modifier,
@@ -36,22 +40,13 @@ fun HomeFeed(
         header()
         Spacer(Modifier.height(spacing.small))
         
-        
-        // Threshold check to load more
-        LaunchedEffect(listState) {
-            snapshotFlow {
-                listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
-            }
-            .distinctUntilChanged()
-            .collect { lastVisibleItem ->
-                if (lastVisibleItem != null) {
-                    val totalItems = listState.layoutInfo.totalItemsCount
-                    if (totalItems > 0 && lastVisibleItem >= totalItems - org.example.project.core.window.FeedConfig.LOAD_MORE_THRESHOLD) {
-                        onIntent(HomeIntent.LoadMorePosts)
-                    }
-                }
-            }
+        // PAGING PIPELINE STEP 5: UI SCROLL TRIGGER
+        // We use InfiniteScrollHandler to monitor how far down the user has scrolled.
+        // When they get near the bottom, it fires an intent to load the next page.
+        InfiniteScrollHandler(listState = listState) {
+            onIntent(HomeIntent.LoadMorePosts)
         }
+        
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth()
@@ -110,6 +105,9 @@ fun HomeFeed(
         }
 
         item {
+            // PAGING PIPELINE STEP 6: UI PAGINATION INDICATOR
+            // Renders a loading spinner or an error/retry button at the very bottom of the feed.
+            // Depends on `feedUiState.footerState` (which represents if we are appending items or failed to append).
             HomeFeedFooter(
                 state = feedUiState.footerState,
                 onRetry = { onIntent(HomeIntent.RetryPosts) }

@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import org.example.project.core.presentation.PaginationState
+import org.example.project.core.presentation.FeedError
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.example.project.core.network.services.PostService
@@ -108,7 +109,7 @@ class PostRepositoryImpl(
                 }
             } catch (e: Exception) {
                 mutex.withLock {
-                    state.update { it.copy(isLoading = false, error = org.example.project.core.presentation.FeedError.Unknown(e.message ?: "Failed to load comments")) }
+                    state.update { it.copy(isLoading = false, error = FeedError.Unknown(e.message ?: "Failed to load comments")) }
                 }
             }
         }
@@ -145,7 +146,7 @@ class PostRepositoryImpl(
                 }
             } catch (e: Exception) {
                 mutex.withLock {
-                    state.update { it.copy(isAppending = false, appendError = org.example.project.core.presentation.FeedError.Unknown(e.message ?: "Failed to load more comments")) }
+                    state.update { it.copy(isAppending = false, appendError = FeedError.Unknown(e.message ?: "Failed to load more comments")) }
                 }
             }
         }

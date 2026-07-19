@@ -6,7 +6,6 @@ import org.example.project.feature.auth.viewmodel.LocationFetchViewModel
 import org.example.project.feature.auth.viewmodel.NameCaptureViewModel
 import org.example.project.feature.createPost.viewmodel.CreatePostViewModel
 import org.example.project.feature.home.viewmodel.HomeViewModel
-import org.example.project.feature.home.viewmodel.PostDetailViewModel
 import org.example.project.feature.profile.viewmodel.EditProfileViewModel
 import org.example.project.feature.profile.viewmodel.ProfileViewModel
 import org.example.project.core.datastore.UserPreferencesRepository
@@ -27,9 +26,7 @@ object KoinHelper {
     fun getCreatePostViewModel(): CreatePostViewModel = getKoin().get()
     
     fun getHomeViewModel(): HomeViewModel = getKoin().get()
-    
-    fun getPostDetailViewModel(postId: String): PostDetailViewModel = getKoin().get { parametersOf(postId) }
-    
+
     fun getEditProfileViewModel(): EditProfileViewModel = getKoin().get()
     
     fun getProfileViewModel(): ProfileViewModel = getKoin().get()

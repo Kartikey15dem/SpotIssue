@@ -12,11 +12,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import org.example.project.core.components.InfiniteScrollHandler
 import org.example.project.core.components.PostCard
 import org.example.project.core.presentation.FeedState
-import org.example.project.feature.home.viewmodel.HomeIntent
 import org.example.project.theme.IssueSpotTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
+import org.example.project.core.window.FeedConfig
+import org.example.project.feature.home.viewmodel.HomeIntent
 
 @Composable
 fun HomeSearchFeed(
@@ -34,18 +36,8 @@ fun HomeSearchFeed(
     val appendError = searchState.appendError
     val showNoMorePosts = itemCount > 0 && !searchState.hasMore && appendError == null && !searchState.isAppending
 
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
-            .distinctUntilChanged()
-            .collect { lastVisibleItem ->
-                val totalItems = listState.layoutInfo.totalItemsCount
-                if (lastVisibleItem != null &&
-                    totalItems > 0 &&
-                    lastVisibleItem >= totalItems - org.example.project.core.window.FeedConfig.LOAD_MORE_THRESHOLD
-                ) {
-                    onIntent(HomeIntent.LoadMoreSearchPosts)
-                }
-            }
+    InfiniteScrollHandler(listState = listState) {
+        onIntent(HomeIntent.LoadMoreSearchPosts)
     }
 
     Column(modifier = modifier) {

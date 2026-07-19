@@ -8,13 +8,16 @@ import kotlinx.coroutines.flow.Flow
 import org.example.project.core.model.home.Comment
 import org.example.project.core.utils.DataState
 
+import kotlinx.coroutines.flow.StateFlow
+import org.example.project.core.presentation.PaginationState
+
 interface PostRepository {
     suspend fun likePost(postId: String): DataState<Unit>
     suspend fun reportPost(postId: String, reason: String?): DataState<Unit>
     suspend fun sharePost(postId: String): DataState<Unit>
     suspend fun getComments(postId: String, page: Int, limit: Int): DataState<PagedResponse<CommentDto>>
 
-    fun observeComments(postId: String): kotlinx.coroutines.flow.StateFlow<org.example.project.core.presentation.PaginationState<org.example.project.core.model.home.Comment>>
+    fun observeComments(postId: String): StateFlow<PaginationState<Comment>>
     fun startComments(postId: String)
     fun stopComments(postId: String)
     fun refreshComments(postId: String)

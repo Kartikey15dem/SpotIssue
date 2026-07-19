@@ -115,8 +115,7 @@ struct ProfileScreen: View {
                         shareContent(text: shareEffect.text)
                     case let dialogEffect as ProfileSideEffectShowDialog:
                         AppDialogManager.shared.show(dialogEffect.message)
-                    case let errorEffect as ProfileSideEffectShowError:
-                        AppDialogManager.shared.show(errorEffect.message)
+
                     default:
                         break
                     }

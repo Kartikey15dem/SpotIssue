@@ -46,15 +46,10 @@ fun CommentsBottomSheet(
     var commentText by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    LaunchedEffect(listState, comments) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
-            .collect { lastIndex ->
-                if (lastIndex != null && comments != null) {
-                    if (lastIndex >= comments.items.size - 3 && comments.hasMore && !comments.isAppending && !comments.isLoading) {
-                        onLoadMore()
-                    }
-                }
-            }
+    InfiniteScrollHandler(listState = listState, buffer = 3) {
+        if (comments != null && comments.hasMore && !comments.isAppending && !comments.isLoading) {
+            onLoadMore()
+        }
     }
 
     ModalBottomSheet(
@@ -117,7 +112,7 @@ fun CommentsBottomSheet(
                                     CircularProgressIndicator(color = IssueSpotColors.Primary)
                                 }
                             }
-                        } else if (!comments.isAppending && !comments.hasMore && comments.items.isNotEmpty()) {
+                        } else if (!comments.hasMore && comments.items.isNotEmpty()) {
                             item {
                                 Text(
                                     modifier = Modifier.fillMaxWidth().padding(8.dp),

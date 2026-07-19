@@ -8,6 +8,10 @@ import org.example.project.core.network.dto.PostWithProfileDto
 import org.example.project.core.utils.ApiEndPoints
 
 interface HomeService {
+    // The network call to fetch posts.
+    // 'page' parameter represents which page we want to fetch (starting from 0).
+    // 'limit' is the maximum number of items requested per page (e.g. 20).
+    // Returns a PagedResponse which tells us the next page key.
     @GET(ApiEndPoints.POSTS)
     suspend fun getPosts(
         @Query("level") level: String,
@@ -25,6 +29,8 @@ interface HomeService {
     suspend fun getActiveIssuesCount(
         @Query("level") level: String
     ): ActiveIssuesDto
+    // Similar to getPosts, this is a paginated search API.
+    // Relies on 'page' and 'limit' to return chunks of search results.
     @GET(ApiEndPoints.POSTS + "/search")
     suspend fun searchPosts(
         @Query("query") query: String,

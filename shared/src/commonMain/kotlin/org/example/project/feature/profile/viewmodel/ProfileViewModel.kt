@@ -294,7 +294,7 @@ class ProfileViewModel(
     private suspend fun handleError(error: Throwable) {
         val message = error.message ?: "Something went wrong.\n\nPlease try again."
         updateState { it.copy(error = message) }
-        _sideEffects.emit(ProfileSideEffect.ShowError(message))
+        _sideEffects.emit(ProfileSideEffect.ShowDialog(message))
     }
 }
 
@@ -335,7 +335,6 @@ sealed interface ProfileSideEffect {
     data object NavigateToCreatePost : ProfileSideEffect
     data object NavigateToEditProfile : ProfileSideEffect
     data class NavigateToPost(val postId: String) : ProfileSideEffect
-    data class ShowError(val message: String) : ProfileSideEffect
     data class ShowDialog(val message: String) : ProfileSideEffect
     data class SharePost(val text: String) : ProfileSideEffect
     data class OpenMediaViewer(val postId: String) : ProfileSideEffect

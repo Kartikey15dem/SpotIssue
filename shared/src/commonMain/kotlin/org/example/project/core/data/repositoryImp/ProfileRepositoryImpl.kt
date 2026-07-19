@@ -1,9 +1,12 @@
+
 package org.example.project.core.data.repositoryImp
 
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import org.example.project.core.database.entities.UserPostEntity
+import org.example.project.core.database.entities.LikedPostEntity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -342,7 +345,7 @@ class ProfileRepositoryImpl(
                 database.likedPostDao().observeNewest(key.sort, limit)
             }
         }
-        return flow.map { posts -> posts.map { if (it is org.example.project.core.database.entities.UserPostEntity) it.toPost() else (it as org.example.project.core.database.entities.LikedPostEntity).toPost() } }
+        return flow.map { posts -> posts.map { if (it is UserPostEntity) it.toPost() else (it as LikedPostEntity).toPost() } }
     }
 
     private suspend fun getCachedPostCount(key: ProfilePostsKey): Int {

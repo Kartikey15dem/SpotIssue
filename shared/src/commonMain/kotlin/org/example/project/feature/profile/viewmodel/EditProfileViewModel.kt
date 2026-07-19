@@ -79,7 +79,7 @@ class EditProfileViewModel(
         viewModelScope.launch {
             val newEmail = _uiState.value.newEmail
             if (newEmail.isBlank() || !isValidEmail(newEmail)) {
-                _sideEffects.send(EditProfileSideEffect.ShowError("Please enter a valid email"))
+                _sideEffects.send(EditProfileSideEffect.ShowDialog("Please enter a valid email"))
                 return@launch
             }
 
@@ -100,7 +100,7 @@ class EditProfileViewModel(
     private fun verifyEmailChange(otp: String) {
         viewModelScope.launch {
             if (otp.length != 6) {
-                _sideEffects.send(EditProfileSideEffect.ShowError("OTP must be 6 digits"))
+                _sideEffects.send(EditProfileSideEffect.ShowDialog("OTP must be 6 digits"))
                 return@launch
             }
 
@@ -205,7 +205,7 @@ class EditProfileViewModel(
 
             // Validation
             if (currentState.name.isBlank()) {
-                _sideEffects.send(EditProfileSideEffect.ShowError("Name cannot be empty\n\nPlease enter your name."))
+                _sideEffects.send(EditProfileSideEffect.ShowDialog("Name cannot be empty\n\nPlease enter your name."))
                 return@launch
             }
 
@@ -266,7 +266,7 @@ class EditProfileViewModel(
     private suspend fun handleError(error: Throwable) {
         val message = error.message ?: "Something went wrong.\n\nPlease try again."
         _uiState.update { it.copy(error = message) }
-        _sideEffects.send(EditProfileSideEffect.ShowError(message))
+        _sideEffects.send(EditProfileSideEffect.ShowDialog(message))
     }
 
 }
@@ -315,7 +315,6 @@ data class EditProfileState(
 )
 
 sealed interface EditProfileSideEffect {
-    data class ShowError(val message: String) : EditProfileSideEffect
     data class ShowDialog(val message: String) : EditProfileSideEffect
     data object ProfileSaved : EditProfileSideEffect
     data object BackPreseed : EditProfileSideEffect
