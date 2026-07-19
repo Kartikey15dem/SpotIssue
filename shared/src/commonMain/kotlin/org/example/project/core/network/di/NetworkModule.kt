@@ -12,40 +12,41 @@ import org.example.project.core.utils.BaseURL
 import org.example.project.core.utils.KtorInterceptor
 import org.koin.dsl.module
 
-val networkModule = module {
-    single<HttpClient> {
-        val preferencesRepository = get<UserPreferencesRepository>()
+val networkModule =
+    module {
+        single<HttpClient> {
+            val preferencesRepository = get<UserPreferencesRepository>()
 
-        ktorHttpClient.config {
+            ktorHttpClient.config {
 
-            install(KtorInterceptor) {
+                install(KtorInterceptor) {
 
-                getToken = { preferencesRepository.userData.value.token }
-                logout = { preferencesRepository.logOut() }
-
+                    getToken = { preferencesRepository.userData.value.token }
+                    logout = { preferencesRepository.logOut() }
+                }
             }
         }
-    }
 
-    single<KtorfitClient> {
-        KtorfitClient.builder()
-            .httpClient(get<HttpClient>())
-            .baseURL(BaseURL().url)
-            .build()
-    }
-    single<AuthenticationService> {
-        get<KtorfitClient>().authenticationApi
-    }
+        single<KtorfitClient> {
+            KtorfitClient
+                .builder()
+                .httpClient(get<HttpClient>())
+                .baseURL(BaseURL().url)
+                .build()
+        }
+        single<AuthenticationService> {
+            get<KtorfitClient>().authenticationApi
+        }
 
-    single<ProfileService> {
-        get<KtorfitClient>().profileApi
-    }
+        single<ProfileService> {
+            get<KtorfitClient>().profileApi
+        }
 
-    single<HomeService> {
-        get<KtorfitClient>().homeApi
-    }
+        single<HomeService> {
+            get<KtorfitClient>().homeApi
+        }
 
-    single<PostService> {
-        get<KtorfitClient>().postApi
+        single<PostService> {
+            get<KtorfitClient>().postApi
+        }
     }
-}

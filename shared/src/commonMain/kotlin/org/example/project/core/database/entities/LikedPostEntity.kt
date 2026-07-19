@@ -29,6 +29,5 @@ data class LikedPostEntity(
     val timeAgo: String,
     val createdAt: Long, // Timestamp for sorting
     val likedAt: Long = 0L, // When user liked it (set when inserting)
-    val cachedAt: Long = 0L // Set when inserting
+    val cachedAt: Long = 0L, // Set when inserting
 )
-

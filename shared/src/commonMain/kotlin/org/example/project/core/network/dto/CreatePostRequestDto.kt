@@ -22,5 +22,5 @@ data class CreatePostRequestDto(
     @SerialName("country")
     val country: String? = null,
     @SerialName("coordinates")
-    val coordinates: CoordinatesDto? = null
+    val coordinates: CoordinatesDto? = null,
 )

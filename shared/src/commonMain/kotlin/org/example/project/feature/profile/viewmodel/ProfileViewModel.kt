@@ -2,41 +2,34 @@ package org.example.project.feature.profile.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
+import org.example.project.core.data.mappers.Sort
 import org.example.project.core.data.repository.PostRepository
 import org.example.project.core.data.repository.ProfileRepository
-import org.example.project.core.data.mappers.Sort
+import org.example.project.core.model.home.Comment
+import org.example.project.core.model.home.Post
+import org.example.project.core.model.profile.Profile
 import org.example.project.core.presentation.FeedRefreshReason
 import org.example.project.core.presentation.FeedState
 import org.example.project.core.presentation.PaginationState
-import org.example.project.core.model.home.Post
-import org.example.project.core.model.home.Comment
-import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
 import kotlin.time.Clock
 
-
 class ProfileViewModel(
     private val profileRepository: ProfileRepository,
-    private val postRepository: PostRepository
+    private val postRepository: PostRepository,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(ProfileState())
     val uiState: StateFlow<ProfileState> = _uiState.asStateFlow()
 
@@ -45,7 +38,7 @@ class ProfileViewModel(
 
     private val _activeCommentsFlow = MutableStateFlow<StateFlow<PaginationState<Comment>>?>(null)
     val activeCommentsFlow: StateFlow<StateFlow<PaginationState<Comment>>?> = _activeCommentsFlow.asStateFlow()
-    
+
     private val _optimisticComments = MutableStateFlow<Map<String, List<Comment>>>(emptyMap())
 
     val profilePostsState: StateFlow<FeedState> = profileRepository.profilePostsState
@@ -73,10 +66,13 @@ class ProfileViewModel(
             profileRepository.observeProfile().collect { dataState ->
                 when (dataState) {
                     is DataState.Loading -> updateState { it.copy(isProfileLoading = true) }
-                    is DataState.Success -> updateState { it.copy(
-                        isProfileLoading = false,
-                        profile = dataState.data
-                    ) }
+                    is DataState.Success ->
+                        updateState {
+                            it.copy(
+                                isProfileLoading = false,
+                                profile = dataState.data,
+                            )
+                        }
                     is DataState.Error -> {
                         updateState { it.copy(isProfileLoading = false) }
                         handleError(dataState.exception)
@@ -128,7 +124,10 @@ class ProfileViewModel(
         }
     }
 
-    private fun report(postId: String, reason: String?) {
+    private fun report(
+        postId: String,
+        reason: String?,
+    ) {
         viewModelScope.launch {
             when (val result = postRepository.reportPost(postId, reason)) {
                 is DataState.Error -> handleError(result.exception)
@@ -140,20 +139,21 @@ class ProfileViewModel(
     private fun openComments(postId: String) {
         postRepository.startComments(postId)
         val repoFlow = postRepository.observeComments(postId)
-        
-        val combinedFlow = combine(repoFlow, _optimisticComments) { state, optimisticMap ->
-            val optimisticList = optimisticMap[postId] ?: emptyList()
-            if (optimisticList.isEmpty()) {
-                state
-            } else {
-                state.copy(items = optimisticList + state.items)
-            }
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = PaginationState()
-        )
-        
+
+        val combinedFlow =
+            combine(repoFlow, _optimisticComments) { state, optimisticMap ->
+                val optimisticList = optimisticMap[postId] ?: emptyList()
+                if (optimisticList.isEmpty()) {
+                    state
+                } else {
+                    state.copy(items = optimisticList + state.items)
+                }
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = PaginationState(),
+            )
+
         _activeCommentsFlow.value = combinedFlow
         updateState { it.copy(showCommentsSheetForPostId = postId) }
     }
@@ -167,17 +167,21 @@ class ProfileViewModel(
         updateState { it.copy(showCommentsSheetForPostId = null) }
     }
 
-    private fun comment(postId: String, commentText: String) {
+    private fun comment(
+        postId: String,
+        commentText: String,
+    ) {
         val tempId = "temp_${Clock.System.now().toEpochMilliseconds()}"
-        val newComment = Comment(
-            id = tempId,
-            postId = postId,
-            text = commentText,
-            timeAgo = "Just now",
-            userName = "You",
-            userImageUrl = _uiState.value.profile?.imageUrl
-        )
-        
+        val newComment =
+            Comment(
+                id = tempId,
+                postId = postId,
+                text = commentText,
+                timeAgo = "Just now",
+                userName = "You",
+                userImageUrl = _uiState.value.profile?.imageUrl,
+            )
+
         _optimisticComments.update { map ->
             val list = map[postId] ?: emptyList()
             map + (postId to (listOf(newComment) + list))
@@ -208,8 +212,6 @@ class ProfileViewModel(
         }
     }
 
-
-
     private fun navigateToCreatePost() {
         viewModelScope.launch {
             _sideEffects.emit(ProfileSideEffect.NavigateToCreatePost)
@@ -227,7 +229,6 @@ class ProfileViewModel(
             _sideEffects.emit(ProfileSideEffect.NavigateToPost(postId))
         }
     }
-
 
     private fun showPostDetail(post: Post) {
         updateState { it.copy(expandedPost = post) }
@@ -271,16 +272,28 @@ class ProfileViewModel(
     }
 
     fun selectMine(isMine: Boolean) = onIntent(ProfileIntent.TabChanged(isMine))
+
     fun selectSort(sort: Sort) = onIntent(ProfileIntent.SortChanged(sort))
+
     fun openCreatePost() = onIntent(ProfileIntent.CreatePostClicked)
+
     fun openEditProfile() = onIntent(ProfileIntent.EditProfileClicked)
+
     fun openPost(post: Post) = onIntent(ProfileIntent.PostClicked(post))
+
     fun closePost() = onIntent(ProfileIntent.DismissPost)
+
     fun likePost(post: Post) = onIntent(ProfileIntent.LikeClicked(post.id))
+
     fun openComments(post: Post) = onIntent(ProfileIntent.CommentsIconClicked(post.id))
+
     fun closeComments() = onIntent(ProfileIntent.DismissCommentsSheet)
-    fun submitComment(postId: String, text: String) =
-        onIntent(ProfileIntent.CommentSubmitted(postId, text))
+
+    fun submitComment(
+        postId: String,
+        text: String,
+    ) = onIntent(ProfileIntent.CommentSubmitted(postId, text))
+
     fun sharePost(post: Post) = onIntent(ProfileIntent.ShareClicked(post))
 
     private fun clearError() {
@@ -300,23 +313,63 @@ class ProfileViewModel(
 
 sealed interface ProfileIntent {
     data object CreatePostClicked : ProfileIntent
+
     data object EditProfileClicked : ProfileIntent
-    data class TabChanged(val isMine: Boolean) : ProfileIntent
-    data class SortChanged(val sort: Sort) : ProfileIntent
-    data class DeletePostClicked(val postId: String) : ProfileIntent
-    data class LikeClicked(val postId: String) : ProfileIntent
-    data class CommentsIconClicked(val postId: String) : ProfileIntent
+
+    data class TabChanged(
+        val isMine: Boolean,
+    ) : ProfileIntent
+
+    data class SortChanged(
+        val sort: Sort,
+    ) : ProfileIntent
+
+    data class DeletePostClicked(
+        val postId: String,
+    ) : ProfileIntent
+
+    data class LikeClicked(
+        val postId: String,
+    ) : ProfileIntent
+
+    data class CommentsIconClicked(
+        val postId: String,
+    ) : ProfileIntent
+
     data object DismissCommentsSheet : ProfileIntent
-    data class CommentSubmitted(val postId: String, val commentText: String) : ProfileIntent
-    data class ShareClicked(val post: Post) : ProfileIntent
-    data class ReportClicked(val postId: String, val reason: String?) : ProfileIntent
-    data class PostClicked(val post: Post) : ProfileIntent
+
+    data class CommentSubmitted(
+        val postId: String,
+        val commentText: String,
+    ) : ProfileIntent
+
+    data class ShareClicked(
+        val post: Post,
+    ) : ProfileIntent
+
+    data class ReportClicked(
+        val postId: String,
+        val reason: String?,
+    ) : ProfileIntent
+
+    data class PostClicked(
+        val post: Post,
+    ) : ProfileIntent
+
     data object DismissPost : ProfileIntent
+
     data object ErrorShown : ProfileIntent
+
     data object RetryProfileClicked : ProfileIntent
-    data class ShowRefreshErrorDialog(val message: String) : ProfileIntent
+
+    data class ShowRefreshErrorDialog(
+        val message: String,
+    ) : ProfileIntent
+
     data object LoadMorePosts : ProfileIntent
+
     data object RefreshPosts : ProfileIntent
+
     data object RetryPosts : ProfileIntent
 }
 
@@ -328,14 +381,27 @@ data class ProfileState(
     val error: String? = null,
     val profileError: String? = null,
     val showCommentsSheetForPostId: String? = null,
-    val expandedPost: Post? = null
+    val expandedPost: Post? = null,
 )
 
 sealed interface ProfileSideEffect {
     data object NavigateToCreatePost : ProfileSideEffect
+
     data object NavigateToEditProfile : ProfileSideEffect
-    data class NavigateToPost(val postId: String) : ProfileSideEffect
-    data class ShowDialog(val message: String) : ProfileSideEffect
-    data class SharePost(val text: String) : ProfileSideEffect
-    data class OpenMediaViewer(val postId: String) : ProfileSideEffect
+
+    data class NavigateToPost(
+        val postId: String,
+    ) : ProfileSideEffect
+
+    data class ShowDialog(
+        val message: String,
+    ) : ProfileSideEffect
+
+    data class SharePost(
+        val text: String,
+    ) : ProfileSideEffect
+
+    data class OpenMediaViewer(
+        val postId: String,
+    ) : ProfileSideEffect
 }

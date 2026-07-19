@@ -10,28 +10,39 @@ import org.example.project.core.database.entities.UserPostEntity
 
 @Dao
 interface UserPostDao {
-
     @Upsert
     suspend fun upsertPost(post: UserPostEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPosts(posts: List<UserPostEntity>)
 
-    @Query("""SELECT * FROM user_posts ORDER BY 
+    @Query(
+        """SELECT * FROM user_posts ORDER BY 
         CASE WHEN :sort = 'latest' THEN createdAt END DESC,
         CASE WHEN :sort = 'oldest' THEN createdAt END ASC,
         CASE WHEN :sort = 'popular' THEN likes END DESC,
-        cachedAt DESC LIMIT :limit""")
-    fun observeNewest(sort: String, limit: Int): Flow<List<UserPostEntity>>
+        cachedAt DESC LIMIT :limit""",
+    )
+    fun observeNewest(
+        sort: String,
+        limit: Int,
+    ): Flow<List<UserPostEntity>>
 
-    @Query("""SELECT * FROM user_posts 
+    @Query(
+        """SELECT * FROM user_posts 
         WHERE (cachedAt < :anchorCachedAt OR (cachedAt = :anchorCachedAt AND id < :anchorId)) 
         ORDER BY 
         CASE WHEN :sort = 'latest' THEN createdAt END DESC,
         CASE WHEN :sort = 'oldest' THEN createdAt END ASC,
         CASE WHEN :sort = 'popular' THEN likes END DESC,
-        cachedAt DESC LIMIT :limit""")
-    fun observeAfterAnchor(sort: String, anchorCachedAt: Long, anchorId: String, limit: Int): Flow<List<UserPostEntity>>
+        cachedAt DESC LIMIT :limit""",
+    )
+    fun observeAfterAnchor(
+        sort: String,
+        anchorCachedAt: Long,
+        anchorId: String,
+        limit: Int,
+    ): Flow<List<UserPostEntity>>
 
     @Query("SELECT MIN(cachedAt) FROM user_posts")
     suspend fun getMinCachedAt(): Long?
@@ -55,16 +66,30 @@ interface UserPostDao {
     suspend fun trimUserPosts(maxPosts: Int)
 
     @Query("UPDATE user_posts SET likes = :likes, isLiked = :isLiked WHERE id = :postId")
-    suspend fun updatePostLikeStatus(postId: String, likes: Int, isLiked: Boolean)
+    suspend fun updatePostLikeStatus(
+        postId: String,
+        likes: Int,
+        isLiked: Boolean,
+    )
 
     @Query("UPDATE user_posts SET comments = :commentsCount WHERE id = :postId")
-    suspend fun updateCommentsCount(postId: String, commentsCount: Int)
+    suspend fun updateCommentsCount(
+        postId: String,
+        commentsCount: Int,
+    )
 
     @Query("UPDATE user_posts SET isReported = :isReported WHERE id = :postId")
-    suspend fun updateReportStatus(postId: String, isReported: Boolean)
+    suspend fun updateReportStatus(
+        postId: String,
+        isReported: Boolean,
+    )
 
     @Query("UPDATE user_posts SET userName = :name, userAvatar = :avatar WHERE userId = :ownerId")
-    suspend fun updateUserInfo(ownerId: String, name: String, avatar: String?)
+    suspend fun updateUserInfo(
+        ownerId: String,
+        name: String,
+        avatar: String?,
+    )
 
     @Query("SELECT COUNT(*) FROM user_posts")
     suspend fun getUserPostCount(): Int

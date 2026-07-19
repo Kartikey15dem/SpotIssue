@@ -32,4 +32,3 @@ interface CacheMetadataDao {
     @Query("DELETE FROM cache_metadata")
     suspend fun clearAll()
 }
-

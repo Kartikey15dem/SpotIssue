@@ -25,14 +25,15 @@ import org.example.project.theme.IssueSpotTypography
 fun HomeFeedFooter(
     state: FooterState,
     onRetry: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val spacing = IssueSpotTheme.spacing
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = 72.dp),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 72.dp),
+        contentAlignment = Alignment.Center,
     ) {
         when (state) {
             is FooterState.Loading -> {
@@ -40,24 +41,26 @@ fun HomeFeedFooter(
             }
             is FooterState.Error -> {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(spacing.medium),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(spacing.medium),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Center,
                 ) {
                     Text(
                         text = state.throwable.message ?: "An error occurred",
                         color = IssueSpotColors.OnBackground,
-                        style = IssueSpotTypography.bodyMedium
+                        style = IssueSpotTypography.bodyMedium,
                     )
                     Spacer(Modifier.height(spacing.small))
                     Button(
                         onClick = onRetry,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = IssueSpotColors.Primary,
-                            contentColor = IssueSpotColors.OnPrimary
-                        )
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = IssueSpotColors.Primary,
+                                contentColor = IssueSpotColors.OnPrimary,
+                            ),
                     ) {
                         Text("Retry")
                     }
@@ -65,13 +68,14 @@ fun HomeFeedFooter(
             }
             is FooterState.EndReached -> {
                 Text(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(spacing.medium),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(spacing.medium),
                     text = "No more posts",
                     color = IssueSpotColors.OnBackground,
                     style = IssueSpotTypography.bodyMedium,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
             }
             is FooterState.Hidden -> {

@@ -21,13 +21,12 @@ fun App() {
 
         val userData by userPreferences.userData.collectAsState()
 
-        val start =  if (userData.isLoggedIn) Route.LocationFetch else Route.Auth
+        val start = if (userData.isLoggedIn) Route.LocationFetch else Route.Auth
 
         OverlayProvider {
             NavigationRoot(
-                start = start
+                start = start,
             )
         }
     }
-
 }

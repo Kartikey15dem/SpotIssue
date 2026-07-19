@@ -13,31 +13,33 @@ import kotlinx.serialization.json.Json
 import co.touchlab.kermit.Logger.Companion as KermitLogger
 
 actual val ktorHttpClient: HttpClient
-    get() = HttpClient(OkHttp) {
-        expectSuccess = true
-        install(HttpTimeout) {
-            socketTimeoutMillis = 60_000
-            requestTimeoutMillis = 60_000
-        }
+    get() =
+        HttpClient(OkHttp) {
+            expectSuccess = true
+            install(HttpTimeout) {
+                socketTimeoutMillis = 60_000
+                requestTimeoutMillis = 60_000
+            }
 
-        install(Logging) {
-            logger = Logger.DEFAULT
-            level = LogLevel.ALL
-            logger = object : Logger {
-                override fun log(message: String) {
-                    KermitLogger.d(tag = "KtorClient", messageString = message)
-                }
+            install(Logging) {
+                logger = Logger.DEFAULT
+                level = LogLevel.ALL
+                logger =
+                    object : Logger {
+                        override fun log(message: String) {
+                            KermitLogger.d(tag = "KtorClient", messageString = message)
+                        }
+                    }
+            }
+
+            install(ContentNegotiation) {
+                json(
+                    Json {
+                        prettyPrint = true
+                        isLenient = true
+                        ignoreUnknownKeys = true
+                        explicitNulls = false
+                    },
+                )
             }
         }
-
-        install(ContentNegotiation) {
-            json(
-                Json {
-                    prettyPrint = true
-                    isLenient = true
-                    ignoreUnknownKeys = true
-                    explicitNulls = false
-                },
-            )
-        }
-    }

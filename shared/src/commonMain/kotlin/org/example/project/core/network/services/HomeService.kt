@@ -2,8 +2,8 @@ package org.example.project.core.network.services
 
 import de.jensklingenberg.ktorfit.http.GET
 import de.jensklingenberg.ktorfit.http.Query
-import org.example.project.core.network.dto.PagedResponse
 import org.example.project.core.network.dto.ActiveIssuesDto
+import org.example.project.core.network.dto.PagedResponse
 import org.example.project.core.network.dto.PostWithProfileDto
 import org.example.project.core.utils.ApiEndPoints
 
@@ -22,13 +22,14 @@ interface HomeService {
         @Query("lat") lat: Double? = null,
         @Query("lon") lon: Double? = null,
         @Query("page") page: Int,
-        @Query("limit") limit: Int
+        @Query("limit") limit: Int,
     ): PagedResponse<PostWithProfileDto>
 
     @GET(ApiEndPoints.ACTIVE_ISSUES)
     suspend fun getActiveIssuesCount(
-        @Query("level") level: String
+        @Query("level") level: String,
     ): ActiveIssuesDto
+
     // Similar to getPosts, this is a paginated search API.
     // Relies on 'page' and 'limit' to return chunks of search results.
     @GET(ApiEndPoints.POSTS + "/search")
@@ -36,6 +37,6 @@ interface HomeService {
         @Query("query") query: String,
         @Query("level") level: String,
         @Query("page") page: Int,
-        @Query("limit") limit: Int
+        @Query("limit") limit: Int,
     ): PagedResponse<PostWithProfileDto>
 }

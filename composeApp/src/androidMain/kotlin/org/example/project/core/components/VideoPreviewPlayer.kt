@@ -4,6 +4,7 @@ import android.net.Uri
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -30,7 +31,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import org.example.project.R
-import androidx.compose.animation.AnimatedVisibility
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -49,52 +49,55 @@ fun VideoPreviewPlayer(
     var showPlayButton by remember { mutableStateOf(true) }
 
     // --- ExoPlayer Init ---
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(Uri.parse(videoUri)))
-            prepare()
-            playWhenReady = false
-            // repeatMode = Player.REPEAT_MODE_ONE // Optional: Uncomment if you want auto-looping
-            volume = 1f
+    val exoPlayer =
+        remember {
+            ExoPlayer.Builder(context).build().apply {
+                setMediaItem(MediaItem.fromUri(Uri.parse(videoUri)))
+                prepare()
+                playWhenReady = false
+                // repeatMode = Player.REPEAT_MODE_ONE // Optional: Uncomment if you want auto-looping
+                volume = 1f
 
-            addListener(object : Player.Listener {
-                override fun onVideoSizeChanged(videoSize: VideoSize) {
-                    if (videoSize.height > 0) {
-                        // Calculate ratio
-                        var videoRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
-                        if(videoRatio < 1f) videoRatio = 1f
-                        onAspectRatioAvailable(videoRatio)
-
-                    }
-                }
-            })
+                addListener(
+                    object : Player.Listener {
+                        override fun onVideoSizeChanged(videoSize: VideoSize) {
+                            if (videoSize.height > 0) {
+                                // Calculate ratio
+                                var videoRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
+                                if (videoRatio < 1f) videoRatio = 1f
+                                onAspectRatioAvailable(videoRatio)
+                            }
+                        }
+                    },
+                )
+            }
         }
-    }
 
     // --- Sync State with Player ---
     DisposableEffect(exoPlayer) {
-        val listener = object : Player.Listener {
-            // This is the CRITICAL fix. It triggers whenever the player actually starts/stops.
-            override fun onIsPlayingChanged(playing: Boolean) {
-                isPlaying = playing
-                // If it starts playing, auto-hide the button (optional)
-                if (playing) {
-                    showPlayButton = false
+        val listener =
+            object : Player.Listener {
+                // This is the CRITICAL fix. It triggers whenever the player actually starts/stops.
+                override fun onIsPlayingChanged(playing: Boolean) {
+                    isPlaying = playing
+                    // If it starts playing, auto-hide the button (optional)
+                    if (playing) {
+                        showPlayButton = false
+                    }
+                }
+
+                // Handle when video finishes naturally
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_ENDED) {
+                        isPlaying = false
+                        showPlayButton = true // Show the play button so user can restart
+                    }
+                }
+
+                override fun onVolumeChanged(volume: Float) {
+                    isMuted = volume == 0f
                 }
             }
-
-            // Handle when video finishes naturally
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) {
-                    isPlaying = false
-                    showPlayButton = true // Show the play button so user can restart
-                }
-            }
-
-            override fun onVolumeChanged(volume: Float) {
-                isMuted = volume == 0f
-            }
-        }
         exoPlayer.addListener(listener)
         onDispose {
             exoPlayer.removeListener(listener)
@@ -103,16 +106,17 @@ fun VideoPreviewPlayer(
     }
 
     Box(
-        modifier = modifier
-            .background(Color.Black)
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                // Toggle the center button visibility
-                showPlayButton = !showPlayButton
-            }
+        modifier =
+            modifier
+                .background(Color.Black)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) {
+                    // Toggle the center button visibility
+                    showPlayButton = !showPlayButton
+                },
     ) {
         // --- Video Layer ---
         AndroidView(
@@ -121,13 +125,14 @@ fun VideoPreviewPlayer(
                     player = exoPlayer
                     useController = false
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT // Fills the card
-                    layoutParams = FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
+                    layoutParams =
+                        FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                        )
                 }
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         )
 
         // --- Center Play/Pause Button ---
@@ -135,7 +140,7 @@ fun VideoPreviewPlayer(
             visible = showPlayButton,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.Center)
+            modifier = Modifier.align(Alignment.Center),
         ) {
             IconButton(
                 onClick = {
@@ -150,60 +155,66 @@ fun VideoPreviewPlayer(
                         exoPlayer.play()
                     }
                 },
-                modifier = Modifier
-                    .size(64.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                modifier =
+                    Modifier
+                        .size(64.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape),
             ) {
                 Icon(
-                    painter = painterResource(
-                        id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
-                    ),
+                    painter =
+                        painterResource(
+                            id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
+                        ),
                     contentDescription = "Toggle Play",
                     tint = Color.White,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(32.dp),
                 )
             }
         }
 
         // --- Bottom Controls (Mute + Fullscreen) ---
         Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(8.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(
                 onClick = {
                     isMuted = !isMuted
                     exoPlayer.volume = if (isMuted) 0f else 1f
                 },
-                modifier = Modifier
-                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                    .size(40.dp)
+                modifier =
+                    Modifier
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        .size(40.dp),
             ) {
                 Icon(
-                    painter = painterResource(
-                        id = if (isMuted) R.drawable.ic_volume_off else R.drawable.ic_volume_up
-                    ),
+                    painter =
+                        painterResource(
+                            id = if (isMuted) R.drawable.ic_volume_off else R.drawable.ic_volume_up,
+                        ),
                     contentDescription = "Mute",
                     tint = Color.White,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
                 )
             }
 
             IconButton(
                 onClick = onFullscreenClick,
-                modifier = Modifier
-                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                    .size(40.dp)
+                modifier =
+                    Modifier
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        .size(40.dp),
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_fullscreen),
                     contentDescription = "Fullscreen",
                     tint = Color.White,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
                 )
             }
         }

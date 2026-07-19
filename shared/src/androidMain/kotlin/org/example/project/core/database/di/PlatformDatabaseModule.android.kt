@@ -10,16 +10,16 @@ import org.koin.dsl.module
 import kotlin.coroutines.CoroutineContext
 import kotlin.jvm.java
 
-actual val platformDatabaseModule: Module = module{
-    single<IssueSpotDatabase> {
-        val ioContext: CoroutineContext = Dispatchers.IO
+actual val platformDatabaseModule: Module =
+    module {
+        single<IssueSpotDatabase> {
+            val ioContext: CoroutineContext = Dispatchers.IO
 
-        AppDatabaseFactory(androidApplication())
-            .createDatabase(IssueSpotDatabase::class.java, "issuespot.db")
-            .fallbackToDestructiveMigration(true)
-            .setDriver(BundledSQLiteDriver())
-            .setQueryCoroutineContext(ioContext)
-            .build()
+            AppDatabaseFactory(androidApplication())
+                .createDatabase(IssueSpotDatabase::class.java, "issuespot.db")
+                .fallbackToDestructiveMigration(true)
+                .setDriver(BundledSQLiteDriver())
+                .setQueryCoroutineContext(ioContext)
+                .build()
+        }
     }
-
-}

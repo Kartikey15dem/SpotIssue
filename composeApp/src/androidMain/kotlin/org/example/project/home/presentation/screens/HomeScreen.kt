@@ -25,24 +25,23 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import org.example.project.core.components.AppErrorDialog
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.collectLatest
 import org.example.project.R
+import org.example.project.core.components.AppErrorDialog
 import org.example.project.core.components.CommentsBottomSheet
 import org.example.project.core.components.PostCard
 import org.example.project.core.components.PostLevelChip
@@ -59,25 +58,38 @@ import org.example.project.theme.IssueSpotTheme
 import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
 
+/**
+ * HomeScreen
+ *
+ * This is the root Compose screen for the primary Feed UI.
+ *
+ * Architecture Highlights:
+ * - Employs MVI (Model-View-Intent) pattern. The screen collects [HomeState] and 
+ *   dispatches [HomeIntent]s to the ViewModel.
+ * - Side-effects (Navigation, Dialogs, Shares) are collected safely in a LaunchedEffect,
+ *   preventing repeated executions during recompositions.
+ * - Renders specific UI states (Loading, Empty, Offline, Error) intelligently based on
+ *   the offline-first database state using [rememberFeedUiState].
+ */
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
     onNavigateToCreatePost: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
     onExpandedPostChange: (Boolean) -> Unit = {},
-    viewModel: HomeViewModel = koinViewModel()
+    viewModel: HomeViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val currentLevel by viewModel.currentLevel.collectAsStateWithLifecycle()
     val activeIssues by viewModel.activeIssues.collectAsStateWithLifecycle()
     val expandedPost by viewModel.expandedPost.collectAsStateWithLifecycle()
-    
+
     val feedState by viewModel.feedState.collectAsStateWithLifecycle()
     val searchState by viewModel.searchState.collectAsStateWithLifecycle()
-    
+
     val activeCommentsFlow by viewModel.activeCommentsFlow.collectAsStateWithLifecycle()
     val activePostId = state.showCommentsSheetForPostId
-    
+
     var errorDialogMessage by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
@@ -96,11 +108,12 @@ fun HomeScreen(
                     errorDialogMessage = effect.message
                 }
                 is HomeSideEffect.SharePost -> {
-                    val sendIntent = Intent().apply {
-                        action = Intent.ACTION_SEND
-                        putExtra(Intent.EXTRA_TEXT, effect.text)
-                        type = "text/plain"
-                    }
+                    val sendIntent =
+                        Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_TEXT, effect.text)
+                            type = "text/plain"
+                        }
                     val shareIntent = Intent.createChooser(sendIntent, "Share Issue via...")
                     context.startActivity(shareIntent)
                 }
@@ -108,16 +121,15 @@ fun HomeScreen(
         }
     }
 
-    
     errorDialogMessage?.let { message ->
         AppErrorDialog(
             message = message,
-            onDismiss = { errorDialogMessage = null }
+            onDismiss = { errorDialogMessage = null },
         )
     }
 
     Scaffold(
-        containerColor = IssueSpotColors.Background
+        containerColor = IssueSpotColors.Background,
     ) { padding ->
         HomeContent(
             modifier = modifier.padding(padding),
@@ -134,7 +146,7 @@ fun HomeScreen(
     val currentCommentsFlow = activeCommentsFlow
     if (activePostId != null && currentCommentsFlow != null) {
         val commentsState by currentCommentsFlow.collectAsState()
-        
+
         CommentsBottomSheet(
             comments = commentsState,
             onLoadMore = { viewModel.loadMoreComments(activePostId) },
@@ -143,11 +155,11 @@ fun HomeScreen(
                 viewModel.onIntent(
                     HomeIntent.CommentSubmitted(
                         postId = activePostId,
-                        commentText = text
-                    )
+                        commentText = text,
+                    ),
                 )
             },
-            currentUserImageUrl = state.currentUserImage
+            currentUserImageUrl = state.currentUserImage,
         )
     }
 }
@@ -160,32 +172,31 @@ data class FeedUiState(
     val showInitialError: Boolean,
     val footerState: FooterState,
     val refreshError: Throwable?,
-    val isPullRefreshing: Boolean
+    val isPullRefreshing: Boolean,
 )
 
 @Composable
-fun rememberFeedUiState(
-    feedState: FeedState,
-): FeedUiState {
+fun rememberFeedUiState(feedState: FeedState): FeedUiState {
     val itemCount = feedState.posts.size
     val showInitialLoading = itemCount == 0 && feedState.isLoading
     val showInitialError = itemCount == 0 && feedState.error != null && !feedState.isLoading
     val showEmptyFeed = itemCount == 0 && !feedState.isLoading && feedState.error == null && !feedState.isRefreshing
     val showFeed = itemCount > 0
-    
+
     val isPullRefreshing = feedState.isRefreshing && itemCount > 0
 
     val appendError = feedState.appendError
     val shouldShowFooter = itemCount > 0 && !feedState.isRefreshing
     val showNoMorePosts = shouldShowFooter && !feedState.hasMore && appendError == null && !feedState.isAppending
 
-    val footerState = when {
-        !shouldShowFooter -> FooterState.Hidden
-        feedState.isAppending -> FooterState.Loading
-        appendError != null -> FooterState.Error(Throwable(appendError.message))
-        showNoMorePosts -> FooterState.EndReached
-        else -> FooterState.Hidden
-    }
+    val footerState =
+        when {
+            !shouldShowFooter -> FooterState.Hidden
+            feedState.isAppending -> FooterState.Loading
+            appendError != null -> FooterState.Error(Throwable(appendError.message))
+            showNoMorePosts -> FooterState.EndReached
+            else -> FooterState.Hidden
+        }
 
     return FeedUiState(
         showInitialLoading = showInitialLoading,
@@ -194,7 +205,7 @@ fun rememberFeedUiState(
         showInitialError = showInitialError,
         footerState = footerState,
         refreshError = if (feedState.error != null) Throwable(feedState.error?.message) else null,
-        isPullRefreshing = isPullRefreshing
+        isPullRefreshing = isPullRefreshing,
     )
 }
 
@@ -214,13 +225,14 @@ fun HomeContent(
     val stateState = rememberLazyListState()
     val nationalState = rememberLazyListState()
 
-    val listState = when (currentLevel) {
-        PostLevel.LOCALITY -> localityState
-        PostLevel.DISTRICT -> districtState
-        PostLevel.STATE -> stateState
-        PostLevel.NATIONAL -> nationalState
-    }
-    
+    val listState =
+        when (currentLevel) {
+            PostLevel.LOCALITY -> localityState
+            PostLevel.DISTRICT -> districtState
+            PostLevel.STATE -> stateState
+            PostLevel.NATIONAL -> nationalState
+        }
+
     val feedUiState = rememberFeedUiState(feedState)
 
     LaunchedEffect(feedUiState.refreshError) {
@@ -229,14 +241,13 @@ fun HomeContent(
         }
     }
 
-
     HomePullRefresh(
         isRefreshing = feedUiState.isPullRefreshing,
         onRefresh = { onIntent(HomeIntent.RefreshPosts()) },
-        modifier = modifier
+        modifier = modifier,
     ) {
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         ) {
             if (feedState.isOffline) {
                 HomeOfflineBanner()
@@ -264,24 +275,23 @@ fun HomeContent(
                         onIntent(HomeIntent.ReportClicked(expandedPost.id, reason))
                     },
                     onCollapseClick = { onIntent(HomeIntent.DismissPost) },
-                    isDetailMode = true
+                    isDetailMode = true,
                 )
-
             } else {
                 HomeHeader(
                     modifier = Modifier.fillMaxWidth(),
                     state = state,
                     currentLevel = currentLevel,
                     activeIssues = activeIssues,
-                    onIntent = onIntent
+                    onIntent = onIntent,
                 )
-                
+
                 if (state.query.isNotBlank()) {
                     HomeSearchFeed(
                         searchState = searchState,
                         onIntent = onIntent,
                         modifier = Modifier.fillMaxSize(),
-                        header = {}
+                        header = {},
                     )
                 } else {
                     HomeFeed(
@@ -290,7 +300,7 @@ fun HomeContent(
                         onIntent = onIntent,
                         feedUiState = feedUiState,
                         modifier = Modifier.fillMaxSize(),
-                        header = {}
+                        header = {},
                     )
                 }
             }
@@ -310,13 +320,14 @@ fun HomeHeader(
     val shapes = MaterialTheme.shapes
 
     Column(
-        modifier = modifier
-            .background(IssueSpotColors.Surface)
-            .padding(horizontal = spacing.smallMedium, vertical = spacing.small)
+        modifier =
+            modifier
+                .background(IssueSpotColors.Surface)
+                .padding(horizontal = spacing.smallMedium, vertical = spacing.small),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             OutlinedTextField(
                 value = state.query,
@@ -325,39 +336,42 @@ fun HomeHeader(
                     Text(
                         text = "Search issues, users, location",
                         style = IssueSpotTypography.bodyLarge,
-                        color = IssueSpotColors.OnSurfaceVariant
+                        color = IssueSpotColors.OnSurfaceVariant,
                     )
                 },
                 leadingIcon = {
                     Icon(
                         painter = painterResource(R.drawable.ic_search),
                         contentDescription = "Search",
-                        tint = IssueSpotColors.OnSurfaceVariant
+                        tint = IssueSpotColors.OnSurfaceVariant,
                     )
                 },
                 singleLine = true,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .height(48.dp),
                 shape = shapes.medium,
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = IssueSpotColors.SurfaceVariant,
-                    focusedContainerColor = IssueSpotColors.SurfaceVariant,
-                    unfocusedBorderColor = IssueSpotColors.SurfaceVariant,
-                    focusedBorderColor = IssueSpotColors.SurfaceVariant,
-                    unfocusedTextColor = IssueSpotColors.OnSurface,
-                    focusedTextColor = IssueSpotColors.OnSurface,
-                )
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = IssueSpotColors.SurfaceVariant,
+                        focusedContainerColor = IssueSpotColors.SurfaceVariant,
+                        unfocusedBorderColor = IssueSpotColors.SurfaceVariant,
+                        focusedBorderColor = IssueSpotColors.SurfaceVariant,
+                        unfocusedTextColor = IssueSpotColors.OnSurface,
+                        focusedTextColor = IssueSpotColors.OnSurface,
+                    ),
             )
 
             Spacer(Modifier.width(spacing.small))
 
             Button(
                 onClick = { onIntent(HomeIntent.CreatePostClicked) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = IssueSpotColors.PostButtonBackground,
-                    contentColor = IssueSpotColors.PostButtonText
-                ),
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = IssueSpotColors.PostButtonBackground,
+                        contentColor = IssueSpotColors.PostButtonText,
+                    ),
                 shape = shapes.medium,
                 modifier = Modifier.defaultMinSize(minWidth = 0.dp),
                 contentPadding = PaddingValues(horizontal = spacing.smallMedium, vertical = spacing.extraSmall),
@@ -365,7 +379,7 @@ fun HomeHeader(
                 Icon(
                     painter = painterResource(R.drawable.ic_add),
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(spacing.small))
                 Text("Post", style = IssueSpotTypography.bodyLarge)
@@ -377,7 +391,7 @@ fun HomeHeader(
                 Icon(
                     painter = painterResource(R.drawable.ic_person),
                     contentDescription = "Profile",
-                    tint = IssueSpotColors.OnSurface
+                    tint = IssueSpotColors.OnSurface,
                 )
             }
         }
@@ -393,7 +407,7 @@ fun HomeHeader(
                 Text(
                     text = "$activeIssues active issues",
                     style = IssueSpotTypography.bodyLarge,
-                    color = IssueSpotColors.OnSurfaceVariant
+                    color = IssueSpotColors.OnSurfaceVariant,
                 )
             }
 
@@ -403,7 +417,7 @@ fun HomeHeader(
                 text = "${currentLevel.displayName} Issues",
                 style = IssueSpotTypography.bodyLarge,
                 color = IssueSpotColors.OnSurface,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
 
             Spacer(Modifier.height(spacing.extraSmall))
@@ -411,7 +425,7 @@ fun HomeHeader(
             Text(
                 text = currentLevel.getText(),
                 style = IssueSpotTypography.bodyLarge,
-                color = IssueSpotColors.OnSurfaceVariant
+                color = IssueSpotColors.OnSurfaceVariant,
             )
         }
     }

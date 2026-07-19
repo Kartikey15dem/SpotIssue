@@ -7,22 +7,22 @@ import io.ktor.client.request.header
 import io.ktor.client.statement.HttpResponsePipeline
 import io.ktor.http.HttpStatusCode
 import io.ktor.util.AttributeKey
-import org.example.project.core.datastore.UserPreferencesRepository
 
 class KtorInterceptor(
     private val getToken: () -> String?,
     private val logout: suspend () -> Unit,
 ) {
     companion object Plugin : HttpClientPlugin<Config, KtorInterceptor> {
-
         private const val HEADER_AUTH = "Authorization"
         private const val HEADER_CONTENT_TYPE = "Content-Type"
         private const val HEADER_ACCEPT = "Accept"
 
         override val key: AttributeKey<KtorInterceptor> = AttributeKey("KtorInterceptor")
 
-        override fun install(plugin: KtorInterceptor, scope: HttpClient) {
-
+        override fun install(
+            plugin: KtorInterceptor,
+            scope: HttpClient,
+        ) {
             scope.requestPipeline.intercept(HttpRequestPipeline.State) {
                 context.header(HEADER_CONTENT_TYPE, "application/json")
                 context.header(HEADER_ACCEPT, "application/json")
@@ -48,7 +48,7 @@ class KtorInterceptor(
             val config = Config().apply(block)
             return KtorInterceptor(
                 getToken = config.getToken,
-                logout = config.logout
+                logout = config.logout,
             )
         }
     }

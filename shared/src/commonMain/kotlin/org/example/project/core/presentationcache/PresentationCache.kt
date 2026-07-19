@@ -4,27 +4,27 @@ package org.example.project.core.presentationcache
  * ---------------------------------------------------------------------------
  * PAGING PIPELINE STEP 4: PRESENTATION CACHE (UI STABILIZATION)
  * ---------------------------------------------------------------------------
- * 
+ *
  * Purpose:
  * Transforms continuous Room emissions (from Step 3) into stable UI updates.
  * In Jetpack Compose and SwiftUI, replacing the entire list reference forces
  * the UI to discard its scroll state and aggressively recompose.
- * 
+ *
  * How it works:
  * 1. Maintains a long-lived `MutableList` internally.
  * 2. When Room emits a new snapshot of the database, it compares it against the internal list.
  * 3. It performs a lightweight O(N) diff and updates the internal list IN PLACE.
  * 4. This means items that haven't changed retain their exact memory identity,
  *    and Compose/SwiftUI can perform smooth inserts/deletes instead of flash-reloading.
- * 
+ *
  * @param T The type of item (e.g., Post)
  * @param K The unique identifier type (e.g., String ID)
  */
 class PresentationCache<T, K>(
-    private val idSelector: (T) -> K
+    private val idSelector: (T) -> K,
 ) {
     private val _items = mutableListOf<T>()
-    
+
     // Read-only view for the UI. The list reference stays exactly the same.
     val items: List<T> get() = _items
 
@@ -34,7 +34,7 @@ class PresentationCache<T, K>(
 
     fun update(roomPosts: List<T>) {
         val oldSize = _items.size
-        
+
         if (roomPosts.isEmpty()) {
             _items.clear()
             return
@@ -90,10 +90,9 @@ class PresentationCache<T, K>(
                 insertedCount++
             }
         }
-        
+
         while (_items.size > cleanRoomList.size) {
             _items.removeLast()
         }
-
     }
 }

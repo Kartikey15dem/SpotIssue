@@ -8,7 +8,7 @@ data class CoordinatesDto(
     @SerialName("latitude")
     val latitude: Double,
     @SerialName("longitude")
-    val longitude: Double
+    val longitude: Double,
 )
 
 @Serializable
@@ -22,7 +22,6 @@ data class ProfileDto(
     val totalPosts: Int,
     @SerialName("acks")
     val acks: Int,
-
     @SerialName("posts_by_level")
     val postByArea: List<Int>? = null,
 )

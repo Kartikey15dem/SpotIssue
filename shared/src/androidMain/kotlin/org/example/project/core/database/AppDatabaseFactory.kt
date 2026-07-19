@@ -7,15 +7,13 @@ import androidx.room.RoomDatabase
 class AppDatabaseFactory(
     private val context: Context,
 ) {
-
     fun <T : RoomDatabase> createDatabase(
         databaseClass: Class<T>,
         databaseName: String,
-    ): RoomDatabase.Builder<T> {
-        return Room.databaseBuilder(
+    ): RoomDatabase.Builder<T> =
+        Room.databaseBuilder(
             context.applicationContext,
             databaseClass,
             databaseName,
         )
-    }
 }

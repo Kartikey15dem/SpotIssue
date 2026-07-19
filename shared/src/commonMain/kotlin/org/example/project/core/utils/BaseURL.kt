@@ -16,15 +16,15 @@ class BaseURL {
     val defaultBaseUrl: String
         get() = PROTOCOL_HTTPS + API_ENDPOINT
 
-    fun getUrl(endpoint: String): String {
-        return endpoint + API_PATH
-    }
+    fun getUrl(endpoint: String): String = endpoint + API_PATH
 
     companion object {
         const val API_ENDPOINT = ""
+
 //        const val API_PATH = "10.0.2.2:8080/api/v1/"
 //        const val API_PATH = "192.168.29.196:8080/api/v1/"
         const val API_PATH = "192.168.29.19:8080/api/v1/"
+
 //        const val API_PATH = "10.116.37.67:8080/api/v1/"
         const val PROTOCOL_HTTPS = "http://"
     }

@@ -13,7 +13,7 @@ import org.example.project.core.model.profile.Profile
 data class ProfileEntity(
     @PrimaryKey(autoGenerate = false)
     val id: Int = 1,
-    val userId : String = "current_user",
+    val userId: String = "current_user",
     val email: String? = null,
     val name: String,
     val imageUrl: String? = null,
@@ -21,7 +21,7 @@ data class ProfileEntity(
     val acks: Int = 0,
     val updatedAt: Long = 0L,
     val postByAreaStr: String? = null,
-    val lastSyncedAt: Long = 0L
+    val lastSyncedAt: Long = 0L,
 )
 
 fun ProfileEntity.toProfile(): Profile {
@@ -32,6 +32,6 @@ fun ProfileEntity.toProfile(): Profile {
         email = email ?: "",
         totalPosts = totalPosts,
         acks = acks,
-        postByArea = if (postByArea.size == 4) postByArea else listOf(0, 0, 0, 0)
+        postByArea = if (postByArea.size == 4) postByArea else listOf(0, 0, 0, 0),
     )
 }

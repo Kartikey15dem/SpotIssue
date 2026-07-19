@@ -3,9 +3,9 @@ package org.example.project.core.data.repository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import org.example.project.core.model.home.Post
+import org.example.project.core.model.profile.Profile
 import org.example.project.core.presentation.FeedRefreshReason
 import org.example.project.core.presentation.FeedState
-import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
 
 /**
@@ -15,7 +15,10 @@ import org.example.project.core.utils.DataState
 interface ProfileRepository {
     val profilePostsState: StateFlow<FeedState>
 
-    fun startProfilePosts(isMine: Boolean, sort: String = "LATEST")
+    fun startProfilePosts(
+        isMine: Boolean,
+        sort: String = "LATEST",
+    )
 
     fun stopProfilePosts()
 
@@ -26,10 +29,6 @@ interface ProfileRepository {
     fun retryProfilePosts()
 
     fun loadMoreProfilePosts()
-
-
-
-
 
     suspend fun refreshUserPosts(sort: String = "LATEST"): DataState<List<Post>>
 
@@ -48,7 +47,10 @@ interface ProfileRepository {
     /**
      * Update user profile
      */
-    suspend fun updateProfile(profile: Profile, imagePath: String? = null): DataState<Unit>
+    suspend fun updateProfile(
+        profile: Profile,
+        imagePath: String? = null,
+    ): DataState<Unit>
 
     /**
      * Request email change (send OTP to new email)
@@ -58,7 +60,10 @@ interface ProfileRepository {
     /**
      * Verify email change (verify OTP and update email)
      */
-    suspend fun verifyEmailChange(newEmail: String, code: String): DataState<Unit>
+    suspend fun verifyEmailChange(
+        newEmail: String,
+        code: String,
+    ): DataState<Unit>
 
     suspend fun logOut()
 }

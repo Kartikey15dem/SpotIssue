@@ -37,14 +37,15 @@ fun FullScreenVideoPlayer(url: String) {
     var isMuted by remember { mutableStateOf(false) }
 
     // 1. Initialize ExoPlayer
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(url))
-            volume = if (isMuted) 0f else 1f
-            prepare()
-            playWhenReady = true
+    val exoPlayer =
+        remember {
+            ExoPlayer.Builder(context).build().apply {
+                setMediaItem(MediaItem.fromUri(url))
+                volume = if (isMuted) 0f else 1f
+                prepare()
+                playWhenReady = true
+            }
         }
-    }
 
     // 2. Manage Lifecycle (Clean up when closed)
     DisposableEffect(Unit) {
@@ -55,7 +56,6 @@ fun FullScreenVideoPlayer(url: String) {
 
     // 3. UI Implementation
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-
         // Embed the Android View (PlayerView)
         AndroidView(
             factory = { ctx ->
@@ -66,33 +66,35 @@ fun FullScreenVideoPlayer(url: String) {
                     setShowNextButton(false)
                     setShowPreviousButton(false)
 
-                    layoutParams = FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
+                    layoutParams =
+                        FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                        )
                 }
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         )
 
         // 4. Loading Spinner and Volume Sync logic
         var isBuffering by remember { mutableStateOf(true) }
         DisposableEffect(exoPlayer) {
-            val listener = object : Player.Listener {
-                override fun onPlaybackStateChanged(state: Int) {
-                    isBuffering = (state == Player.STATE_BUFFERING)
-                }
-                
+            val listener =
+                object : Player.Listener {
+                    override fun onPlaybackStateChanged(state: Int) {
+                        isBuffering = (state == Player.STATE_BUFFERING)
+                    }
+
                 /* WHY WE OBSERVE VOLUME HERE:
-                 * If the user taps the device's physical volume buttons or interacts with 
-                 * ExoPlayer's default UI controls, the actual volume of the video changes. 
-                 * By listening here, we ensure our custom `isMuted` Compose state (and 
+                 * If the user taps the device's physical volume buttons or interacts with
+                 * ExoPlayer's default UI controls, the actual volume of the video changes.
+                 * By listening here, we ensure our custom `isMuted` Compose state (and
                  * thus the UI icon) is always 100% in sync with what the user actually hears.
                  */
-                override fun onVolumeChanged(volume: Float) {
-                    isMuted = volume == 0f
+                    override fun onVolumeChanged(volume: Float) {
+                        isMuted = volume == 0f
+                    }
                 }
-            }
             exoPlayer.addListener(listener)
             onDispose { exoPlayer.removeListener(listener) }
         }
@@ -109,20 +111,22 @@ fun FullScreenVideoPlayer(url: String) {
                 isMuted = !isMuted
                 exoPlayer.volume = if (isMuted) 0f else 1f
             },
-            modifier = Modifier
-                .align(Alignment.TopEnd) // Place at Top-Right
-                .statusBarsPadding()
-                .padding(end = 6.dp)         // Add some margin
-                .background(Color.Black.copy(alpha = 0.5f), CircleShape) // Semi-transparent background
-                .size(36.dp)             // Size of the touch target
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd) // Place at Top-Right
+                    .statusBarsPadding()
+                    .padding(end = 6.dp) // Add some margin
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape) // Semi-transparent background
+                    .size(36.dp), // Size of the touch target
         ) {
             Icon(
                 // Use your own drawable resources here
-                painter = painterResource(
-                    id = if (isMuted) R.drawable.ic_volume_off else R.drawable.ic_volume_up
-                ),
+                painter =
+                    painterResource(
+                        id = if (isMuted) R.drawable.ic_volume_off else R.drawable.ic_volume_up,
+                    ),
                 contentDescription = if (isMuted) "Unmute" else "Mute",
-                tint = Color.White
+                tint = Color.White,
             )
         }
     }

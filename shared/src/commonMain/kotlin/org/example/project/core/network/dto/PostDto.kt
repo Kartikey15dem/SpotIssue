@@ -10,45 +10,32 @@ import kotlinx.serialization.Serializable
 data class PostDto(
     @SerialName("id")
     val id: String,
-
     @SerialName("user_id")
     val userId: String,
-
     @SerialName("post_level")
     val postLevel: String, // LOCALITY, DISTRICT, STATE, NATIONAL
-
     @SerialName("post_text")
     val postText: String,
-
     @SerialName("media_type")
     val mediaType: String, // IMAGE, VIDEO, GIF
-
     @SerialName("media_urls")
     val mediaUrls: List<String>? = null,
-
     @SerialName("likes")
     val likes: Int = 0,
-
     @SerialName("comments")
     val comments: Int = 0,
-
     @SerialName("created_at")
     val createdAt: String? = null,
-
     @SerialName("locality")
     val locality: String? = null,
-
     @SerialName("district")
     val district: String? = null,
-
     @SerialName("state")
     val state: String? = null,
-
     @SerialName("country")
     val country: String? = null,
-
     @SerialName("coordinates")
-    val coordinates: CoordinatesDto? = null
+    val coordinates: CoordinatesDto? = null,
 )
 
 /**
@@ -57,65 +44,47 @@ data class PostDto(
 @Serializable
 data class PostWithProfileDto(
     val id: String,
-
     @SerialName("user_id")
     val userId: String,
-
     @SerialName("post_level")
     val postLevel: String,
-
     @SerialName("post_text")
     val postText: String,
-
     @SerialName("media_type")
     val mediaType: String,
-
     @SerialName("media_urls")
     val mediaUrls: List<String>? = null,
-
     @SerialName("likes")
     val likes: Int = 0,
-
     @SerialName("comments")
     val comments: Int = 0,
-
     @SerialName("created_at")
     val createdAt: String? = null,
-
     // Profile info
     @SerialName("profiles")
     val profile: ProfileInfoDto? = null,
-
     @SerialName("locality")
     val locality: String? = null,
-
     @SerialName("district")
     val district: String? = null,
-
     @SerialName("state")
     val state: String? = null,
-
     @SerialName("country")
     val country: String? = null,
-
     @SerialName("coordinates")
     val coordinates: CoordinatesDto? = null,
-
     @SerialName("is_liked")
     val isLiked: Boolean = false,
-
     @SerialName("is_reported")
-    val isReported: Boolean = false
+    val isReported: Boolean = false,
 )
 
 @Serializable
 data class ProfileInfoDto(
     @SerialName("id")
     val id: String,
-
     @SerialName("name")
     val name: String,
-
     @SerialName("image_url")
-    val imageUrl: String?
+    val imageUrl: String?,
 )

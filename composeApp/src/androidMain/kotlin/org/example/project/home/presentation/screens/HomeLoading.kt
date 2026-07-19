@@ -13,10 +13,11 @@ import org.example.project.theme.IssueSpotColors
 @Composable
 fun HomeInitialLoading(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(300.dp),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(300.dp),
+        contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator(color = IssueSpotColors.Primary)
     }

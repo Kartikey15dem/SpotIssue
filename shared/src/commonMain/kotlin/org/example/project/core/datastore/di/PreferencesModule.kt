@@ -6,13 +6,14 @@ import org.example.project.core.datastore.UserPreferencesRepository
 import org.example.project.core.datastore.UserPreferencesRepositoryImpl
 import org.koin.dsl.module
 
-val preferencesModule = module {
+val preferencesModule =
+    module {
 
-    single<Settings> { Settings() }
+        single<Settings> { Settings() }
 
-    single { UserPreferencesDataSource(settings = get()) }
+        single { UserPreferencesDataSource(settings = get()) }
 
-    single<UserPreferencesRepository> {
-        UserPreferencesRepositoryImpl(localDataSource = get())
+        single<UserPreferencesRepository> {
+            UserPreferencesRepositoryImpl(localDataSource = get())
+        }
     }
-}

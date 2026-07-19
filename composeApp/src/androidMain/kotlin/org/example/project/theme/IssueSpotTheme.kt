@@ -8,35 +8,32 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val IssueSpotColorScheme = lightColorScheme(
-    primary = IssueSpotColors.Primary,
-    onPrimary = IssueSpotColors.OnPrimary,
-    primaryContainer = IssueSpotColors.PrimaryContainer,
-    onPrimaryContainer = IssueSpotColors.OnPrimaryContainer,
-
-    secondary = IssueSpotColors.Secondary,
-    onSecondary = IssueSpotColors.OnSecondary,
-    secondaryContainer = IssueSpotColors.SecondaryContainer,
-    onSecondaryContainer = IssueSpotColors.OnSecondaryContainer,
-
-    tertiary = IssueSpotColors.Tertiary,
-    onTertiary = IssueSpotColors.OnTertiary,
-    tertiaryContainer = IssueSpotColors.TertiaryContainer,
-    onTertiaryContainer = IssueSpotColors.OnTertiaryContainer,
-
-    background = IssueSpotColors.Background,
-    onBackground = IssueSpotColors.OnBackground,
-
-    surface = IssueSpotColors.Surface,
-    onSurface = IssueSpotColors.OnSurface,
-    onSurfaceVariant = IssueSpotColors.OnSurfaceVariant,
-    surfaceVariant = IssueSpotColors.SurfaceVariant,
-)
+private val IssueSpotColorScheme =
+    lightColorScheme(
+        primary = IssueSpotColors.Primary,
+        onPrimary = IssueSpotColors.OnPrimary,
+        primaryContainer = IssueSpotColors.PrimaryContainer,
+        onPrimaryContainer = IssueSpotColors.OnPrimaryContainer,
+        secondary = IssueSpotColors.Secondary,
+        onSecondary = IssueSpotColors.OnSecondary,
+        secondaryContainer = IssueSpotColors.SecondaryContainer,
+        onSecondaryContainer = IssueSpotColors.OnSecondaryContainer,
+        tertiary = IssueSpotColors.Tertiary,
+        onTertiary = IssueSpotColors.OnTertiary,
+        tertiaryContainer = IssueSpotColors.TertiaryContainer,
+        onTertiaryContainer = IssueSpotColors.OnTertiaryContainer,
+        background = IssueSpotColors.Background,
+        onBackground = IssueSpotColors.OnBackground,
+        surface = IssueSpotColors.Surface,
+        onSurface = IssueSpotColors.OnSurface,
+        onSurfaceVariant = IssueSpotColors.OnSurfaceVariant,
+        surfaceVariant = IssueSpotColors.SurfaceVariant,
+    )
 
 @Composable
 fun IssueSpotTheme(
     spacing: IssueSpotSpacing = IssueSpotSpacing(),
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -48,13 +45,13 @@ fun IssueSpotTheme(
     }
 
     CompositionLocalProvider(
-        LocalIssueSpotSpacing provides spacing
+        LocalIssueSpotSpacing provides spacing,
     ) {
         MaterialTheme(
             colorScheme = IssueSpotColorScheme,
             typography = IssueSpotTypography,
             shapes = IssueSpotShapes,
-            content = content
+            content = content,
         )
     }
 }

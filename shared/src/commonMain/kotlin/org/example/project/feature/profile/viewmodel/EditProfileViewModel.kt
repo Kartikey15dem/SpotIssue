@@ -2,25 +2,23 @@ package org.example.project.feature.profile.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.example.project.core.data.repository.ProfileRepository
 import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
 
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
-
 class EditProfileViewModel(
-    private val profileRepository: ProfileRepository
+    private val profileRepository: ProfileRepository,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(EditProfileState())
     val uiState: StateFlow<EditProfileState> = _uiState.asStateFlow()
 
@@ -51,19 +49,30 @@ class EditProfileViewModel(
             is EditProfileIntent.EmailChanged -> {
                 _uiState.update { it.copy(email = intent.email, newEmail = intent.email) }
             }
-            EditProfileIntent.ShowEmailChangeDialogClicked -> _uiState.update { it.copy(showEmailChangeDialog = true, emailChangeStep = EmailChangeStep.Request) }
+            EditProfileIntent.ShowEmailChangeDialogClicked ->
+                _uiState.update {
+                    it.copy(showEmailChangeDialog = true, emailChangeStep = EmailChangeStep.Request)
+                }
             EditProfileIntent.LogoutClicked -> logout()
         }
     }
 
     fun setName(name: String) = onIntent(EditProfileIntent.NameChanged(name))
+
     fun setImageUrl(url: String) = onIntent(EditProfileIntent.ImageUrlChanged(url))
+
     fun setNewEmail(email: String) = onIntent(EditProfileIntent.NewEmailChanged(email))
+
     fun save() = onIntent(EditProfileIntent.SaveChangesClicked)
+
     fun submitEmailChangeRequest() = onIntent(EditProfileIntent.RequestEmailChangeClicked)
+
     fun submitEmailChangeVerification(otp: String) = onIntent(EditProfileIntent.VerifyEmailChangeClicked(otp))
+
     fun showEmailChange() = onIntent(EditProfileIntent.ShowEmailChangeDialogClicked)
+
     fun dismissEmailChange() = onIntent(EditProfileIntent.DismissEmailChangeDialog)
+
     fun logoutUser() = onIntent(EditProfileIntent.LogoutClicked)
 
     private fun logout() {
@@ -107,13 +116,13 @@ class EditProfileViewModel(
             _uiState.update { it.copy(isEmailUpdating = true) }
             when (val res = profileRepository.verifyEmailChange(_uiState.value.newEmail, otp)) {
                 is DataState.Success -> {
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
-                            isEmailUpdating = false, 
+                            isEmailUpdating = false,
                             showEmailChangeDialog = false,
                             email = _uiState.value.newEmail,
-                            newEmail = ""
-                        ) 
+                            newEmail = "",
+                        )
                     }
                     _sideEffects.send(EditProfileSideEffect.ShowDialog("Email updated successfully"))
                     _sideEffects.send(EditProfileSideEffect.EmailChanged)
@@ -166,7 +175,7 @@ class EditProfileViewModel(
                         _uiState.update {
                             it.copy(
                                 originalProfile = profile,
-                                imageUrl = profile.imageUrl?: "",
+                                imageUrl = profile.imageUrl ?: "",
                                 name = profile.name,
                                 email = profile.email,
                                 isLoading = false,
@@ -214,10 +223,11 @@ class EditProfileViewModel(
             val isLocalPath = currentState.imageUrl.startsWith("/") || currentState.imageUrl.startsWith("file://")
             val localImagePath = if (isLocalPath) currentState.imageUrl.removePrefix("file://") else null
 
-            val updatedProfile = currentState.originalProfile?.copy(
-                imageUrl = if (isLocalPath) "" else currentState.imageUrl,
-                name = currentState.name,
-            )
+            val updatedProfile =
+                currentState.originalProfile?.copy(
+                    imageUrl = if (isLocalPath) "" else currentState.imageUrl,
+                    name = currentState.name,
+                )
 
             if (updatedProfile != null) {
                 when (val res = profileRepository.updateProfile(updatedProfile, localImagePath)) {
@@ -247,7 +257,7 @@ class EditProfileViewModel(
         if (original != null) {
             _uiState.update {
                 it.copy(
-                    imageUrl = original.imageUrl?: "",
+                    imageUrl = original.imageUrl ?: "",
                     name = original.name,
                     email = original.email,
                 )
@@ -268,33 +278,59 @@ class EditProfileViewModel(
         _uiState.update { it.copy(error = message) }
         _sideEffects.send(EditProfileSideEffect.ShowDialog(message))
     }
-
 }
 
 // MVI Contract
 
 sealed interface EditProfileIntent {
     data object LoadProfile : EditProfileIntent
-    data class ImageUrlChanged(val url: String) : EditProfileIntent
-    data class NameChanged(val name: String) : EditProfileIntent
+
+    data class ImageUrlChanged(
+        val url: String,
+    ) : EditProfileIntent
+
+    data class NameChanged(
+        val name: String,
+    ) : EditProfileIntent
+
     data object PickFromGalleryClicked : EditProfileIntent
+
     data object CaptureFromCameraClicked : EditProfileIntent
+
     data object SaveChangesClicked : EditProfileIntent
+
     data object ResetClicked : EditProfileIntent
+
     data object BackPressed : EditProfileIntent
+
     data object DismissImagePicker : EditProfileIntent
+
     data object ErrorShown : EditProfileIntent
+
     data object ShowEmailChangeDialogClicked : EditProfileIntent
+
     data object RequestEmailChangeClicked : EditProfileIntent
-    data class VerifyEmailChangeClicked(val otp: String) : EditProfileIntent
+
+    data class VerifyEmailChangeClicked(
+        val otp: String,
+    ) : EditProfileIntent
+
     data object DismissEmailChangeDialog : EditProfileIntent
-    data class NewEmailChanged(val email: String) : EditProfileIntent
-    data class EmailChanged(val email: String) : EditProfileIntent
+
+    data class NewEmailChanged(
+        val email: String,
+    ) : EditProfileIntent
+
+    data class EmailChanged(
+        val email: String,
+    ) : EditProfileIntent
+
     data object LogoutClicked : EditProfileIntent
 }
 
 enum class EmailChangeStep {
-    Request, Verify
+    Request,
+    Verify,
 }
 
 data class EditProfileState(
@@ -311,16 +347,24 @@ data class EditProfileState(
     val isSaving: Boolean = false,
     val isLoadingImage: Boolean = false,
     val showImagePickerDialog: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
 )
 
 sealed interface EditProfileSideEffect {
-    data class ShowDialog(val message: String) : EditProfileSideEffect
+    data class ShowDialog(
+        val message: String,
+    ) : EditProfileSideEffect
+
     data object ProfileSaved : EditProfileSideEffect
+
     data object BackPreseed : EditProfileSideEffect
+
     data object ShowImagePicker : EditProfileSideEffect
+
     data object ShowCamera : EditProfileSideEffect
+
     data object EmailChanged : EditProfileSideEffect
+
     data object LogoutSuccess : EditProfileSideEffect
 }
 

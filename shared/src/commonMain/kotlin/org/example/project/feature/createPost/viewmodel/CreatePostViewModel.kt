@@ -4,26 +4,25 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.example.project.core.data.repository.PostRepository
 import org.example.project.core.data.repository.ProfileRepository
-import org.example.project.core.model.home.MediaType
 import org.example.project.core.datastore.UserPreferencesRepository
-import org.example.project.core.datastore.model.UploadStatus
 import org.example.project.core.datastore.model.UploadDraftState
+import org.example.project.core.datastore.model.UploadStatus
 import org.example.project.core.model.createPost.CreatePost
+import org.example.project.core.model.home.MediaType
 import org.example.project.core.model.home.SelectedMediaItem
 import org.example.project.core.utils.DataState
-import kotlinx.coroutines.flow.update
-
 
 class CreatePostViewModel(
     private val postRepository: PostRepository,
     private val profileRepository: ProfileRepository,
-    private val prefRepository: UserPreferencesRepository
+    private val prefRepository: UserPreferencesRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CreatePostState())
     val uiState: StateFlow<CreatePostState> = _uiState.asStateFlow()
@@ -39,21 +38,25 @@ class CreatePostViewModel(
     private fun observeUserData() {
         viewModelScope.launch {
             prefRepository.userData.collect { userData ->
-                _uiState.update { it.copy(
-                    location = userData.userLocation.address.ifEmpty { "Current Location" }
-                ) }
+                _uiState.update {
+                    it.copy(
+                        location = userData.userLocation.address.ifEmpty { "Current Location" },
+                    )
+                }
 
                 val draft = userData.uploadDraftState
                 when (draft.status) {
                     UploadStatus.ERROR -> {
-                        _uiState.update { it.copy(
-                            description = draft.postText,
-                            selectedMedia = draft.selectedMedia
-                        ) }
+                        _uiState.update {
+                            it.copy(
+                                description = draft.postText,
+                                selectedMedia = draft.selectedMedia,
+                            )
+                        }
                         _sideEffects.send(
                             CreatePostSideEffect.ShowError(
-                                draft.errorMessage ?: "Upload failed\n\nDraft restored. Please try again."
-                            )
+                                draft.errorMessage ?: "Upload failed\n\nDraft restored. Please try again.",
+                            ),
                         )
                         // Reset status to IDLE so we don't keep showing the error
                         prefRepository.updateUploadDraftState(draft.copy(status = UploadStatus.IDLE))
@@ -82,10 +85,12 @@ class CreatePostViewModel(
                 if (res is DataState.Success) {
                     val profile = res.data
                     if (profile != null) {
-                        _uiState.update { it.copy(
-                            userName = profile.name,
-                            userImageUrl = profile.imageUrl
-                        ) }
+                        _uiState.update {
+                            it.copy(
+                                userName = profile.name,
+                                userImageUrl = profile.imageUrl,
+                            )
+                        }
                     }
                 }
             }
@@ -107,7 +112,6 @@ class CreatePostViewModel(
         }
     }
 
-
     private fun changeDescription(description: String) {
         _uiState.value = _uiState.value.copy(description = description)
     }
@@ -124,12 +128,13 @@ class CreatePostViewModel(
             if (_uiState.value.selectedMedia.isNullOrEmpty()) {
                 // Upload text-only post directly
                 val userLocation = prefRepository.userData.value.userLocation
-                val createPostModel = CreatePost(
-                    postText = _uiState.value.description,
-                    mediaType = null,
-                    mediaFilePaths = emptyList(),
-                    location = userLocation
-                )
+                val createPostModel =
+                    CreatePost(
+                        postText = _uiState.value.description,
+                        mediaType = null,
+                        mediaFilePaths = emptyList(),
+                        location = userLocation,
+                    )
 
                 when (val result = postRepository.createPost(createPostModel)) {
                     is DataState.Success -> {
@@ -145,11 +150,12 @@ class CreatePostViewModel(
                 }
             } else {
                 // Use WorkManager for media uploads
-                val draft = UploadDraftState(
-                    status = UploadStatus.UPLOADING,
-                    postText = _uiState.value.description,
-                    selectedMedia = _uiState.value.selectedMedia,
-                )
+                val draft =
+                    UploadDraftState(
+                        status = UploadStatus.UPLOADING,
+                        postText = _uiState.value.description,
+                        selectedMedia = _uiState.value.selectedMedia,
+                    )
                 prefRepository.updateUploadDraftState(draft)
 
                 _sideEffects.send(CreatePostSideEffect.StartBackgroundUpload)
@@ -172,15 +178,17 @@ class CreatePostViewModel(
     fun setVisualMedia(mediaItems: List<Pair<String, String?>>) {
         val maxItems = 10
 
-        val processedItems = mediaItems.mapNotNull { (uri, mimeType) ->
-            if (!validateMedia(mimeType)) return@mapNotNull null
-            val type = when {
-                mimeType?.startsWith("image/") == true -> MediaType.IMAGE
-                mimeType?.startsWith("video/") == true -> MediaType.VIDEO
-                else -> null
+        val processedItems =
+            mediaItems.mapNotNull { (uri, mimeType) ->
+                if (!validateMedia(mimeType)) return@mapNotNull null
+                val type =
+                    when {
+                        mimeType?.startsWith("image/") == true -> MediaType.IMAGE
+                        mimeType?.startsWith("video/") == true -> MediaType.VIDEO
+                        else -> null
+                    }
+                if (type != null) SelectedMediaItem(uri, type) else null
             }
-            if (type != null) SelectedMediaItem(uri, type) else null
-        }
 
         val videosCount = processedItems.count { it.type == MediaType.VIDEO }
         val imagesCount = processedItems.count { it.type == MediaType.IMAGE }
@@ -207,9 +215,10 @@ class CreatePostViewModel(
             emitError("Unsupported format\n\nPDF format is not supported.")
             return
         }
-        _uiState.value = _uiState.value.copy(
-            selectedMedia = listOf(SelectedMediaItem(uri, MediaType.PDF))
-        )
+        _uiState.value =
+            _uiState.value.copy(
+                selectedMedia = listOf(SelectedMediaItem(uri, MediaType.PDF)),
+            )
     }
 
     private fun emitError(message: String) {
@@ -219,17 +228,23 @@ class CreatePostViewModel(
     }
 
     fun validateMedia(mimeType: String?): Boolean {
-        val supportedTypes = listOf(
-            "image/jpeg", "image/png", "image/webp",
-            "video/mp4", "video/mpeg", "video/quicktime",
-            "application/pdf"
-        )
+        val supportedTypes =
+            listOf(
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "video/mp4",
+                "video/mpeg",
+                "video/quicktime",
+                "application/pdf",
+            )
         return mimeType != null && supportedTypes.any { mimeType.startsWith(it) }
     }
 
-    private fun removeMedia(){
+    private fun removeMedia() {
         _uiState.value = _uiState.value.copy(selectedMedia = null)
     }
+
     private fun removeImage(uriToRemove: String) {
         val updatedList = _uiState.value.selectedMedia?.filterNot { it.uri == uriToRemove }
         _uiState.value = _uiState.value.copy(selectedMedia = updatedList)
@@ -238,15 +253,32 @@ class CreatePostViewModel(
 
 sealed interface CreatePostIntent {
     data object CloseClicked : CreatePostIntent
-    data class DescriptionChanged(val description: String) : CreatePostIntent
+
+    data class DescriptionChanged(
+        val description: String,
+    ) : CreatePostIntent
+
     data object AddMediaClicked : CreatePostIntent
+
     data object AddPdfClicked : CreatePostIntent
+
     data object RemoveMedia : CreatePostIntent
-    data class RemoveImage(val uri: String) : CreatePostIntent
+
+    data class RemoveImage(
+        val uri: String,
+    ) : CreatePostIntent
+
     data object CancelClicked : CreatePostIntent
+
     data object PostIssueClicked : CreatePostIntent
-    data class VisualMediaAdded(val mediaItems: List<Pair<String, String?>>) : CreatePostIntent
-    data class DocumentUrlAdded(val uri: String) : CreatePostIntent
+
+    data class VisualMediaAdded(
+        val mediaItems: List<Pair<String, String?>>,
+    ) : CreatePostIntent
+
+    data class DocumentUrlAdded(
+        val uri: String,
+    ) : CreatePostIntent
 }
 
 data class CreatePostState(
@@ -257,14 +289,23 @@ data class CreatePostState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val showIssueScopeDropdown: Boolean = false,
-    val selectedMedia: List<SelectedMediaItem>? = null
+    val selectedMedia: List<SelectedMediaItem>? = null,
 )
 
 sealed interface CreatePostSideEffect {
     data object NavigateBack : CreatePostSideEffect
+
     data object ShowMediaPicker : CreatePostSideEffect
+
     data object ShowPdfPicker : CreatePostSideEffect
+
     data object StartBackgroundUpload : CreatePostSideEffect
-    data class ShowError(val message: String) : CreatePostSideEffect
-    data class PostCreated(val postId: String) : CreatePostSideEffect
+
+    data class ShowError(
+        val message: String,
+    ) : CreatePostSideEffect
+
+    data class PostCreated(
+        val postId: String,
+    ) : CreatePostSideEffect
 }

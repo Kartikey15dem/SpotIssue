@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -36,21 +35,18 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import org.example.project.core.components.AppErrorDialog
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -65,6 +61,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextLayoutResult
@@ -73,9 +70,20 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.collectLatest
 import org.example.project.R
+import org.example.project.core.components.AppErrorDialog
+import org.example.project.core.components.LocalOverlayController
+import org.example.project.core.components.PdfPreviewContent
+import org.example.project.core.components.VideoPreviewPlayer
+import org.example.project.core.model.home.MediaType
+import org.example.project.core.model.home.SelectedMediaItem
+import org.example.project.createPost.work.PostUploadWorker
 import org.example.project.feature.createPost.viewmodel.CreatePostIntent
 import org.example.project.feature.createPost.viewmodel.CreatePostSideEffect
 import org.example.project.feature.createPost.viewmodel.CreatePostState
@@ -84,26 +92,13 @@ import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTheme
 import org.example.project.theme.IssueSpotTypography
 import org.koin.compose.viewmodel.koinViewModel
-import androidx.core.net.toUri
-import coil3.compose.AsyncImage
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import org.example.project.createPost.work.PostUploadWorker
-import org.example.project.core.components.LocalOverlayController
-import org.example.project.core.components.PdfPreviewContent
-import org.example.project.core.components.VideoPreviewPlayer
-import org.example.project.core.model.home.MediaType
-import org.example.project.core.model.home.SelectedMediaItem
-
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.CircularProgressIndicator
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CreatePostScreen(
     modifier: Modifier = Modifier,
     onNavigateBack: () -> Unit = {},
-    viewModel: CreatePostViewModel = koinViewModel()
+    viewModel: CreatePostViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -111,24 +106,27 @@ fun CreatePostScreen(
 
     val context = LocalContext.current
 
-    val mediaPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5)
-    ) { uris: List<Uri> ->
-        if (uris.isNotEmpty()) {
-            val mediaData = uris.map { uri ->
-                val mimeType = context.contentResolver.getType(uri)
-                Pair(uri.toString(), mimeType)
+    val mediaPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5),
+        ) { uris: List<Uri> ->
+            if (uris.isNotEmpty()) {
+                val mediaData =
+                    uris.map { uri ->
+                        val mimeType = context.contentResolver.getType(uri)
+                        Pair(uri.toString(), mimeType)
+                    }
+                viewModel.setVisualMedia(mediaData)
             }
-            viewModel.setVisualMedia(mediaData)
         }
-    }
-    val pdfPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        uri?.let {
-            viewModel.setDocumentUrl(it.toString())
+    val pdfPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+        ) { uri: Uri? ->
+            uri?.let {
+                viewModel.setDocumentUrl(it.toString())
+            }
         }
-    }
 
     LaunchedEffect(viewModel) {
         viewModel.sideEffects.collectLatest { effect ->
@@ -136,7 +134,7 @@ fun CreatePostScreen(
                 CreatePostSideEffect.NavigateBack -> onNavigateBack()
                 CreatePostSideEffect.ShowMediaPicker -> {
                     mediaPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
                     )
                 }
                 CreatePostSideEffect.ShowPdfPicker -> {
@@ -156,97 +154,99 @@ fun CreatePostScreen(
         }
     }
 
-    
     errorDialogMessage?.let { message ->
         AppErrorDialog(
             message = message,
-            onDismiss = { errorDialogMessage = null }
+            onDismiss = { errorDialogMessage = null },
         )
     }
 
     Scaffold(
-        snackbarHost = { 
+        snackbarHost = {
             SnackbarHost(snackbarHostState) { data ->
                 Snackbar(
                     snackbarData = data,
                     containerColor = Color(0xFF323232),
                     contentColor = Color.White,
-                    actionColor = Color(0xFF4A6CF7)
+                    actionColor = Color(0xFF4A6CF7),
                 )
             }
         },
-        containerColor = IssueSpotColors.Surface
+        containerColor = IssueSpotColors.Surface,
     ) { padding ->
         CreatePostScreenContent(
             modifier = modifier.padding(padding),
             state = state,
-            onIntent = viewModel::onIntent
+            onIntent = viewModel::onIntent,
         )
     }
 }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CreatePostScreenContent(
     modifier: Modifier = Modifier,
     state: CreatePostState,
-    onIntent: (CreatePostIntent) -> Unit = {}
+    onIntent: (CreatePostIntent) -> Unit = {},
 ) {
     val spacing = IssueSpotTheme.spacing
     val shapes = MaterialTheme.shapes
 
     Surface(
         modifier = modifier.fillMaxSize(),
-        color = IssueSpotColors.Surface
+        color = IssueSpotColors.Surface,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(spacing.smallMedium)
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(spacing.smallMedium),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top
+                    verticalAlignment = Alignment.Top,
                 ) {
-
                     IconButton(
                         onClick = { onIntent(CreatePostIntent.CloseClicked) },
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(36.dp),
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.ic_close),
                             contentDescription = "Close",
-                            tint = IssueSpotColors.OnSurface
+                            tint = IssueSpotColors.OnSurface,
                         )
                     }
 
                     Spacer(modifier = Modifier.width(spacing.small))
 
                     Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(IssueSpotColors.SurfaceVariant),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(IssueSpotColors.SurfaceVariant),
+                        contentAlignment = Alignment.Center,
                     ) {
                         val userImageUrl = state.userImageUrl
                         if (!userImageUrl.isNullOrBlank()) {
                             AsyncImage(
                                 model = userImageUrl.toUri(),
                                 contentDescription = "avatar",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(CircleShape),
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape),
                                 contentScale = ContentScale.Crop,
                                 error = painterResource(R.drawable.ic_user_avatar),
-                                fallback = painterResource(R.drawable.ic_user_avatar)
+                                fallback = painterResource(R.drawable.ic_user_avatar),
                             )
                         } else {
                             Image(
                                 painter = painterResource(R.drawable.ic_user_avatar),
                                 contentDescription = "avatar",
                                 modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
+                                contentScale = ContentScale.Crop,
                             )
                         }
                     }
@@ -254,15 +254,14 @@ fun CreatePostScreenContent(
                     Spacer(modifier = Modifier.width(spacing.smallMedium))
 
                     Column(
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     ) {
-
                         Text(
                             text = state.userName,
                             style = IssueSpotTypography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
                         )
 
                         Spacer(modifier = Modifier.height(2.dp))
@@ -272,7 +271,7 @@ fun CreatePostScreenContent(
                             style = IssueSpotTypography.bodySmall,
                             color = IssueSpotColors.OnSurfaceVariant,
                             maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
 
@@ -280,30 +279,33 @@ fun CreatePostScreenContent(
 
                     Button(
                         onClick = { onIntent(CreatePostIntent.PostIssueClicked) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = IssueSpotColors.PostButtonBackground,
-                            contentColor = IssueSpotColors.PostButtonText
-                        ),
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = IssueSpotColors.PostButtonBackground,
+                                contentColor = IssueSpotColors.PostButtonText,
+                            ),
                         shape = shapes.extraLarge,
-                        contentPadding = PaddingValues(
-                            horizontal = spacing.medium,
-                            vertical = spacing.small
-                        ),
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 0.dp
-                        )
+                        contentPadding =
+                            PaddingValues(
+                                horizontal = spacing.medium,
+                                vertical = spacing.small,
+                            ),
+                        elevation =
+                            ButtonDefaults.buttonElevation(
+                                defaultElevation = 0.dp,
+                            ),
                     ) {
                         Text(
                             text = "Post",
                             style = IssueSpotTypography.labelMedium,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
                         )
                     }
                 }
 
                 HorizontalDivider(
                     modifier = Modifier.padding(top = spacing.smallMedium),
-                    color = IssueSpotColors.Outline.copy(alpha = 0.15f)
+                    color = IssueSpotColors.Outline.copy(alpha = 0.15f),
                 )
 
                 Spacer(modifier = Modifier.height(spacing.smallMedium))
@@ -311,21 +313,20 @@ fun CreatePostScreenContent(
                 var boxHeightPx by remember { mutableIntStateOf(0) }
                 var cursorYInText by remember { mutableFloatStateOf(0f) }
                 var textLayoutResultState by remember { mutableStateOf<TextLayoutResult?>(null) }
-                
-
 
                 val density = LocalDensity.current
                 val imeHeightPx = WindowInsets.ime.getBottom(density)
 
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f, fill = false)
-                        .background(Color.Transparent, shapes.medium)
-                        .border(1.dp, IssueSpotColors.Outline, shapes.medium)
-                        .onGloballyPositioned { coordinates ->
-                            boxHeightPx = coordinates.size.height
-                        }
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .background(Color.Transparent, shapes.medium)
+                            .border(1.dp, IssueSpotColors.Outline, shapes.medium)
+                            .onGloballyPositioned { coordinates ->
+                                boxHeightPx = coordinates.size.height
+                            },
                 ) {
                     val scrollState = rememberScrollState()
 
@@ -345,10 +346,11 @@ fun CreatePostScreenContent(
                     }
 
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(scrollState)
-                            .padding(bottom = with(density) { imeHeightPx.toDp() })
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .verticalScroll(scrollState)
+                                .padding(bottom = with(density) { imeHeightPx.toDp() }),
                     ) {
                         var textFieldValue by remember { mutableStateOf(TextFieldValue(state.description)) }
 
@@ -381,25 +383,27 @@ fun CreatePostScreenContent(
                                     cursorYInText = cursorRect.bottom
                                 }
                             },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .defaultMinSize(minHeight = 150.dp)
-                                .padding(spacing.smallMedium),
-                            textStyle = IssueSpotTypography.bodyLarge.copy(
-                                color = IssueSpotColors.OnSurface
-                            ),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .defaultMinSize(minHeight = 150.dp)
+                                    .padding(spacing.smallMedium),
+                            textStyle =
+                                IssueSpotTypography.bodyLarge.copy(
+                                    color = IssueSpotColors.OnSurface,
+                                ),
                             decorationBox = { innerTextField ->
                                 Box(modifier = Modifier.fillMaxWidth()) {
                                     if (textFieldValue.text.isEmpty()) {
                                         Text(
                                             text = "Describe the issue you want to report...",
                                             style = IssueSpotTypography.bodyLarge,
-                                            color = IssueSpotColors.OnSurfaceVariant
+                                            color = IssueSpotColors.OnSurfaceVariant,
                                         )
                                     }
                                     innerTextField()
                                 }
-                            }
+                            },
                         )
 
                         val selectedMedia = state.selectedMedia
@@ -407,73 +411,75 @@ fun CreatePostScreenContent(
                             MediaPreviewContent(
                                 mediaItems = selectedMedia,
                                 onRemove = { onIntent(CreatePostIntent.RemoveMedia) },
-                                onRemoveImage = { onIntent(CreatePostIntent.RemoveImage(it)) }
+                                onRemoveImage = { onIntent(CreatePostIntent.RemoveImage(it)) },
                             )
                         }
                     }
                 }
             }
 
-
             if (state.isLoading) {
                 Box(
-                    modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)).clickable(enabled = false) {}, 
-                    contentAlignment = Alignment.Center
+                    modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)).clickable(enabled = false) {},
+                    contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator(color = IssueSpotColors.Primary)
                 }
             }
 
-            if(state.selectedMedia == null) {
+            if (state.selectedMedia == null) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .imePadding()
-                        .background(Color.Transparent)
-                        .padding(bottom = spacing.large, start = spacing.extraSmall, top = spacing.extraSmall, end = spacing.large),
-                    horizontalArrangement = Arrangement.spacedBy(spacing.small, Alignment.End)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomCenter)
+                            .imePadding()
+                            .background(Color.Transparent)
+                            .padding(bottom = spacing.large, start = spacing.extraSmall, top = spacing.extraSmall, end = spacing.large),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.small, Alignment.End),
                 ) {
                     Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .background(
-                                color = IssueSpotColors.OnSurfaceVariant.copy(alpha = 0.1f),
-                                shape = shapes.small
-                            ),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .size(44.dp)
+                                .background(
+                                    color = IssueSpotColors.OnSurfaceVariant.copy(alpha = 0.1f),
+                                    shape = shapes.small,
+                                ),
+                        contentAlignment = Alignment.Center,
                     ) {
                         IconButton(
                             onClick = { onIntent(CreatePostIntent.AddMediaClicked) },
-                            modifier = Modifier.size(44.dp)
+                            modifier = Modifier.size(44.dp),
                         ) {
                             Icon(
                                 painter = painterResource(R.drawable.ic_photo),
                                 contentDescription = "Add Photo or Video",
                                 modifier = Modifier.size(24.dp),
-                                tint = IssueSpotColors.OnSurfaceVariant
+                                tint = IssueSpotColors.OnSurfaceVariant,
                             )
                         }
                     }
 
                     Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .background(
-                                color = IssueSpotColors.OnSurfaceVariant.copy(alpha = 0.1f),
-                                shape = shapes.small
-                            ),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .size(44.dp)
+                                .background(
+                                    color = IssueSpotColors.OnSurfaceVariant.copy(alpha = 0.1f),
+                                    shape = shapes.small,
+                                ),
+                        contentAlignment = Alignment.Center,
                     ) {
                         IconButton(
                             onClick = { onIntent(CreatePostIntent.AddPdfClicked) },
-                            modifier = Modifier.size(44.dp)
+                            modifier = Modifier.size(44.dp),
                         ) {
                             Icon(
                                 painter = painterResource(R.drawable.ic_add),
                                 contentDescription = "Add PDF",
                                 modifier = Modifier.size(24.dp),
-                                tint = IssueSpotColors.OnSurfaceVariant
+                                tint = IssueSpotColors.OnSurfaceVariant,
                             )
                         }
                     }
@@ -488,43 +494,44 @@ fun MediaPreviewContent(
     mediaItems: List<SelectedMediaItem>,
     onRemove: () -> Unit,
     onRemoveImage: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val overlayController = LocalOverlayController.current
     var aspectRatio by remember { mutableFloatStateOf(1f) }
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         // 2. Close Button (Appears above the content)
         IconButton(
             onClick = onRemove,
-            modifier = Modifier
-                .align(Alignment.End)
-                .clip(CircleShape)
-                .background(Color.Black)
-                .size(28.dp) // Standard touch target size
-
+            modifier =
+                Modifier
+                    .align(Alignment.End)
+                    .clip(CircleShape)
+                    .background(Color.Black)
+                    .size(28.dp), // Standard touch target size
         ) {
             Icon(
                 painter = painterResource(R.drawable.ic_close),
                 contentDescription = "Remove media",
                 modifier = Modifier.size(18.dp),
-                tint = Color.White // Black Icon
+                tint = Color.White, // Black Icon
             )
         }
         Spacer(modifier = modifier.height(6.dp))
         // 3. Media Content (Image or Video)
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(aspectRatio)
-                .clip(RoundedCornerShape(8.dp))
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(aspectRatio)
+                    .clip(RoundedCornerShape(8.dp)),
         ) {
             when (mediaItems.first().type) {
                 MediaType.IMAGE -> {
-
                     ImageGrid(
                         images = mediaItems,
                         onRemove = onRemoveImage,
@@ -533,16 +540,15 @@ fun MediaPreviewContent(
                             overlayController.show(
                                 type = MediaType.IMAGE,
                                 urls = mediaItems.map { it.uri },
-                                initialIndex = clickedIndex
+                                initialIndex = clickedIndex,
                             )
-                        }
+                        },
                     )
-
                 }
                 MediaType.VIDEO -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         VideoPreviewPlayer(
                             videoUri = mediaItems.first().uri,
@@ -556,7 +562,7 @@ fun MediaPreviewContent(
                             },
                             onAspectRatioAvailable = { newRatio ->
                                 aspectRatio = newRatio
-                            }
+                            },
                         )
                     }
                 }
@@ -566,7 +572,7 @@ fun MediaPreviewContent(
                         pdfUri = mediaItems.first().uri.toUri(),
                         onFullscreenClick = {
                             overlayController.show(MediaType.PDF, mediaItems.map { it.uri })
-                        }
+                        },
                     )
                 }
 
@@ -580,7 +586,7 @@ fun MediaPreviewContent(
 fun ImageGrid(
     images: List<SelectedMediaItem>,
     onRemove: (String) -> Unit,
-    onImageClick: (Int) -> Unit
+    onImageClick: (Int) -> Unit,
 ) {
     val count = images.size
     val gridHeight = 300.dp // Fixed height for multi-image grids to look uniform
@@ -605,23 +611,33 @@ fun ImageGrid(
                             singleAspectRatio = width / height
                             if (singleAspectRatio < 1f) singleAspectRatio = 1f
                         }
-                    }
+                    },
                 )
             }
             2 -> {
                 // Two Images - Side by side
                 Row(modifier = Modifier.fillMaxWidth().height(gridHeight), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                    GridImageItem(uri = images[0].uri, onRemove = { onRemove(images[0].uri) }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
-                    GridImageItem(uri = images[1].uri, onRemove = { onRemove(images[1].uri) }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                    GridImageItem(uri = images[0].uri, onRemove = {
+                        onRemove(images[0].uri)
+                    }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                    GridImageItem(uri = images[1].uri, onRemove = {
+                        onRemove(images[1].uri)
+                    }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxHeight())
                 }
             }
             3 -> {
                 // Three Images - 1 Large Left, 2 Small Right vertically stacked
                 Row(modifier = Modifier.fillMaxWidth().height(gridHeight), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                    GridImageItem(uri = images[0].uri, onRemove = { onRemove(images[0].uri) }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                    GridImageItem(uri = images[0].uri, onRemove = {
+                        onRemove(images[0].uri)
+                    }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
                     Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(spacing)) {
-                        GridImageItem(uri = images[1].uri, onRemove = { onRemove(images[1].uri) }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxWidth())
-                        GridImageItem(uri = images[2].uri, onRemove = { onRemove(images[2].uri) }, onClick = { onImageClick(2) }, modifier = Modifier.weight(1f).fillMaxWidth())
+                        GridImageItem(uri = images[1].uri, onRemove = {
+                            onRemove(images[1].uri)
+                        }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxWidth())
+                        GridImageItem(uri = images[2].uri, onRemove = {
+                            onRemove(images[2].uri)
+                        }, onClick = { onImageClick(2) }, modifier = Modifier.weight(1f).fillMaxWidth())
                     }
                 }
             }
@@ -629,29 +645,41 @@ fun ImageGrid(
                 // Four or More Images - 2x2 Grid with +N overlay on the 4th
                 Column(modifier = Modifier.fillMaxWidth().height(gridHeight), verticalArrangement = Arrangement.spacedBy(spacing)) {
                     Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                        GridImageItem(uri = images[0].uri, onRemove = { onRemove(images[0].uri) }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
-                        GridImageItem(uri = images[1].uri, onRemove = { onRemove(images[1].uri) }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                        GridImageItem(uri = images[0].uri, onRemove = {
+                            onRemove(images[0].uri)
+                        }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                        GridImageItem(uri = images[1].uri, onRemove = {
+                            onRemove(images[1].uri)
+                        }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxHeight())
                     }
                     Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                        GridImageItem(uri = images[2].uri, onRemove = { onRemove(images[2].uri) }, onClick = { onImageClick(2) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                        GridImageItem(uri = images[2].uri, onRemove = {
+                            onRemove(images[2].uri)
+                        }, onClick = { onImageClick(2) }, modifier = Modifier.weight(1f).fillMaxHeight())
 
                         // 4th Image with Overlay
                         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            GridImageItem(uri = images[3].uri, onRemove = { onRemove(images[3].uri) }, onClick = { onImageClick(3) }, modifier = Modifier.fillMaxSize())
+                            GridImageItem(
+                                uri = images[3].uri,
+                                onRemove = { onRemove(images[3].uri) },
+                                onClick = { onImageClick(3) },
+                                modifier = Modifier.fillMaxSize(),
+                            )
 
                             if (count > 4) {
                                 Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(Color.Black.copy(alpha = 0.5f))
-                                        .clickable { onImageClick(3) },
-                                    contentAlignment = Alignment.Center
+                                    modifier =
+                                        Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Black.copy(alpha = 0.5f))
+                                            .clickable { onImageClick(3) },
+                                    contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
                                         text = "+${count - 4}",
                                         color = Color.White,
                                         style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
                                     )
                                 }
                             }
@@ -671,7 +699,7 @@ fun GridImageItem(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
     showRemoveButton: Boolean = true,
-    onSuccess: ((coil3.compose.AsyncImagePainter.State.Success) -> Unit)? = null
+    onSuccess: ((coil3.compose.AsyncImagePainter.State.Success) -> Unit)? = null,
 ) {
     Box(modifier = modifier.clip(RoundedCornerShape(8.dp))) {
         AsyncImage(
@@ -681,40 +709,36 @@ fun GridImageItem(
             modifier = Modifier.fillMaxSize().clickable(onClick = onClick),
             contentScale = contentScale,
             error = painterResource(R.drawable.img_post_placeholder),
-            fallback = painterResource(R.drawable.img_post_placeholder)
+            fallback = painterResource(R.drawable.img_post_placeholder),
         )
         if (showRemoveButton) {
             IconButton(
                 onClick = onRemove,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .size(24.dp)
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .size(24.dp),
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_close),
                     contentDescription = "Remove",
                     modifier = Modifier.size(14.dp),
-                    tint = Color.White
+                    tint = Color.White,
                 )
             }
         }
     }
 }
 
-
 @Preview
 @Composable
 fun CreatePostScreenPreview() {
     IssueSpotTheme {
         CreatePostScreenContent(
-            state = CreatePostState()
+            state = CreatePostState(),
         )
     }
 }
-
-
-
-

@@ -1,11 +1,5 @@
 package org.example.project.auth.presentation.screens
 
-import org.example.project.core.components.AppErrorDialog
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.remember
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -14,21 +8,23 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.example.project.core.components.AppErrorDialog
 import org.example.project.feature.auth.viewmodel.AuthEffect
 import org.example.project.feature.auth.viewmodel.AuthIntent
 import org.example.project.feature.auth.viewmodel.AuthUiState
@@ -40,11 +36,10 @@ import org.example.project.theme.IssueSpotTypography
 @Composable
 fun OTPScreen(
     navigateToNameCapture: (String) -> Unit,
-    viewModel: AuthViewModel
+    viewModel: AuthViewModel,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var errorDialogMessage by remember { mutableStateOf<String?>(null) }
-
 
     LaunchedEffect(Unit) {
         viewModel.effect.collect { effect ->
@@ -58,25 +53,25 @@ fun OTPScreen(
         }
     }
 
-    
     errorDialogMessage?.let { message ->
         AppErrorDialog(
             message = message,
-            onDismiss = { errorDialogMessage = null }
+            onDismiss = { errorDialogMessage = null },
         )
     }
 
     Scaffold(
-        containerColor = Color.White
+        containerColor = Color.White,
     ) { padding ->
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding),
         ) {
             OTPContent(
                 uiState = uiState,
-                onAction = { intent -> viewModel.handleIntent(intent) }
+                onAction = { intent -> viewModel.handleIntent(intent) },
             )
         }
     }
@@ -85,13 +80,14 @@ fun OTPScreen(
 @Composable
 fun OTPContent(
     uiState: AuthUiState,
-    onAction: (AuthIntent) -> Unit
+    onAction: (AuthIntent) -> Unit,
 ) {
     val isLoading = uiState.isLoading
     val otpString = uiState.otp
-    val otpDigits = remember(otpString) {
-        List(6) { index -> otpString.getOrNull(index)?.toString() ?: "" }
-    }
+    val otpDigits =
+        remember(otpString) {
+            List(6) { index -> otpString.getOrNull(index)?.toString() ?: "" }
+        }
     val spacing = IssueSpotTheme.spacing
     val shapes = MaterialTheme.shapes
 
@@ -99,11 +95,12 @@ fun OTPContent(
     val focusManager = LocalFocusManager.current
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(IssueSpotColors.Surface)
-            .padding(spacing.large),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(IssueSpotColors.Surface)
+                .padding(spacing.large),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(modifier = Modifier.height(spacing.huge * 2))
 
@@ -111,7 +108,7 @@ fun OTPContent(
             text = "Enter verification code",
             style = IssueSpotTypography.headlineMedium,
             fontWeight = FontWeight.Bold,
-            color = IssueSpotColors.OnSurface
+            color = IssueSpotColors.OnSurface,
         )
 
         Spacer(modifier = Modifier.height(spacing.small))
@@ -121,7 +118,7 @@ fun OTPContent(
             style = IssueSpotTypography.bodyMedium,
             color = IssueSpotColors.OnSurfaceVariant,
             textAlign = TextAlign.Center,
-            lineHeight = 20.sp
+            lineHeight = 20.sp,
         )
 
         Spacer(modifier = Modifier.height(spacing.huge))
@@ -133,56 +130,61 @@ fun OTPContent(
                     onAction(AuthIntent.OtpChanged(newValue))
                 }
             },
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.NumberPassword,
-                imeAction = ImeAction.Done
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = spacing.medium),
+            keyboardOptions =
+                KeyboardOptions(
+                    keyboardType = KeyboardType.NumberPassword,
+                    imeAction = ImeAction.Done,
+                ),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = spacing.medium),
             enabled = !isLoading,
             decorationBox = {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(spacing.smallMedium),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     repeat(6) { index ->
-                        val char = when {
-                            index >= otpString.length -> ""
-                            else -> otpString[index].toString()
-                        }
+                        val char =
+                            when {
+                                index >= otpString.length -> ""
+                                else -> otpString[index].toString()
+                            }
                         Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(56.dp)
-                                .border(
-                                    width = 1.dp,
-                                    color = if (char.isEmpty()) IssueSpotColors.Outline else IssueSpotColors.Primary,
-                                    shape = MaterialTheme.shapes.small
-                                )
-                                .background(IssueSpotColors.Surface),
-                            contentAlignment = Alignment.Center
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .height(56.dp)
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (char.isEmpty()) IssueSpotColors.Outline else IssueSpotColors.Primary,
+                                        shape = MaterialTheme.shapes.small,
+                                    ).background(IssueSpotColors.Surface),
+                            contentAlignment = Alignment.Center,
                         ) {
                             if (char.isEmpty()) {
                                 Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .background(IssueSpotColors.Outline, CircleShape)
+                                    modifier =
+                                        Modifier
+                                            .size(8.dp)
+                                            .background(IssueSpotColors.Outline, CircleShape),
                                 )
                             } else {
                                 Text(
                                     text = char,
-                                    style = IssueSpotTypography.bodyLarge.copy(
-                                        textAlign = TextAlign.Center,
-                                        fontWeight = FontWeight.Bold,
-                                        color = IssueSpotColors.OnSurface
-                                    )
+                                    style =
+                                        IssueSpotTypography.bodyLarge.copy(
+                                            textAlign = TextAlign.Center,
+                                            fontWeight = FontWeight.Bold,
+                                            color = IssueSpotColors.OnSurface,
+                                        ),
                                 )
                             }
                         }
                     }
                 }
-            }
+            },
         )
 
         Spacer(modifier = Modifier.height(spacing.extraLarge))
@@ -190,25 +192,26 @@ fun OTPContent(
         Button(
             onClick = { onAction(AuthIntent.VerifyOtpClicked) },
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = IssueSpotColors.Primary,
-                contentColor = IssueSpotColors.OnPrimary
-            ),
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = IssueSpotColors.Primary,
+                    contentColor = IssueSpotColors.OnPrimary,
+                ),
             shape = shapes.medium,
-            enabled = otpString.length == 6 && !isLoading
+            enabled = otpString.length == 6 && !isLoading,
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(24.dp),
                     color = IssueSpotColors.OnPrimary,
-                    strokeWidth = 2.dp
+                    strokeWidth = 2.dp,
                 )
             } else {
                 Text(
                     text = "Verify OTP",
                     style = IssueSpotTypography.labelLarge,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(vertical = spacing.extraSmall)
+                    modifier = Modifier.padding(vertical = spacing.extraSmall),
                 )
             }
         }
@@ -217,12 +220,12 @@ fun OTPContent(
 
         TextButton(
             onClick = { onAction(AuthIntent.SendOtpClicked) },
-            enabled = !isLoading
+            enabled = !isLoading,
         ) {
             Text(
                 text = "Resend Code",
                 style = IssueSpotTypography.labelLarge,
-                color = IssueSpotColors.Primary
+                color = IssueSpotColors.Primary,
             )
         }
 
@@ -236,7 +239,7 @@ fun OTPScreenPreview() {
     MaterialTheme {
         OTPContent(
             uiState = AuthUiState(),
-            onAction = {}
+            onAction = {},
         )
     }
 }

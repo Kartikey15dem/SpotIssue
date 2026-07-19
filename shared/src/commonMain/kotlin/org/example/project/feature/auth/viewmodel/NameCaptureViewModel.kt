@@ -2,25 +2,29 @@ package org.example.project.feature.auth.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.example.project.core.datastore.UserPreferencesRepository
+import kotlinx.coroutines.withContext
 import org.example.project.core.data.repository.ProfileRepository
+import org.example.project.core.datastore.UserPreferencesRepository
 import org.example.project.core.model.profile.Profile
 import org.example.project.core.utils.DataState
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import org.example.project.core.utils.FileSystem
 
 sealed class NameCaptureEffect {
-    data class ShowDialog(val message: String) : NameCaptureEffect()
+    data class ShowDialog(
+        val message: String,
+    ) : NameCaptureEffect()
+
     data object ShowImagePicker : NameCaptureEffect()
+
     data object ShowCamera : NameCaptureEffect()
 }
 
@@ -28,23 +32,30 @@ data class NameCaptureUiState(
     val name: String = "",
     val imageUrl: String = "",
     val isLoading: Boolean = false,
-    val isLoadingImage: Boolean = false
+    val isLoadingImage: Boolean = false,
 )
 
 sealed class NameCaptureIntent {
-    data class NameChanged(val name: String) : NameCaptureIntent()
-    data class ImageUrlChanged(val url: String) : NameCaptureIntent()
+    data class NameChanged(
+        val name: String,
+    ) : NameCaptureIntent()
+
+    data class ImageUrlChanged(
+        val url: String,
+    ) : NameCaptureIntent()
+
     data object SubmitClicked : NameCaptureIntent()
+
     data object PickFromGalleryClicked : NameCaptureIntent()
+
     data object CaptureFromCameraClicked : NameCaptureIntent()
 }
 
 class NameCaptureViewModel(
     private val email: String,
     private val prefRepository: UserPreferencesRepository,
-    private val profileRepository: ProfileRepository
+    private val profileRepository: ProfileRepository,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(NameCaptureUiState())
     val uiState: StateFlow<NameCaptureUiState> = _uiState.asStateFlow()
 
@@ -95,17 +106,18 @@ class NameCaptureViewModel(
 
             val isLocalPath = currentImageUrl.startsWith("/") || currentImageUrl.startsWith("file://")
             val localImagePath = if (isLocalPath) currentImageUrl.removePrefix("file://") else null
-            
-            val profile = Profile(
-                name = currentName,
-                email = email.trim(),
-                imageUrl = if (isLocalPath) "" else currentImageUrl,
-                totalPosts = 0,
-                acks = 0,
-                postByArea = listOf(0, 0, 0, 0),
-                myPosts = emptyList(),
-                ackPosts = emptyList()
-            )
+
+            val profile =
+                Profile(
+                    name = currentName,
+                    email = email.trim(),
+                    imageUrl = if (isLocalPath) "" else currentImageUrl,
+                    totalPosts = 0,
+                    acks = 0,
+                    postByArea = listOf(0, 0, 0, 0),
+                    myPosts = emptyList(),
+                    ackPosts = emptyList(),
+                )
 
             when (val result = profileRepository.updateProfile(profile, localImagePath)) {
                 is DataState.Success -> {
@@ -124,8 +136,6 @@ class NameCaptureViewModel(
                     _uiState.update { it.copy(isLoading = true) }
                 }
             }
-
-
         }
     }
 

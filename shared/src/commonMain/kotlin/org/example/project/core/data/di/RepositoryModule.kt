@@ -13,19 +13,20 @@ import org.example.project.core.data.repositoryImp.ProfileRepositoryImpl
 import org.koin.dsl.bind
 import org.koin.dsl.module
 
-val RepositoryModule = module {
-    // Auth
-    single { AuthRepositoryImpl(get(), get(), get()) } bind AuthRepository::class
+val RepositoryModule =
+    module {
+        // Auth
+        single { AuthRepositoryImpl(get(), get(), get()) } bind AuthRepository::class
 
-    // Feed
-    factory { FeedRepositoryImpl(get(), get(), get(), get()) } bind FeedRepository::class
+        // Feed
+        factory { FeedRepositoryImpl(get(), get(), get(), get()) } bind FeedRepository::class
 
-    // Post
-    single { PostRepositoryImpl(get(), get(), get()) } bind PostRepository::class
+        // Post
+        single { PostRepositoryImpl(get(), get(), get()) } bind PostRepository::class
 
-    // Profile
-    single { ProfileRepositoryImpl(get(), get(), get(), get(), get()) } bind ProfileRepository::class
+        // Profile
+        single { ProfileRepositoryImpl(get(), get(), get(), get(), get()) } bind ProfileRepository::class
 
-    single { FeedLocalDataSource(get()) }
-    single { ProfileLocalDataSource(get()) }
-}
+        single { FeedLocalDataSource(get()) }
+        single { ProfileLocalDataSource(get()) }
+    }

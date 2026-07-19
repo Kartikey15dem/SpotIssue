@@ -7,7 +7,7 @@ import org.koin.core.module.Module
 import org.koin.dsl.bind
 import org.koin.dsl.module
 
-actual val platformNetworkModule: Module = module {
-    single { ConnectivityManagerNetworkMonitor(androidApplication()) } bind NetworkMonitor::class
-}
-
+actual val platformNetworkModule: Module =
+    module {
+        single { ConnectivityManagerNetworkMonitor(androidApplication()) } bind NetworkMonitor::class
+    }

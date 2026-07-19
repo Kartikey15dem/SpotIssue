@@ -4,18 +4,17 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
-import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-
 import org.example.project.core.utils.LocationProvider
 
 /**
  * Handles location permission requests and checks.
  * Use this before calling [LocationProvider.getCurrentLocation].
  */
-class LocationPermissionHandler(private val context: Context) {
-
+class LocationPermissionHandler(
+    private val context: Context,
+) {
     companion object {
         const val REQUEST_LOCATION_PERMISSIONS = 0xB00
     }
@@ -24,14 +23,16 @@ class LocationPermissionHandler(private val context: Context) {
      * Check if location permissions are currently granted.
      */
     fun hasLocationPermission(): Boolean {
-        val hasFineLocation = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val hasCoarseLocation = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
+        val hasFineLocation =
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+            ) == PackageManager.PERMISSION_GRANTED
+        val hasCoarseLocation =
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            ) == PackageManager.PERMISSION_GRANTED
 
         return hasFineLocation || hasCoarseLocation
     }
@@ -50,9 +51,9 @@ class LocationPermissionHandler(private val context: Context) {
             activity,
             arrayOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
+                Manifest.permission.ACCESS_COARSE_LOCATION,
             ),
-            REQUEST_LOCATION_PERMISSIONS
+            REQUEST_LOCATION_PERMISSIONS,
         )
         return false
     }
@@ -60,13 +61,13 @@ class LocationPermissionHandler(private val context: Context) {
     /**
      * Check if we should show rationale for requesting permissions.
      */
-    fun shouldShowRequestPermissionRationale(activity: Activity): Boolean {
-        return ActivityCompat.shouldShowRequestPermissionRationale(
+    fun shouldShowRequestPermissionRationale(activity: Activity): Boolean =
+        ActivityCompat.shouldShowRequestPermissionRationale(
             activity,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) || ActivityCompat.shouldShowRequestPermissionRationale(
-            activity,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        )
-    }
+            Manifest.permission.ACCESS_FINE_LOCATION,
+        ) ||
+            ActivityCompat.shouldShowRequestPermissionRationale(
+                activity,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            )
 }

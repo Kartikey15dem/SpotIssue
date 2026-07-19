@@ -5,40 +5,54 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.example.project.core.data.repository.AuthRepository
 import org.example.project.core.data.repository.ProfileRepository
-import org.example.project.core.utils.DataState
 import org.example.project.core.datastore.UserPreferencesRepository
+import org.example.project.core.utils.DataState
 
 sealed class AuthEffect {
-    data class NavigateToOtpScreen(val email: String) : AuthEffect()
-    data class NavigateToNameCaptureScreen(val email: String) : AuthEffect()
-    data class ShowDialog(val message: String) : AuthEffect()
+    data class NavigateToOtpScreen(
+        val email: String,
+    ) : AuthEffect()
+
+    data class NavigateToNameCaptureScreen(
+        val email: String,
+    ) : AuthEffect()
+
+    data class ShowDialog(
+        val message: String,
+    ) : AuthEffect()
 }
 
 data class AuthUiState(
     val email: String = "",
     val otp: String = "",
-    val isLoading : Boolean = false,
+    val isLoading: Boolean = false,
 )
 
-sealed class AuthIntent{
-    data class EmailChanged(val email: String) : AuthIntent()
-    data class OtpChanged(val otp: String) : AuthIntent()
+sealed class AuthIntent {
+    data class EmailChanged(
+        val email: String,
+    ) : AuthIntent()
+
+    data class OtpChanged(
+        val otp: String,
+    ) : AuthIntent()
+
     data object SendOtpClicked : AuthIntent()
+
     data object VerifyOtpClicked : AuthIntent()
 }
 
 class AuthViewModel(
     private val authRepository: AuthRepository,
     private val prefRepository: UserPreferencesRepository,
-    private val profileRepository: ProfileRepository
+    private val profileRepository: ProfileRepository,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
@@ -105,9 +119,10 @@ class AuthViewModel(
             when (val result = authRepository.verifyOtp(email, otp)) {
                 is DataState.Success -> {
                     val isNewUser = result.data.isNewUser
-                    if(isNewUser) _effect.send(AuthEffect.NavigateToNameCaptureScreen(email))
-                    else {
-                        when(val res = profileRepository.refreshProfile()){
+                    if (isNewUser) {
+                        _effect.send(AuthEffect.NavigateToNameCaptureScreen(email))
+                    } else {
+                        when (val res = profileRepository.refreshProfile()) {
                             is DataState.Error -> {
                                 showError(res.exception.message ?: "An unexpected error occurred\n\nPlease try again.")
                             }
@@ -119,9 +134,7 @@ class AuthViewModel(
                                 prefRepository.setLoggedIn(true)
                             }
                         }
-
                     }
-
                 }
                 is DataState.Error -> {
                     hideLoading()
@@ -134,9 +147,8 @@ class AuthViewModel(
         }
     }
 
-
     private fun showLoading() {
-        _uiState.update { it.copy(isLoading = true)  }
+        _uiState.update { it.copy(isLoading = true) }
     }
 
     private fun hideLoading() {

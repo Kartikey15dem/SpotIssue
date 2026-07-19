@@ -11,7 +11,6 @@ import org.example.project.core.database.entities.ProfileEntity
  */
 @Dao
 interface ProfileDao {
-
     /**
      * Insert or update profile (upsert)
      */
@@ -40,12 +39,17 @@ interface ProfileDao {
      * Update profile image
      */
     @Query("UPDATE profile SET imageUrl = :imageUrl, updatedAt = :timestamp WHERE userId = 'current_user'")
-    suspend fun updateProfileImage(imageUrl: String?, timestamp: Long)
+    suspend fun updateProfileImage(
+        imageUrl: String?,
+        timestamp: Long,
+    )
 
     /**
      * Update profile name
      */
     @Query("UPDATE profile SET name = :name, updatedAt = :timestamp WHERE userId = 'current_user'")
-    suspend fun updateProfileName(name: String, timestamp: Long)
+    suspend fun updateProfileName(
+        name: String,
+        timestamp: Long,
+    )
 }
-

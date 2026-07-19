@@ -7,5 +7,5 @@ import kotlinx.serialization.Serializable
 data class AuthRequestOtpResponse(
     val sent: Boolean,
     @SerialName("dev_code")
-    val devCode: String? = null
+    val devCode: String? = null,
 )

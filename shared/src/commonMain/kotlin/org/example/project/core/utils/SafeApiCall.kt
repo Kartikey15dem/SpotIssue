@@ -20,16 +20,17 @@ private const val FALLBACK_ERROR_MESSAGE = "An error occurred.\n\nPlease try aga
 
 private val safeApiCallLogger = Logger.withTag("SafeApiCall")
 
-private val errorJson = Json {
-    ignoreUnknownKeys = true
-    isLenient = true
-    explicitNulls = false
-}
+private val errorJson =
+    Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        explicitNulls = false
+    }
 
 suspend fun <T> safeApiCall(
     networkMonitor: NetworkMonitor? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    apiCall: suspend () -> T
+    apiCall: suspend () -> T,
 ): DataState<T> {
     return withContext(dispatcher) {
         if (networkMonitor?.isOnline?.first() == false) {
@@ -54,27 +55,29 @@ suspend fun <T> safeApiCall(
 }
 
 private suspend fun <T> handleResponseException(e: ResponseException): DataState<T> {
-    val rawBody = try {
-        e.response.bodyAsText()
-    } catch (inner: Exception) {
-        safeApiCallLogger.e { "Failed to read error response: ${inner.message ?: inner::class.simpleName}" }
-        null
-    }
+    val rawBody =
+        try {
+            e.response.bodyAsText()
+        } catch (inner: Exception) {
+            safeApiCallLogger.e { "Failed to read error response: ${inner.message ?: inner::class.simpleName}" }
+            null
+        }
 
     val errorBody = rawBody?.parseErrorResponse()
-    val developerMessage = errorBody?.developerMessage
-        ?: rawBody?.takeIf { it.isNotBlank() }
-        ?: e.message
-        ?: e::class.simpleName
-        ?: FALLBACK_ERROR_MESSAGE
+    val developerMessage =
+        errorBody?.developerMessage
+            ?: rawBody?.takeIf { it.isNotBlank() }
+            ?: e.message
+            ?: e::class.simpleName
+            ?: FALLBACK_ERROR_MESSAGE
     val userMessage = errorBody?.userMessage?.takeIf { it.isNotBlank() } ?: FALLBACK_ERROR_MESSAGE
 
     safeApiCallLogger.e { "API error ${e.response.status.value}: $developerMessage" }
     return DataState.Error(Exception(userMessage))
 }
 
-private fun String.parseErrorResponse(): ErrorResponseDto? {
-    return try {
+private fun String.parseErrorResponse(): ErrorResponseDto? =
+    try {
         errorJson.decodeFromString<ErrorResponseDto>(this)
     } catch (e: SerializationException) {
         safeApiCallLogger.e { "Failed to parse error response: ${e.message ?: e::class.simpleName}" }
@@ -83,4 +86,3 @@ private fun String.parseErrorResponse(): ErrorResponseDto? {
         safeApiCallLogger.e { "Invalid error response body: ${e.message ?: e::class.simpleName}" }
         null
     }
-}

@@ -39,4 +39,3 @@ interface ActiveIssuesDao {
     @Query("DELETE FROM active_issues")
     suspend fun clearAll()
 }
-

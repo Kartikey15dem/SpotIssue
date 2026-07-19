@@ -1,7 +1,7 @@
 package org.example.project.core.utils
 
-import kotlin.time.Clock
 import kotlinx.datetime.Instant
+import kotlin.time.Clock
 
 /**
  * Helpers to keep DB ordering stable for offline-first paging.
@@ -27,12 +27,12 @@ fun getRelativeTime(isoString: String): String {
     val epochMillis = parseIsoEpochMillis(isoString)
     val now = Clock.System.now().toEpochMilliseconds()
     val diff = now - epochMillis
-    
+
     val seconds = diff / 1000L
     val minutes = seconds / 60L
     val hours = minutes / 60L
     val days = hours / 24L
-    
+
     return when {
         diff < 0L -> "Just now"
         seconds < 60L -> "Just now"

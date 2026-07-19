@@ -10,8 +10,8 @@ import kotlin.time.Clock
 @Entity(
     tableName = "posts",
     indices = [
-        androidx.room.Index(value = ["postLevel", "createdAt", "id"])
-    ]
+        androidx.room.Index(value = ["postLevel", "createdAt", "id"]),
+    ],
 )
 data class PostEntity(
     @PrimaryKey
@@ -34,11 +34,11 @@ data class PostEntity(
     val cachedAt: Long,
     val createdAt: Long,
     val isLiked: Boolean = false,
-    val isReported: Boolean = false
+    val isReported: Boolean = false,
 )
 
-fun PostEntity.toPost(): Post {
-    return Post(
+fun PostEntity.toPost(): Post =
+    Post(
         id = id,
         userId = userId,
         userUrl = userUrl,
@@ -56,12 +56,11 @@ fun PostEntity.toPost(): Post {
         district = district,
         state = state,
         country = country,
-        createdAt = createdAt
+        createdAt = createdAt,
     )
-}
 
-fun Post.toEntity(cachedAt: Long = Clock.System.now().toEpochMilliseconds()): PostEntity {
-    return PostEntity(
+fun Post.toEntity(cachedAt: Long = Clock.System.now().toEpochMilliseconds()): PostEntity =
+    PostEntity(
         id = id,
         userId = userId,
         userUrl = userUrl,
@@ -81,6 +80,5 @@ fun Post.toEntity(cachedAt: Long = Clock.System.now().toEpochMilliseconds()): Po
         country = country,
         isLiked = isLiked,
         isReported = isReported,
-        createdAt = createdAt
+        createdAt = createdAt,
     )
-}

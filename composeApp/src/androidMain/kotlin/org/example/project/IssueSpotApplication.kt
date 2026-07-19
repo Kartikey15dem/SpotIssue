@@ -7,20 +7,19 @@ import org.example.project.core.utils.initializeKoin
 import org.koin.android.ext.koin.androidContext
 
 class IssueSpotApplication : Application() {
-
     override fun onCreate() {
         super.onCreate()
 
-        val androidModules = listOf(
-            platformModule
-        )
+        val androidModules =
+            listOf(
+                platformModule,
+            )
         initializeDatabase(this)
 
         initializeKoin(
-            additionalModules = androidModules
+            additionalModules = androidModules,
         ) {
             androidContext(this@IssueSpotApplication)
-
         }
     }
 }

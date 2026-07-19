@@ -19,15 +19,18 @@ import org.example.project.core.window.FeedConfig
 fun InfiniteScrollHandler(
     listState: LazyListState,
     buffer: Int = FeedConfig.LOAD_MORE_THRESHOLD,
-    onLoadMore: () -> Unit
+    onLoadMore: () -> Unit,
 ) {
     LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
-            .distinctUntilChanged()
+        snapshotFlow {
+            listState.layoutInfo.visibleItemsInfo
+                .lastOrNull()
+                ?.index
+        }.distinctUntilChanged()
             .collect { lastVisibleItem ->
                 // Check the total number of items currently in the list
                 val totalItems = listState.layoutInfo.totalItemsCount
-                
+
                 // If the user has scrolled down far enough that the remaining invisible items
                 // are less than or equal to our buffer (e.g. 5 items left), trigger a load!
                 if (lastVisibleItem != null &&

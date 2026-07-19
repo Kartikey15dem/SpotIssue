@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class VerifyResponseDto(
-    val token : String,
+    val token: String,
     @SerialName("is_new_user")
-    val isNewUser : Boolean
+    val isNewUser: Boolean,
 )

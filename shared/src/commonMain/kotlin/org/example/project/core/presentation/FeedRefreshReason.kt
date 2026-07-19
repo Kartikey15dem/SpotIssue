@@ -7,5 +7,5 @@ enum class FeedRefreshReason {
     LEVEL_CHANGED,
     APP_RESUMED,
     CACHE_EXPIRED,
-    NETWORK_RESTORED
+    NETWORK_RESTORED,
 }

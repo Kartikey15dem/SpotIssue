@@ -16,17 +16,18 @@ import org.example.project.theme.IssueSpotTypography
 @Composable
 fun HomeOfflineBanner(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(Color(0xFFE53935))
-            .padding(vertical = IssueSpotTheme.spacing.extraSmall),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(Color(0xFFE53935))
+                .padding(vertical = IssueSpotTheme.spacing.extraSmall),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = "You are currently offline. Showing cached posts.",
             style = IssueSpotTypography.bodyMedium,
             color = Color.White,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
     }
 }

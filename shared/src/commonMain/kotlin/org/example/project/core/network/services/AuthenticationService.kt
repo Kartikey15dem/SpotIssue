@@ -9,20 +9,13 @@ import org.example.project.core.network.dto.VerifyResponseDto
 import org.example.project.core.utils.ApiEndPoints
 
 interface AuthenticationService {
-
     @POST(ApiEndPoints.AUTHENTICATION + "/otp/request")
     suspend fun requestOtp(
-        @Body request: LoginRequestDto
+        @Body request: LoginRequestDto,
     ): AuthRequestOtpResponse
 
     @POST(ApiEndPoints.AUTHENTICATION + "/otp/verify")
     suspend fun verifyOtp(
-        @Body request: VerifyRequestDto
+        @Body request: VerifyRequestDto,
     ): VerifyResponseDto
 }
-
-
-
-
-
-

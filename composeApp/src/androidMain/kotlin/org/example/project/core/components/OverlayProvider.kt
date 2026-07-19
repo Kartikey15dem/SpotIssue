@@ -13,7 +13,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,12 +26,11 @@ import org.example.project.R
 import org.example.project.core.model.home.MediaType
 
 @Composable
-fun OverlayProvider(
-    content: @Composable () -> Unit
-) {
-    val overlayController = rememberSaveable(saver = OverlayController.Saver) {
-        OverlayController()
-    }
+fun OverlayProvider(content: @Composable () -> Unit) {
+    val overlayController =
+        rememberSaveable(saver = OverlayController.Saver) {
+            OverlayController()
+        }
 
     CompositionLocalProvider(LocalOverlayController provides overlayController) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -48,11 +46,12 @@ fun OverlayProvider(
                 }
                 // The Scrim (Dark background)
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black)
-                        .zIndex(1f),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color.Black)
+                            .zIndex(1f),
+                    contentAlignment = Alignment.Center,
                 ) {
                     // Render content based on Enum
                     when (data.type) {
@@ -62,21 +61,21 @@ fun OverlayProvider(
                     }
                     IconButton(
                         onClick = { overlayController.hide() },
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .statusBarsPadding()
-                            .padding(start = 6.dp)
-                            .zIndex(2f)
-                            .clip(CircleShape)
-                            .background(Color.Black)
-                            .size(36.dp)
-
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopStart)
+                                .statusBarsPadding()
+                                .padding(start = 6.dp)
+                                .zIndex(2f)
+                                .clip(CircleShape)
+                                .background(Color.Black)
+                                .size(36.dp),
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.ic_back),
                             contentDescription = "Remove media",
                             modifier = Modifier.size(28.dp),
-                            tint = Color.White // Black Icon
+                            tint = Color.White, // Black Icon
                         )
                     }
                 }
@@ -85,12 +84,11 @@ fun OverlayProvider(
     }
 }
 
-
 @Composable
 fun OverlayLoadingSpinner() {
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator(color = Color.White)
     }

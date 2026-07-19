@@ -6,6 +6,9 @@ import org.example.project.core.utils.DataState
 
 interface AuthRepository {
     suspend fun requestOtp(email: String): DataState<AuthRequestOtpResponse>
-    suspend fun verifyOtp(email: String, otp: String): DataState<VerifyResponseDto>
-}
 
+    suspend fun verifyOtp(
+        email: String,
+        otp: String,
+    ): DataState<VerifyResponseDto>
+}

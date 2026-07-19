@@ -9,23 +9,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import org.example.project.core.components.InfiniteScrollHandler
 import org.example.project.core.components.PostCard
 import org.example.project.core.presentation.FeedState
-import org.example.project.theme.IssueSpotTheme
-import kotlinx.coroutines.flow.distinctUntilChanged
-import org.example.project.core.window.FeedConfig
 import org.example.project.feature.home.viewmodel.HomeIntent
+import org.example.project.theme.IssueSpotTheme
 
 @Composable
 fun HomeSearchFeed(
     searchState: FeedState,
     onIntent: (HomeIntent) -> Unit,
     modifier: Modifier = Modifier,
-    header: @Composable () -> Unit
+    header: @Composable () -> Unit,
 ) {
     val spacing = IssueSpotTheme.spacing
     val listState = rememberLazyListState()
@@ -46,7 +42,7 @@ fun HomeSearchFeed(
 
         LazyColumn(
             state = listState,
-            modifier = Modifier.weight(1f).fillMaxWidth()
+            modifier = Modifier.weight(1f).fillMaxWidth(),
         ) {
             item {
                 if (showInitialLoading) {
@@ -55,7 +51,7 @@ fun HomeSearchFeed(
                 if (showInitialError) {
                     HomeInitialError(
                         message = searchState.error?.message ?: "An error occurred",
-                        onRetry = { onIntent(HomeIntent.RetrySearchPosts) }
+                        onRetry = { onIntent(HomeIntent.RetrySearchPosts) },
                     )
                 }
                 if (showEmptyFeed) {
@@ -66,45 +62,47 @@ fun HomeSearchFeed(
             items(
                 items = searchState.posts,
                 key = { it.id },
-                contentType = { null }
+                contentType = { null },
             ) { post ->
-                    PostCard(
-                        modifier = Modifier
+                PostCard(
+                    modifier =
+                        Modifier
                             .fillMaxWidth()
                             .padding(
                                 start = spacing.smallMedium,
                                 end = spacing.smallMedium,
-                                bottom = spacing.smallMedium
+                                bottom = spacing.smallMedium,
                             ),
-                        post = post,
-                        isLiked = post.isLiked,
-                        likesCount = post.likes,
-                        commentsCount = post.comments,
-                        isReported = post.isReported,
-                        onLikeClick = {
-                            onIntent(HomeIntent.LikeClicked(post.id))
-                        },
-                        onCommentIconClick = {
-                            onIntent(HomeIntent.CommentsIconClicked(post.id))
-                        },
-                        onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
-                        onReportClick = { reason ->
-                            onIntent(HomeIntent.ReportClicked(post.id, reason))
-                        },
-                        onPostClick = { onIntent(HomeIntent.PostClicked(post.id)) }
-                    )
+                    post = post,
+                    isLiked = post.isLiked,
+                    likesCount = post.likes,
+                    commentsCount = post.comments,
+                    isReported = post.isReported,
+                    onLikeClick = {
+                        onIntent(HomeIntent.LikeClicked(post.id))
+                    },
+                    onCommentIconClick = {
+                        onIntent(HomeIntent.CommentsIconClicked(post.id))
+                    },
+                    onShareClick = { onIntent(HomeIntent.ShareClicked(post)) },
+                    onReportClick = { reason ->
+                        onIntent(HomeIntent.ReportClicked(post.id, reason))
+                    },
+                    onPostClick = { onIntent(HomeIntent.PostClicked(post.id)) },
+                )
             }
 
             item {
-                val footerState = when {
-                    searchState.isAppending -> FooterState.Loading
-                    appendError != null -> FooterState.Error(Throwable(appendError.message))
-                    showNoMorePosts -> FooterState.EndReached
-                    else -> FooterState.Hidden
-                }
+                val footerState =
+                    when {
+                        searchState.isAppending -> FooterState.Loading
+                        appendError != null -> FooterState.Error(Throwable(appendError.message))
+                        showNoMorePosts -> FooterState.EndReached
+                        else -> FooterState.Hidden
+                    }
                 HomeFeedFooter(
                     state = footerState,
-                    onRetry = { onIntent(HomeIntent.RetrySearchPosts) }
+                    onRetry = { onIntent(HomeIntent.RetrySearchPosts) },
                 )
             }
         }

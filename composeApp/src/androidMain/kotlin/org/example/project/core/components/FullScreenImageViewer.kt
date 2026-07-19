@@ -30,13 +30,14 @@ import org.example.project.theme.IssueSpotTypography
 @Composable
 fun FullScreenImageViewer(
     imageUrls: List<String>,
-    initialPage: Int = 0
+    initialPage: Int = 0,
 ) {
     val scope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(
-        initialPage = initialPage,
-        pageCount = { imageUrls.size }
-    )
+    val pagerState =
+        rememberPagerState(
+            initialPage = initialPage,
+            pageCount = { imageUrls.size },
+        )
 
     // --- ZOOM STATE ---
     var scale by remember { mutableFloatStateOf(1f) }
@@ -53,48 +54,51 @@ fun FullScreenImageViewer(
         HorizontalPager(
             state = pagerState,
             userScrollEnabled = scale == 1f, // Lock scrolling if zoomed in
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         ) { pageIndex ->
 
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            val newScale = (scale * zoom).coerceIn(1f, 4f)
-                            scale = newScale
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                val newScale = (scale * zoom).coerceIn(1f, 4f)
+                                scale = newScale
 
-                            if (scale > 1f) {
-                                val maxX = (size.width * (scale - 1)) / 2
-                                val maxY = (size.height * (scale - 1)) / 2
-                                val newOffset = offset + pan
-                                offset = Offset(
-                                    x = newOffset.x.coerceIn(-maxX, maxX),
-                                    y = newOffset.y.coerceIn(-maxY, maxY)
-                                )
-                            } else {
-                                offset = Offset.Zero
+                                if (scale > 1f) {
+                                    val maxX = (size.width * (scale - 1)) / 2
+                                    val maxY = (size.height * (scale - 1)) / 2
+                                    val newOffset = offset + pan
+                                    offset =
+                                        Offset(
+                                            x = newOffset.x.coerceIn(-maxX, maxX),
+                                            y = newOffset.y.coerceIn(-maxY, maxY),
+                                        )
+                                } else {
+                                    offset = Offset.Zero
+                                }
                             }
-                        }
-                    },
-                contentAlignment = Alignment.Center
+                        },
+                contentAlignment = Alignment.Center,
             ) {
                 AsyncImage(
                     model = imageUrls[pageIndex],
                     contentDescription = "Image ${pageIndex + 1}",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()
-                        // APPLY TRANSFORMATIONS HERE
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            translationX = offset.x
-                            translationY = offset.y
-                        },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight()
+                            // APPLY TRANSFORMATIONS HERE
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                translationX = offset.x
+                                translationY = offset.y
+                            },
                     contentScale = ContentScale.Fit,
                     error = painterResource(R.drawable.img_post_placeholder),
-                    fallback = painterResource(R.drawable.img_post_placeholder)
+                    fallback = painterResource(R.drawable.img_post_placeholder),
                 )
             }
         }
@@ -102,11 +106,12 @@ fun FullScreenImageViewer(
         // 2. Navigation Arrows & Indicator
         if (scale == 1f && imageUrls.size > 1) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.Center)
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.Center)
+                        .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 // LEFT ARROW
                 if (pagerState.currentPage > 0) {
@@ -114,12 +119,12 @@ fun FullScreenImageViewer(
                         onClick = {
                             scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
                         },
-                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape),
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_back_arrow),
                             contentDescription = "Previous",
-                            tint = Color.White
+                            tint = Color.White,
                         )
                     }
                 } else {
@@ -132,12 +137,12 @@ fun FullScreenImageViewer(
                         onClick = {
                             scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                         },
-                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape),
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_next_arrow),
                             contentDescription = "Next",
-                            tint = Color.White
+                            tint = Color.White,
                         )
                     }
                 } else {
@@ -147,16 +152,17 @@ fun FullScreenImageViewer(
 
             // PAGE INDICATOR
             Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 32.dp)
-                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 32.dp)
+                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
             ) {
                 Text(
                     text = "${pagerState.currentPage + 1} / ${imageUrls.size}",
                     color = Color.White,
-                    style = IssueSpotTypography.bodyMedium
+                    style = IssueSpotTypography.bodyMedium,
                 )
             }
         }

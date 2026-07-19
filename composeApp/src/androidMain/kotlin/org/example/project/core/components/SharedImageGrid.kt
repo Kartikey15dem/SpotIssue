@@ -27,7 +27,7 @@ fun SharedImageGrid(
     images: List<String>,
     onRemove: (String) -> Unit = {},
     onImageClick: (Int) -> Unit = {},
-    isEditable: Boolean = false
+    isEditable: Boolean = false,
 ) {
     val count = images.size
     val gridHeight = 300.dp // Fixed height for multi-image grids to look uniform
@@ -52,23 +52,33 @@ fun SharedImageGrid(
                             singleAspectRatio = width / height
                             if (singleAspectRatio < 1f) singleAspectRatio = 1f
                         }
-                    }
+                    },
                 )
             }
             2 -> {
                 // Two Images - Side by side
                 Row(modifier = Modifier.fillMaxWidth().height(gridHeight), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                    SharedGridImageItem(uri = images[0], onRemove = { onRemove(images[0]) }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight(), showRemoveButton = isEditable)
-                    SharedGridImageItem(uri = images[1], onRemove = { onRemove(images[1]) }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxHeight(), showRemoveButton = isEditable)
+                    SharedGridImageItem(uri = images[0], onRemove = {
+                        onRemove(images[0])
+                    }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight(), showRemoveButton = isEditable)
+                    SharedGridImageItem(uri = images[1], onRemove = {
+                        onRemove(images[1])
+                    }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxHeight(), showRemoveButton = isEditable)
                 }
             }
             3 -> {
                 // Three Images - 1 Large Left, 2 Small Right vertically stacked
                 Row(modifier = Modifier.fillMaxWidth().height(gridHeight), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                    SharedGridImageItem(uri = images[0], onRemove = { onRemove(images[0]) }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight(), showRemoveButton = isEditable)
+                    SharedGridImageItem(uri = images[0], onRemove = {
+                        onRemove(images[0])
+                    }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight(), showRemoveButton = isEditable)
                     Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(spacing)) {
-                        SharedGridImageItem(uri = images[1], onRemove = { onRemove(images[1]) }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxWidth(), showRemoveButton = isEditable)
-                        SharedGridImageItem(uri = images[2], onRemove = { onRemove(images[2]) }, onClick = { onImageClick(2) }, modifier = Modifier.weight(1f).fillMaxWidth(), showRemoveButton = isEditable)
+                        SharedGridImageItem(uri = images[1], onRemove = {
+                            onRemove(images[1])
+                        }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxWidth(), showRemoveButton = isEditable)
+                        SharedGridImageItem(uri = images[2], onRemove = {
+                            onRemove(images[2])
+                        }, onClick = { onImageClick(2) }, modifier = Modifier.weight(1f).fillMaxWidth(), showRemoveButton = isEditable)
                     }
                 }
             }
@@ -76,29 +86,38 @@ fun SharedImageGrid(
                 // Four or More Images - 2x2 Grid with +N overlay on the 4th
                 Column(modifier = Modifier.fillMaxWidth().height(gridHeight), verticalArrangement = Arrangement.spacedBy(spacing)) {
                     Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                        SharedGridImageItem(uri = images[0], onRemove = { onRemove(images[0]) }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight(), showRemoveButton = isEditable)
-                        SharedGridImageItem(uri = images[1], onRemove = { onRemove(images[1]) }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxHeight(), showRemoveButton = isEditable)
+                        SharedGridImageItem(uri = images[0], onRemove = {
+                            onRemove(images[0])
+                        }, onClick = { onImageClick(0) }, modifier = Modifier.weight(1f).fillMaxHeight(), showRemoveButton = isEditable)
+                        SharedGridImageItem(uri = images[1], onRemove = {
+                            onRemove(images[1])
+                        }, onClick = { onImageClick(1) }, modifier = Modifier.weight(1f).fillMaxHeight(), showRemoveButton = isEditable)
                     }
                     Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                        SharedGridImageItem(uri = images[2], onRemove = { onRemove(images[2]) }, onClick = { onImageClick(2) }, modifier = Modifier.weight(1f).fillMaxHeight(), showRemoveButton = isEditable)
+                        SharedGridImageItem(uri = images[2], onRemove = {
+                            onRemove(images[2])
+                        }, onClick = { onImageClick(2) }, modifier = Modifier.weight(1f).fillMaxHeight(), showRemoveButton = isEditable)
 
                         // 4th Image with Overlay
                         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            SharedGridImageItem(uri = images[3], onRemove = { onRemove(images[3]) }, onClick = { onImageClick(3) }, modifier = Modifier.fillMaxSize(), showRemoveButton = isEditable)
+                            SharedGridImageItem(uri = images[3], onRemove = {
+                                onRemove(images[3])
+                            }, onClick = { onImageClick(3) }, modifier = Modifier.fillMaxSize(), showRemoveButton = isEditable)
 
                             if (count > 4) {
                                 Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(Color.Black.copy(alpha = 0.5f))
-                                        .clickable { onImageClick(3) },
-                                    contentAlignment = Alignment.Center
+                                    modifier =
+                                        Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Black.copy(alpha = 0.5f))
+                                            .clickable { onImageClick(3) },
+                                    contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
                                         text = "+${count - 4}",
                                         color = Color.White,
                                         style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
                                     )
                                 }
                             }
@@ -118,7 +137,7 @@ fun SharedGridImageItem(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
     showRemoveButton: Boolean = false,
-    onSuccess: ((coil3.compose.AsyncImagePainter.State.Success) -> Unit)? = null
+    onSuccess: ((coil3.compose.AsyncImagePainter.State.Success) -> Unit)? = null,
 ) {
     Box(modifier = modifier.clip(RoundedCornerShape(8.dp))) {
         AsyncImage(
@@ -128,23 +147,24 @@ fun SharedGridImageItem(
             modifier = Modifier.fillMaxSize().clickable(onClick = onClick),
             contentScale = contentScale,
             error = painterResource(R.drawable.img_post_placeholder),
-            fallback = painterResource(R.drawable.img_post_placeholder)
+            fallback = painterResource(R.drawable.img_post_placeholder),
         )
         if (showRemoveButton) {
             IconButton(
                 onClick = onRemove,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .size(24.dp)
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .size(24.dp),
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_close),
                     contentDescription = "Remove",
                     modifier = Modifier.size(14.dp),
-                    tint = Color.White
+                    tint = Color.White,
                 )
             }
         }

@@ -13,13 +13,23 @@ interface PostDao {
      * Observe newest posts for a specific post level
      */
     @Query("SELECT * FROM posts WHERE postLevel = :postLevel ORDER BY cachedAt DESC, id DESC LIMIT :limit")
-    fun observeNewestByLevel(postLevel: String, limit: Int): Flow<List<PostEntity>>
+    fun observeNewestByLevel(
+        postLevel: String,
+        limit: Int,
+    ): Flow<List<PostEntity>>
 
     /**
      * Observe posts starting from an anchor (for sliding window)
      */
-    @Query("SELECT * FROM posts WHERE postLevel = :postLevel AND (cachedAt < :anchorCachedAt OR (cachedAt = :anchorCachedAt AND id < :anchorId)) ORDER BY cachedAt DESC, id DESC LIMIT :limit")
-    fun observeAfterAnchorByLevel(postLevel: String, anchorCachedAt: Long, anchorId: String, limit: Int): Flow<List<PostEntity>>
+    @Query(
+        "SELECT * FROM posts WHERE postLevel = :postLevel AND (cachedAt < :anchorCachedAt OR (cachedAt = :anchorCachedAt AND id < :anchorId)) ORDER BY cachedAt DESC, id DESC LIMIT :limit",
+    )
+    fun observeAfterAnchorByLevel(
+        postLevel: String,
+        anchorCachedAt: Long,
+        anchorId: String,
+        limit: Int,
+    ): Flow<List<PostEntity>>
 
     /**
      * Get post by ID
@@ -60,19 +70,29 @@ interface PostDao {
           )
         """,
     )
-    suspend fun trimPostsByLevel(postLevel: String, maxPosts: Int)
+    suspend fun trimPostsByLevel(
+        postLevel: String,
+        maxPosts: Int,
+    )
 
     /**
      * Update like status and count for a post
      */
     @Query("UPDATE posts SET likes = :likesCount, isLiked = :isLiked WHERE id = :postId")
-    suspend fun updateLikeStatus(postId: String, likesCount: Int, isLiked: Boolean)
+    suspend fun updateLikeStatus(
+        postId: String,
+        likesCount: Int,
+        isLiked: Boolean,
+    )
 
     /**
      * Update report status for a post
      */
     @Query("UPDATE posts SET isReported = :isReported WHERE id = :postId")
-    suspend fun updateReportStatus(postId: String, isReported: Boolean)
+    suspend fun updateReportStatus(
+        postId: String,
+        isReported: Boolean,
+    )
 
     /**
      * Delete a post by ID
@@ -84,7 +104,10 @@ interface PostDao {
      * Update comments count for a post
      */
     @Query("UPDATE posts SET comments = :commentsCount WHERE id = :postId")
-    suspend fun updateCommentsCount(postId: String, commentsCount: Int)
+    suspend fun updateCommentsCount(
+        postId: String,
+        commentsCount: Int,
+    )
 
     /**
      * Get count of cached posts for a level

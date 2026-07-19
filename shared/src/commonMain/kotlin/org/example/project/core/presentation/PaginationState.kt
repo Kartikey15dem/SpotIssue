@@ -10,5 +10,5 @@ data class PaginationState<T>(
     val isOffline: Boolean = false,
     val hasMore: Boolean = true,
     val error: FeedError? = null,
-    val appendError: FeedError? = null
+    val appendError: FeedError? = null,
 )

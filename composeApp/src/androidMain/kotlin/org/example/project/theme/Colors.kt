@@ -66,6 +66,6 @@ object IssueSpotColors {
     val OnError = Color(0xFFFFFFFF)
 
     // Lighter error container (was too dark)
-    val ErrorContainer = Color(0xFF5A1414)     // lighter than 0xFF3B0A0A
+    val ErrorContainer = Color(0xFF5A1414) // lighter than 0xFF3B0A0A
     val OnErrorContainer = Color(0xFFFFEDEC)
 }

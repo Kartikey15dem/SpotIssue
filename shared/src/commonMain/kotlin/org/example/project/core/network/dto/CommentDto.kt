@@ -9,5 +9,5 @@ data class CommentDto(
     @SerialName("post_id") val postId: String,
     @SerialName("comment_text") val commentText: String,
     @SerialName("created_at") val createdAt: String,
-    @SerialName("profile") val profile: ProfileInfoDto? = null
+    @SerialName("profile") val profile: ProfileInfoDto? = null,
 )

@@ -24,15 +24,16 @@ import org.example.project.theme.IssueSpotColors
 @Composable
 fun ReportPostDialog(
     onDismiss: () -> Unit,
-    onSubmit: (String) -> Unit
+    onSubmit: (String) -> Unit,
 ) {
-    val reportReasons = listOf(
-        "Spam or Misleading",
-        "Harassment or Hate Speech",
-        "Inappropriate Content",
-        "False Information",
-        "Other"
-    )
+    val reportReasons =
+        listOf(
+            "Spam or Misleading",
+            "Harassment or Hate Speech",
+            "Inappropriate Content",
+            "False Information",
+            "Other",
+        )
     var selectedReason by rememberSaveable { mutableStateOf(reportReasons.first()) }
 
     AlertDialog(
@@ -46,19 +47,20 @@ fun ReportPostDialog(
                 reportReasons.forEach { reason ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { selectedReason = reason }
-                            .padding(vertical = 4.dp)
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedReason = reason }
+                                .padding(vertical = 4.dp),
                     ) {
                         RadioButton(
                             selected = (reason == selectedReason),
                             onClick = { selectedReason = reason },
-                            colors = RadioButtonDefaults.colors(selectedColor = IssueSpotColors.Primary)
+                            colors = RadioButtonDefaults.colors(selectedColor = IssueSpotColors.Primary),
                         )
                         Text(
                             text = reason,
-                            modifier = Modifier.padding(start = 8.dp)
+                            modifier = Modifier.padding(start = 8.dp),
                         )
                     }
                 }
@@ -74,6 +76,6 @@ fun ReportPostDialog(
                 Text("Cancel", color = IssueSpotColors.OnSurfaceVariant)
             }
         },
-        containerColor = IssueSpotColors.Surface
+        containerColor = IssueSpotColors.Surface,
     )
 }

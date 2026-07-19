@@ -22,29 +22,31 @@ import org.example.project.theme.IssueSpotTypography
 fun HomeInitialError(
     message: String,
     onRetry: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val spacing = IssueSpotTheme.spacing
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(300.dp)
-            .padding(spacing.medium),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(300.dp)
+                .padding(spacing.medium),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
         Text(
             text = message,
             color = IssueSpotColors.OnBackground,
-            style = IssueSpotTypography.bodyMedium
+            style = IssueSpotTypography.bodyMedium,
         )
         Spacer(Modifier.height(spacing.small))
         Button(
             onClick = onRetry,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = IssueSpotColors.Primary,
-                contentColor = IssueSpotColors.OnPrimary
-            )
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = IssueSpotColors.Primary,
+                    contentColor = IssueSpotColors.OnPrimary,
+                ),
         ) {
             Text("Retry")
         }
@@ -55,16 +57,17 @@ fun HomeInitialError(
 fun HomeEmptyFeed(modifier: Modifier = Modifier) {
     val spacing = IssueSpotTheme.spacing
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(300.dp)
-            .padding(spacing.medium),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(300.dp)
+                .padding(spacing.medium),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = "No posts found",
             style = IssueSpotTypography.bodyLarge,
-            color = IssueSpotColors.OnBackground
+            color = IssueSpotColors.OnBackground,
         )
     }
 }

@@ -1,6 +1,11 @@
 package org.example.project.profile.presentation.screens
 
-import androidx.compose.ui.graphics.Color
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,119 +40,107 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import org.example.project.core.components.AppErrorDialog
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.PickVisualMediaRequest
-import android.net.Uri
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.collectLatest
-import org.example.project.theme.IssueSpotColors
-import org.example.project.theme.IssueSpotTypography
+import kotlinx.coroutines.launch
+import org.example.project.R
+import org.example.project.core.components.AppErrorDialog
 import org.example.project.feature.profile.viewmodel.EditProfileIntent
 import org.example.project.feature.profile.viewmodel.EditProfileSideEffect
 import org.example.project.feature.profile.viewmodel.EditProfileState
 import org.example.project.feature.profile.viewmodel.EditProfileViewModel
-import org.example.project.R
-import org.koin.compose.viewmodel.koinViewModel
-import org.example.project.theme.IssueSpotTheme
-
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
-
-import androidx.core.content.FileProvider
-import java.io.File
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.material3.AlertDialog
 import org.example.project.feature.profile.viewmodel.EmailChangeStep
+import org.example.project.theme.IssueSpotColors
+import org.example.project.theme.IssueSpotTheme
+import org.example.project.theme.IssueSpotTypography
 import org.example.project.utils.media.MediaCompressorUtil
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
-
+import org.koin.compose.viewmodel.koinViewModel
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileScreen(
     modifier: Modifier = Modifier,
     onNavigateBack: () -> Unit = {},
-    viewModel: EditProfileViewModel = koinViewModel()
+    viewModel: EditProfileViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
     var errorDialogMessage by remember { mutableStateOf<String?>(null) }
-
 
     val context = LocalContext.current
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
     var cameraFilePath by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            viewModel.onIntent(EditProfileIntent.CaptureFromCameraClicked)
-        } else {
-            coroutineScope.launch {
-                errorDialogMessage = "Camera permission denied"
-            }
-        }
-    }
-
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success) {
-            coroutineScope.launch {
-                cameraFilePath?.let {
-                    val compressedFile = MediaCompressorUtil.compressImage(context, "file://$it")
-                    viewModel.onIntent(EditProfileIntent.ImageUrlChanged(compressedFile?.absolutePath ?: it))
+    val cameraPermissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            if (granted) {
+                viewModel.onIntent(EditProfileIntent.CaptureFromCameraClicked)
+            } else {
+                coroutineScope.launch {
+                    errorDialogMessage = "Camera permission denied"
                 }
             }
         }
-    }
 
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            coroutineScope.launch {
-                val compressedFile = MediaCompressorUtil.compressImage(context, uri.toString())
-                if (compressedFile != null) {
-                    viewModel.onIntent(EditProfileIntent.ImageUrlChanged(compressedFile.absolutePath))
-                } else {
-                    viewModel.onIntent(EditProfileIntent.ImageUrlChanged(uri.toString()))
+    val cameraLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.TakePicture(),
+        ) { success ->
+            if (success) {
+                coroutineScope.launch {
+                    cameraFilePath?.let {
+                        val compressedFile = MediaCompressorUtil.compressImage(context, "file://$it")
+                        viewModel.onIntent(EditProfileIntent.ImageUrlChanged(compressedFile?.absolutePath ?: it))
+                    }
                 }
             }
         }
-    }
+
+    val imagePickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickVisualMedia(),
+        ) { uri: Uri? ->
+            if (uri != null) {
+                coroutineScope.launch {
+                    val compressedFile = MediaCompressorUtil.compressImage(context, uri.toString())
+                    if (compressedFile != null) {
+                        viewModel.onIntent(EditProfileIntent.ImageUrlChanged(compressedFile.absolutePath))
+                    } else {
+                        viewModel.onIntent(EditProfileIntent.ImageUrlChanged(uri.toString()))
+                    }
+                }
+            }
+        }
 
     LaunchedEffect(viewModel) {
         viewModel.sideEffects.collectLatest { effect ->
             when (effect) {
-
                 is EditProfileSideEffect.ShowDialog -> {
                     errorDialogMessage = effect.message
                 }
-                EditProfileSideEffect.ProfileSaved ,EditProfileSideEffect.BackPreseed -> {
+                EditProfileSideEffect.ProfileSaved, EditProfileSideEffect.BackPreseed -> {
                     onNavigateBack()
                 }
                 EditProfileSideEffect.LogoutSuccess -> {
@@ -154,16 +148,17 @@ fun EditProfileScreen(
                 }
                 EditProfileSideEffect.ShowImagePicker -> {
                     imagePickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                     )
                 }
                 EditProfileSideEffect.ShowCamera -> {
                     val file = File(context.filesDir, "camera_photo_${System.currentTimeMillis()}.jpg")
-                    val uri = FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        file
-                    )
+                    val uri =
+                        FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            file,
+                        )
                     cameraUri = uri
                     cameraFilePath = file.absolutePath
                     cameraLauncher.launch(uri)
@@ -177,15 +172,14 @@ fun EditProfileScreen(
     if (state.showEmailChangeDialog) {
         EmailChangeDialog(
             state = state,
-            onIntent = viewModel::onIntent
+            onIntent = viewModel::onIntent,
         )
     }
 
-    
     errorDialogMessage?.let { message ->
         AppErrorDialog(
             message = message,
-            onDismiss = { errorDialogMessage = null }
+            onDismiss = { errorDialogMessage = null },
         )
     }
 
@@ -198,7 +192,7 @@ fun EditProfileScreen(
                         Icon(
                             painter = painterResource(R.drawable.ic_close),
                             contentDescription = "Back",
-                            tint = IssueSpotColors.OnSurface
+                            tint = IssueSpotColors.OnSurface,
                         )
                     }
                 },
@@ -207,17 +201,18 @@ fun EditProfileScreen(
                         Icon(
                             painter = painterResource(R.drawable.ic_logout),
                             contentDescription = "Logout",
-                            tint = IssueSpotColors.Error
+                            tint = IssueSpotColors.Error,
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = IssueSpotColors.Surface,
-                    titleContentColor = IssueSpotColors.OnSurface
-                )
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = IssueSpotColors.Surface,
+                        titleContentColor = IssueSpotColors.OnSurface,
+                    ),
             )
         },
-        containerColor = Color.White
+        containerColor = Color.White,
     ) { paddingValues ->
         EditProfileContent(
             modifier = modifier.padding(paddingValues).background(Color.White),
@@ -230,7 +225,7 @@ fun EditProfileScreen(
                 } else {
                     cameraPermissionLauncher.launch(permission)
                 }
-            }
+            },
         )
     }
 }
@@ -240,19 +235,20 @@ fun EditProfileContent(
     modifier: Modifier = Modifier,
     state: EditProfileState,
     onIntent: (EditProfileIntent) -> Unit,
-    onCameraClick: () -> Unit = {}
+    onCameraClick: () -> Unit = {},
 ) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier =
+            modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (state.isSaving) {
             LinearProgressIndicator(
                 modifier = Modifier.fillMaxWidth(),
-                color = IssueSpotColors.Primary
+                color = IssueSpotColors.Primary,
             )
         }
 
@@ -263,52 +259,53 @@ fun EditProfileContent(
             style = IssueSpotTypography.titleMedium,
             color = IssueSpotColors.OnBackground,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.Start)
+            modifier = Modifier.align(Alignment.Start),
         )
 
         Spacer(Modifier.height(16.dp))
 
         Box(
             modifier = Modifier.size(120.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             if (state.isLoadingImage) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(120.dp),
-                    color = IssueSpotColors.Primary
+                    color = IssueSpotColors.Primary,
                 )
             } else {
                 AsyncImage(
                     model = state.imageUrl.ifBlank { null },
                     contentDescription = "Profile Picture",
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(CircleShape)
-                        .border(3.dp, IssueSpotColors.Primary, CircleShape)
-                        .clickable { onIntent(EditProfileIntent.PickFromGalleryClicked) },
+                    modifier =
+                        Modifier
+                            .size(120.dp)
+                            .clip(CircleShape)
+                            .border(3.dp, IssueSpotColors.Primary, CircleShape)
+                            .clickable { onIntent(EditProfileIntent.PickFromGalleryClicked) },
                     contentScale = ContentScale.Crop,
                     error = painterResource(R.drawable.ic_user_avatar),
-                    fallback = painterResource(R.drawable.ic_user_avatar)
+                    fallback = painterResource(R.drawable.ic_user_avatar),
                 )
             }
 
             Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(IssueSpotColors.Primary)
-                    .clickable {
-                        onCameraClick()
-                    }
-                    .padding(8.dp),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(IssueSpotColors.Primary)
+                        .clickable {
+                            onCameraClick()
+                        }.padding(8.dp),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_edit),
                     contentDescription = "Edit Picture",
                     tint = IssueSpotColors.OnPrimary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }
@@ -316,16 +313,16 @@ fun EditProfileContent(
         Spacer(Modifier.height(8.dp))
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OutlinedButton(
                 onClick = { onIntent(EditProfileIntent.PickFromGalleryClicked) },
-                enabled = !state.isLoadingImage
+                enabled = !state.isLoadingImage,
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_photo),
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(16.dp),
                 )
                 Spacer(Modifier.width(4.dp))
                 Text("Gallery")
@@ -333,12 +330,12 @@ fun EditProfileContent(
 
             OutlinedButton(
                 onClick = onCameraClick,
-                enabled = !state.isLoadingImage
+                enabled = !state.isLoadingImage,
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_video),
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(16.dp),
                 )
                 Spacer(Modifier.width(4.dp))
                 Text("Camera")
@@ -353,7 +350,7 @@ fun EditProfileContent(
             style = IssueSpotTypography.titleSmall,
             color = IssueSpotColors.OnBackground,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.Start)
+            modifier = Modifier.align(Alignment.Start),
         )
 
         Spacer(Modifier.height(8.dp))
@@ -364,12 +361,13 @@ fun EditProfileContent(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = Color.White,
-                focusedContainerColor = Color.White,
-                unfocusedBorderColor = IssueSpotColors.Outline,
-                focusedBorderColor = IssueSpotColors.Primary
-            )
+            colors =
+                OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = Color.White,
+                    unfocusedBorderColor = IssueSpotColors.Outline,
+                    focusedBorderColor = IssueSpotColors.Primary,
+                ),
         )
 
         Spacer(Modifier.height(16.dp))
@@ -379,7 +377,7 @@ fun EditProfileContent(
             style = IssueSpotTypography.titleSmall,
             color = IssueSpotColors.OnBackground,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.Start)
+            modifier = Modifier.align(Alignment.Start),
         )
 
         Spacer(Modifier.height(8.dp))
@@ -387,7 +385,7 @@ fun EditProfileContent(
         Row(
             modifier = Modifier.fillMaxWidth().background(Color.White),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OutlinedTextField(
                 value = state.email,
@@ -397,21 +395,23 @@ fun EditProfileContent(
                 readOnly = true,
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    disabledContainerColor = IssueSpotColors.SurfaceVariant,
-                    disabledTextColor = IssueSpotColors.OnSurfaceVariant,
-                    disabledBorderColor = IssueSpotColors.Outline
-                )
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        disabledContainerColor = IssueSpotColors.SurfaceVariant,
+                        disabledTextColor = IssueSpotColors.OnSurfaceVariant,
+                        disabledBorderColor = IssueSpotColors.Outline,
+                    ),
             )
 
             Button(
                 onClick = { onIntent(EditProfileIntent.ShowEmailChangeDialogClicked) },
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.height(56.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = IssueSpotColors.Primary.copy(alpha = 0.1f),
-                    contentColor = IssueSpotColors.Primary
-                )
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = IssueSpotColors.Primary.copy(alpha = 0.1f),
+                        contentColor = IssueSpotColors.Primary,
+                    ),
             ) {
                 Text("Update", style = IssueSpotTypography.labelLarge)
             }
@@ -419,21 +419,20 @@ fun EditProfileContent(
 
         Spacer(Modifier.height(24.dp))
 
-
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OutlinedButton(
                 onClick = { onIntent(EditProfileIntent.ResetClicked) },
                 modifier = Modifier.weight(1f),
                 enabled = !state.isSaving,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_close),
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(4.dp))
                 Text("Reset")
@@ -443,37 +442,37 @@ fun EditProfileContent(
                 onClick = { onIntent(EditProfileIntent.SaveChangesClicked) },
                 modifier = Modifier.weight(1f),
                 enabled = !state.isSaving && state.name.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = IssueSpotColors.Primary,
-                    contentColor = IssueSpotColors.OnPrimary
-                ),
-                shape = RoundedCornerShape(12.dp)
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = IssueSpotColors.Primary,
+                        contentColor = IssueSpotColors.OnPrimary,
+                    ),
+                shape = RoundedCornerShape(12.dp),
             ) {
                 if (state.isSaving) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
                         color = IssueSpotColors.OnPrimary,
-                        strokeWidth = 2.dp
+                        strokeWidth = 2.dp,
                     )
                 } else {
                     Icon(
                         painter = painterResource(R.drawable.ic_edit),
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp),
                     )
                 }
                 Spacer(Modifier.width(4.dp))
                 Text("Save Changes")
             }
         }
-
     }
 }
 
 @Composable
 fun EmailChangeDialog(
     state: EditProfileState,
-    onIntent: (EditProfileIntent) -> Unit
+    onIntent: (EditProfileIntent) -> Unit,
 ) {
     var otpCode by remember { mutableStateOf("") }
 
@@ -482,18 +481,18 @@ fun EmailChangeDialog(
         title = {
             Text(
                 text = if (state.emailChangeStep == EmailChangeStep.Request) "Change Email" else "Verify Email",
-                style = IssueSpotTypography.titleMedium
+                style = IssueSpotTypography.titleMedium,
             )
         },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (state.emailChangeStep == EmailChangeStep.Request) {
                     Text(
                         "Enter your new email address. We will send a verification code to it.",
-                        style = IssueSpotTypography.bodySmall
+                        style = IssueSpotTypography.bodySmall,
                     )
                     OutlinedTextField(
                         value = state.newEmail,
@@ -502,12 +501,12 @@ fun EmailChangeDialog(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
-                        enabled = !state.isEmailUpdating
+                        enabled = !state.isEmailUpdating,
                     )
                 } else {
                     Text(
                         "Enter the 6-digit code sent to ${state.newEmail}",
-                        style = IssueSpotTypography.bodySmall
+                        style = IssueSpotTypography.bodySmall,
                     )
                     OutlinedTextField(
                         value = otpCode,
@@ -516,7 +515,7 @@ fun EmailChangeDialog(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
-                        enabled = !state.isEmailUpdating
+                        enabled = !state.isEmailUpdating,
                     )
                 }
             }
@@ -530,8 +529,10 @@ fun EmailChangeDialog(
                         onIntent(EditProfileIntent.VerifyEmailChangeClicked(otpCode))
                     }
                 },
-                enabled = !state.isEmailUpdating && (if (state.emailChangeStep == EmailChangeStep.Request) state.newEmail.isNotBlank() else otpCode.length == 6),
-                shape = RoundedCornerShape(12.dp)
+                enabled =
+                    !state.isEmailUpdating &&
+                        (if (state.emailChangeStep == EmailChangeStep.Request) state.newEmail.isNotBlank() else otpCode.length == 6),
+                shape = RoundedCornerShape(12.dp),
             ) {
                 if (state.isEmailUpdating) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -544,14 +545,14 @@ fun EmailChangeDialog(
             OutlinedButton(
                 onClick = { onIntent(EditProfileIntent.DismissEmailChangeDialog) },
                 enabled = !state.isEmailUpdating,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
             ) {
                 Text("Cancel")
             }
         },
         containerColor = IssueSpotColors.Surface,
         titleContentColor = IssueSpotColors.OnSurface,
-        textContentColor = IssueSpotColors.OnSurface
+        textContentColor = IssueSpotColors.OnSurface,
     )
 }
 
@@ -560,13 +561,14 @@ fun EmailChangeDialog(
 fun EditProfileContentPreview() {
     IssueSpotTheme {
         EditProfileContent(
-            state = EditProfileState(
-                name = "John Doe",
-                imageUrl = "",
-                isLoadingImage = false,
-                isSaving = false
-            ),
-            onIntent = {}
+            state =
+                EditProfileState(
+                    name = "John Doe",
+                    imageUrl = "",
+                    isLoadingImage = false,
+                    isSaving = false,
+                ),
+            onIntent = {},
         )
     }
 }

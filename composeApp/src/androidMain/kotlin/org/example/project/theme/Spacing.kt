@@ -15,7 +15,7 @@ data class IssueSpotSpacing(
     val large: Dp = 24.dp,
     val extraLarge: Dp = 32.dp,
     val huge: Dp = 48.dp,
-    val massive: Dp = 64.dp
+    val massive: Dp = 64.dp,
 )
 
 val LocalIssueSpotSpacing = staticCompositionLocalOf { IssueSpotSpacing() }

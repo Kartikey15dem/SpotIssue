@@ -1,17 +1,15 @@
 package org.example.project.auth.presentation.screens
 
-import org.example.project.core.components.AppErrorDialog
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.remember
-
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +23,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.example.project.R
+import org.example.project.core.components.AppErrorDialog
 import org.example.project.feature.auth.viewmodel.AuthEffect
 import org.example.project.feature.auth.viewmodel.AuthIntent
 import org.example.project.feature.auth.viewmodel.AuthUiState
@@ -36,11 +35,10 @@ import org.example.project.theme.IssueSpotTypography
 @Composable
 fun LoginScreen(
     onNavigateToOtp: () -> Unit,
-    viewModel: AuthViewModel
+    viewModel: AuthViewModel,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var errorDialogMessage by remember { mutableStateOf<String?>(null) }
-
 
     LaunchedEffect(Unit) {
         viewModel.effect.collect { effect ->
@@ -54,25 +52,25 @@ fun LoginScreen(
         }
     }
 
-    
     errorDialogMessage?.let { message ->
         AppErrorDialog(
             message = message,
-            onDismiss = { errorDialogMessage = null }
+            onDismiss = { errorDialogMessage = null },
         )
     }
 
     Scaffold(
-        containerColor = Color.White
+        containerColor = Color.White,
     ) { padding ->
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding),
         ) {
             LoginContent(
                 uiState = uiState,
-                onAction = { intent -> viewModel.handleIntent(intent) }
+                onAction = { intent -> viewModel.handleIntent(intent) },
             )
         }
     }
@@ -82,36 +80,38 @@ fun LoginScreen(
 @Composable
 fun LoginContent(
     uiState: AuthUiState,
-    onAction: (AuthIntent) -> Unit
+    onAction: (AuthIntent) -> Unit,
 ) {
     val isLoading = uiState.isLoading
     val spacing = IssueSpotTheme.spacing
     val shapes = MaterialTheme.shapes
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(IssueSpotColors.Surface)
-            .padding(spacing.large),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(IssueSpotColors.Surface)
+                .padding(spacing.large),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(modifier = Modifier.height(spacing.huge))
 
         Image(
             painter = painterResource(id = R.drawable.logo_issue),
             contentDescription = "Company Logo",
-            modifier = Modifier
-                .size(160.dp)
-                .clip(shapes.large)
-                .background(IssueSpotColors.Surface),
-            contentScale = ContentScale.Crop
+            modifier =
+                Modifier
+                    .size(160.dp)
+                    .clip(shapes.large)
+                    .background(IssueSpotColors.Surface),
+            contentScale = ContentScale.Crop,
         )
 
         Text(
             text = "IssueSpot",
             style = IssueSpotTypography.headlineLarge,
             color = IssueSpotColors.OnSurface,
-            modifier = Modifier.padding(top = spacing.medium)
+            modifier = Modifier.padding(top = spacing.medium),
         )
 
         Spacer(modifier = Modifier.height(spacing.huge))
@@ -123,15 +123,16 @@ fun LoginContent(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             modifier = Modifier.fillMaxWidth(),
             shape = shapes.medium,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = IssueSpotColors.Primary,
-                focusedLabelColor = IssueSpotColors.Primary,
-                unfocusedBorderColor = IssueSpotColors.Outline,
-                cursorColor = IssueSpotColors.Primary
-            ),
+            colors =
+                OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = IssueSpotColors.Primary,
+                    focusedLabelColor = IssueSpotColors.Primary,
+                    unfocusedBorderColor = IssueSpotColors.Outline,
+                    cursorColor = IssueSpotColors.Primary,
+                ),
             textStyle = IssueSpotTypography.bodyLarge,
             enabled = !isLoading,
-            singleLine = true
+            singleLine = true,
         )
 
         Spacer(modifier = Modifier.height(spacing.large))
@@ -141,7 +142,7 @@ fun LoginContent(
             style = IssueSpotTypography.bodySmall,
             color = IssueSpotColors.OnSurfaceVariant,
             textAlign = TextAlign.Center,
-            lineHeight = 16.sp
+            lineHeight = 16.sp,
         )
 
         Spacer(modifier = Modifier.height(spacing.extraLarge))
@@ -149,25 +150,26 @@ fun LoginContent(
         Button(
             onClick = { onAction(AuthIntent.SendOtpClicked) },
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = IssueSpotColors.Primary,
-                contentColor = IssueSpotColors.OnPrimary
-            ),
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = IssueSpotColors.Primary,
+                    contentColor = IssueSpotColors.OnPrimary,
+                ),
             shape = shapes.medium,
-            enabled = uiState.email.contains("@") && uiState.email.contains(".") && !isLoading
+            enabled = uiState.email.contains("@") && uiState.email.contains(".") && !isLoading,
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(24.dp),
                     color = IssueSpotColors.OnPrimary,
-                    strokeWidth = 2.dp
+                    strokeWidth = 2.dp,
                 )
             } else {
                 Text(
                     text = "Login / Sign up",
                     style = IssueSpotTypography.labelLarge,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(vertical = spacing.extraSmall)
+                    modifier = Modifier.padding(vertical = spacing.extraSmall),
                 )
             }
         }
@@ -182,7 +184,7 @@ fun LoginScreenPreview() {
     MaterialTheme {
         LoginContent(
             uiState = AuthUiState(),
-            onAction = {}
+            onAction = {},
         )
     }
 }

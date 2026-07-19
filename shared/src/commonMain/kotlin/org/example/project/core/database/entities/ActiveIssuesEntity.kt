@@ -12,6 +12,5 @@ data class ActiveIssuesEntity(
     @PrimaryKey
     val postLevel: String, // LOCALITY, DISTRICT, STATE, NATIONAL
     val count: Int,
-    val cachedAt: Long = Clock.System.now().toEpochMilliseconds()
+    val cachedAt: Long = Clock.System.now().toEpochMilliseconds(),
 )
-

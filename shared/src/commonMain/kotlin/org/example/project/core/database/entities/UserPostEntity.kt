@@ -28,6 +28,5 @@ data class UserPostEntity(
     val isReported: Boolean = false,
     val timeAgo: String,
     val createdAt: Long, // Timestamp for sorting
-    val cachedAt: Long = 0L // Set when inserting
+    val cachedAt: Long = 0L, // Set when inserting
 )
-

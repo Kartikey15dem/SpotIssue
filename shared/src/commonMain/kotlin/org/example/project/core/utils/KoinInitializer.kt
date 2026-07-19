@@ -5,11 +5,9 @@ import org.koin.core.context.startKoin
 import org.koin.core.module.Module
 import org.koin.dsl.KoinAppDeclaration
 
-
-
 fun initializeKoin(
     additionalModules: List<Module> = emptyList(),
-    config: KoinAppDeclaration? = null
+    config: KoinAppDeclaration? = null,
 ) {
     startKoin {
         config?.invoke(this)
@@ -17,4 +15,3 @@ fun initializeKoin(
         modules(appModules + additionalModules)
     }
 }
-

@@ -4,9 +4,9 @@ import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
 @Serializable
-sealed interface Route:NavKey{
+sealed interface Route : NavKey {
     @Serializable
-    data object Auth : Route{
+    data object Auth : Route {
         @Serializable
         data object Login : Route
 
@@ -14,28 +14,31 @@ sealed interface Route:NavKey{
         data object Otp : Route
 
         @Serializable
-        data class NameCapture(val email : String) : Route
+        data class NameCapture(
+            val email: String,
+        ) : Route
     }
 
     @Serializable
     data object LocationFetch : Route
 
     @Serializable
-    data object Home: Route
+    data object Home : Route
 
     @Serializable
     data object CreatePost : Route
 
     @Serializable
-    data object Profile: Route{
+    data object Profile : Route {
         @Serializable
-        object ProfileDetail: Route
+        object ProfileDetail : Route
 
         @Serializable
-        object EditProfileRoute: Route
+        object EditProfileRoute : Route
     }
 
     @Serializable
-    data class PostDetail(val postId: String) : Route
+    data class PostDetail(
+        val postId: String,
+    ) : Route
 }
-

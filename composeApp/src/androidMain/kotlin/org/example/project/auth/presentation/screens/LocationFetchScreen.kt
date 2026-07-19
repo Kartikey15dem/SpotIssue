@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,7 +27,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -43,7 +43,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -51,35 +50,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import kotlinx.coroutines.delay
-
-import org.example.project.utils.location.LocationPermissionHandler
-import org.koin.compose.koinInject
-import org.example.project.R
-import org.koin.compose.viewmodel.koinViewModel
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.rememberLottieComposition
+import kotlinx.coroutines.delay
+import org.example.project.R
+import org.example.project.feature.auth.viewmodel.LocationFetchEffect
+import org.example.project.feature.auth.viewmodel.LocationFetchIntent
+import org.example.project.feature.auth.viewmodel.LocationFetchStep
+import org.example.project.feature.auth.viewmodel.LocationFetchUiState
+import org.example.project.feature.auth.viewmodel.LocationFetchViewModel
 import org.example.project.theme.IssueSpotColors
 import org.example.project.theme.IssueSpotTheme
 import org.example.project.theme.IssueSpotTypography
-
-import androidx.compose.foundation.BorderStroke
-import org.example.project.feature.auth.viewmodel.LocationFetchViewModel
-import org.example.project.feature.auth.viewmodel.LocationFetchIntent
-import org.example.project.feature.auth.viewmodel.LocationFetchEffect
-import org.example.project.feature.auth.viewmodel.LocationFetchStep
-import org.example.project.feature.auth.viewmodel.LocationFetchUiState
+import org.example.project.utils.location.LocationPermissionHandler
+import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
-fun LocationFetchScreenWithPermissions(
-    onLocationFetched: () -> Unit
-) {
+fun LocationFetchScreenWithPermissions(onLocationFetched: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val permissionHandler: LocationPermissionHandler = koinInject()
@@ -89,7 +82,8 @@ fun LocationFetchScreenWithPermissions(
     val locationManager = remember { context.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
     var hasRequestedInitialPermission by rememberSaveable { mutableStateOf(false) }
 
-    fun isGpsEnabled() = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+    fun isGpsEnabled() =
+        locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
             locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
 
     fun evaluateHardwareState() {
@@ -109,18 +103,19 @@ fun LocationFetchScreenWithPermissions(
     }
 
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                val activity = context as? Activity
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    val activity = context as? Activity
 
-                if (activity != null && !hasRequestedInitialPermission && !permissionHandler.hasLocationPermission()) {
-                    hasRequestedInitialPermission = true
-                    permissionHandler.requestLocationPermission(activity)
-                } else {
-                    evaluateHardwareState()
+                    if (activity != null && !hasRequestedInitialPermission && !permissionHandler.hasLocationPermission()) {
+                        hasRequestedInitialPermission = true
+                        permissionHandler.requestLocationPermission(activity)
+                    } else {
+                        evaluateHardwareState()
+                    }
                 }
             }
-        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
@@ -129,18 +124,20 @@ fun LocationFetchScreenWithPermissions(
         onLocationFetched = onLocationFetched,
         viewModel = viewModel,
         onOpenAppSettings = {
-            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.fromParts("package", context.packageName, null)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
+            val intent =
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
             context.startActivity(intent)
         },
         onPromptGpsSettings = {
-            val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
+            val intent =
+                Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
             context.startActivity(intent)
-        }
+        },
     )
 }
 
@@ -149,7 +146,7 @@ fun LocationFetchScreen(
     onLocationFetched: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onPromptGpsSettings: () -> Unit,
-    viewModel: LocationFetchViewModel = koinViewModel()
+    viewModel: LocationFetchViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -168,7 +165,7 @@ fun LocationFetchScreen(
 
     LocationFetchContent(
         uiState = uiState,
-        onIntent = { viewModel.handleIntent(it) }
+        onIntent = { viewModel.handleIntent(it) },
     )
 }
 
@@ -176,7 +173,7 @@ fun LocationFetchScreen(
 @Composable
 private fun LocationFetchContent(
     uiState: LocationFetchUiState,
-    onIntent: (LocationFetchIntent) -> Unit
+    onIntent: (LocationFetchIntent) -> Unit,
 ) {
     val spacing = IssueSpotTheme.spacing
     val shapes = MaterialTheme.shapes
@@ -190,55 +187,56 @@ private fun LocationFetchContent(
                 Text(
                     text = "Why is Location Important?",
                     style = IssueSpotTypography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             },
             text = {
                 Text(
                     text = "Location is required for fetching posts around you and for creating new posts, which is the primary focus of this app.",
-                    style = IssueSpotTypography.bodyMedium
+                    style = IssueSpotTypography.bodyMedium,
                 )
             },
             confirmButton = {
                 Button(
                     onClick = { showRationaleDialog = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = IssueSpotColors.Primary)
+                    colors = ButtonDefaults.buttonColors(containerColor = IssueSpotColors.Primary),
                 ) {
                     Text("Back", color = IssueSpotColors.OnPrimary)
                 }
             },
             containerColor = IssueSpotColors.Surface,
             titleContentColor = IssueSpotColors.OnSurface,
-            textContentColor = IssueSpotColors.OnSurfaceVariant
+            textContentColor = IssueSpotColors.OnSurfaceVariant,
         )
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(IssueSpotColors.Surface)
-            .padding(spacing.large),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(IssueSpotColors.Surface)
+                .padding(spacing.large),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
         AnimatedContent(
             targetState = uiState.currentStep,
             transitionSpec = {
                 (fadeIn() + scaleIn()).togetherWith(fadeOut() + scaleOut())
-            }
+            },
         ) { step ->
             when (step) {
                 LocationFetchStep.FETCHING -> LocationFetchingAnimation()
                 LocationFetchStep.COMPLETED -> LocationCompletedAnimation(uiState.address)
                 LocationFetchStep.ERROR -> {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.8f)
-                            .aspectRatio(1f)
-                            .background(IssueSpotColors.SurfaceVariant, shapes.medium),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .fillMaxWidth(0.8f)
+                                .aspectRatio(1f)
+                                .background(IssueSpotColors.SurfaceVariant, shapes.medium),
+                        contentAlignment = Alignment.Center,
                     ) {
-
                         Image(
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.size(72.dp),
@@ -254,14 +252,17 @@ private fun LocationFetchContent(
 
         if (uiState.currentStep != LocationFetchStep.ERROR) {
             Text(
-                text = when (uiState.currentStep) {
-                    LocationFetchStep.FETCHING -> "Fetching your location..."
-                    LocationFetchStep.COMPLETED -> "Location fetched successfully!"
-                    else -> {"Something went wrong!"}
-                },
+                text =
+                    when (uiState.currentStep) {
+                        LocationFetchStep.FETCHING -> "Fetching your location..."
+                        LocationFetchStep.COMPLETED -> "Location fetched successfully!"
+                        else -> {
+                            "Something went wrong!"
+                        }
+                    },
                 style = IssueSpotTypography.titleLarge,
                 color = IssueSpotColors.OnSurface,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
             Spacer(modifier = Modifier.height(spacing.small))
         }
@@ -274,15 +275,14 @@ private fun LocationFetchContent(
                 text = address,
                 style = IssueSpotTypography.bodyMedium,
                 color = IssueSpotColors.OnSurfaceVariant,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
         } else if (uiState.currentStep == LocationFetchStep.ERROR && errorState != null) {
-
             Text(
                 text = errorState.message,
                 style = IssueSpotTypography.bodyLarge,
                 color = IssueSpotColors.OnSurfaceVariant,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
 
             Spacer(modifier = Modifier.height(spacing.huge))
@@ -291,13 +291,13 @@ private fun LocationFetchContent(
                 onClick = { onIntent(LocationFetchIntent.ActionClicked) },
                 modifier = Modifier.fillMaxWidth(0.9f).height(56.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = IssueSpotColors.Primary),
-                shape = shapes.medium
+                shape = shapes.medium,
             ) {
                 Text(
                     text = errorState.primaryButtonText,
                     style = IssueSpotTypography.labelLarge,
                     color = IssueSpotColors.OnPrimary,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
 
@@ -308,12 +308,12 @@ private fun LocationFetchContent(
                     modifier = Modifier.fillMaxWidth(0.9f).height(56.dp),
                     shape = shapes.medium,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = IssueSpotColors.Primary),
-                    border = BorderStroke(1.dp, IssueSpotColors.Primary)
+                    border = BorderStroke(1.dp, IssueSpotColors.Primary),
                 ) {
                     Text(
                         text = "I've turned it on, Retry",
                         style = IssueSpotTypography.labelLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
             }
@@ -326,45 +326,46 @@ private fun LocationFetchContent(
                 style = IssueSpotTypography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 textDecoration = TextDecoration.Underline,
-                modifier = Modifier
-                    .clickable { showRationaleDialog = true }
-                    .padding(spacing.small)
+                modifier =
+                    Modifier
+                        .clickable { showRationaleDialog = true }
+                        .padding(spacing.small),
             )
         }
     }
 }
 
-
-
 @Composable
 private fun LocationFetchingAnimation() {
     // Load the composition directly from the URL
     val composition by rememberLottieComposition(
-        LottieCompositionSpec.Url("https://lottie.host/4c31b4f6-857d-419d-97e5-7c722e5c2e99/EhLlK9bqgJ.lottie")
+        LottieCompositionSpec.Url("https://lottie.host/4c31b4f6-857d-419d-97e5-7c722e5c2e99/EhLlK9bqgJ.lottie"),
     )
 
     LottieAnimation(
         composition = composition,
         iterations = LottieConstants.IterateForever,
         speed = 1f,
-        modifier = Modifier
-            .fillMaxWidth(0.9f)
-            .aspectRatio(1f)
+        modifier =
+            Modifier
+                .fillMaxWidth(0.9f)
+                .aspectRatio(1f),
     )
 }
 
 @Composable
 private fun LocationCompletedAnimation(address: String?) {
     val composition by rememberLottieComposition(
-        LottieCompositionSpec.Url("https://lottie.host/17c7befc-f9f2-4e6e-a977-b7c9f5455f17/2HFHUsSkt1.lottie")
+        LottieCompositionSpec.Url("https://lottie.host/17c7befc-f9f2-4e6e-a977-b7c9f5455f17/2HFHUsSkt1.lottie"),
     )
 
     LottieAnimation(
         composition = composition,
         iterations = 1,
         speed = 1f,
-        modifier = Modifier
-            .fillMaxWidth(0.9f)
-            .aspectRatio(1f)
+        modifier =
+            Modifier
+                .fillMaxWidth(0.9f)
+                .aspectRatio(1f),
     )
 }

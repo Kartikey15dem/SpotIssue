@@ -11,5 +11,5 @@ data class Profile(
     val acks: Int = 0,
     val postByArea: List<Int> = listOf(0, 0, 0, 0),
     val myPosts: List<Post> = emptyList(),
-    val ackPosts: List<Post> = emptyList()
+    val ackPosts: List<Post> = emptyList(),
 )

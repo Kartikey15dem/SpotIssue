@@ -15,4 +15,3 @@ class CurrentLevelManager {
 
     fun getCurrentLevelValue(): PostLevel = _currentLevel.value
 }
-
