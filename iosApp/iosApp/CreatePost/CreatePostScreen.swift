@@ -128,12 +128,20 @@ struct CreatePostScreen: View {
 
                 // Loading Overlay
                 if state.isLoading {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                        .overlay(
+                    ZStack {
+                        Color.black.opacity(0.3).ignoresSafeArea()
+                        VStack(spacing: 16) {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: IssueSpotColors.primary))
-                        )
+                                .scaleEffect(1.5)
+                            Text("Uploading...")
+                                .font(IssueSpotTypography.bodyLarge)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .zIndex(100)
                 }
 
                 // Bottom Toolbar

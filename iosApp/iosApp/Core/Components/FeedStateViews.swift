@@ -44,7 +44,7 @@ struct FeedFooterView: View {
 
     var body: some View {
         Group {
-            if feedState.isAppending {
+            if feedState.isAppending || feedState.isRefreshing || feedState.isBackgroundRefreshing {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle(tint: IssueSpotColors.primary))
             } else if let error = feedState.appendError {

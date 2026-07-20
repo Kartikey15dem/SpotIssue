@@ -35,7 +35,10 @@ fun HomeFeed(
         // PAGING PIPELINE STEP 5: UI SCROLL TRIGGER
         // We use InfiniteScrollHandler to monitor how far down the user has scrolled.
         // When they get near the bottom, it fires an intent to load the next page.
-        InfiniteScrollHandler(listState = listState) {
+        InfiniteScrollHandler(
+            listState = listState,
+            isRefreshing = feedState.isRefreshing
+        ) {
             onIntent(HomeIntent.LoadMorePosts)
         }
 

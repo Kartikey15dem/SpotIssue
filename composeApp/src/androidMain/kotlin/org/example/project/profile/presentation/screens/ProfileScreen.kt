@@ -205,7 +205,10 @@ fun ProfileScreenContent(
         }
     }
 
-    InfiniteScrollHandler(listState = listState) {
+    InfiniteScrollHandler(
+        listState = listState,
+        isRefreshing = profilePostsState.isRefreshing
+    ) {
         onIntent(ProfileIntent.LoadMorePosts)
     }
 
@@ -448,7 +451,7 @@ fun ProfileScreenContent(
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     when {
-                                        profilePostsState.isAppending -> {
+                                        profilePostsState.isAppending || profilePostsState.isRefreshing || profilePostsState.isBackgroundRefreshing -> {
                                             CircularProgressIndicator(color = IssueSpotColors.Primary)
                                         }
                                         appendError != null -> {

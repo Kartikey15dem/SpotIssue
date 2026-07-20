@@ -5,23 +5,40 @@ struct RootView: View {
     @StateObject private var mediaOverlayController = MediaOverlayController()
     let prefRepo = KoinHelper().getUserPreferencesRepository()
     
+    @State private var showSplash = true
+    
     var body: some View {
-        Observing(prefRepo.userData) { userData in
-            ZStack {
-                Group {
-                    if !userData.isLoggedIn {
-                        AuthCoordinator()
-                    } else {
-                        MainCoordinator()
+        ZStack {
+            Observing(prefRepo.userData) { userData in
+                ZStack {
+                    Group {
+                        if !userData.isLoggedIn {
+                            AuthCoordinator()
+                        } else {
+                            MainCoordinator()
+                        }
                     }
+                    
+                    AppDialogHost()
                 }
-                
-                AppDialogHost()
+                .environmentObject(mediaOverlayController)
+                .fullScreenCover(isPresented: $mediaOverlayController.isShowing) {
+                    MediaOverlayView()
+                        .environmentObject(mediaOverlayController)
+                }
             }
-            .environmentObject(mediaOverlayController)
-            .fullScreenCover(isPresented: $mediaOverlayController.isShowing) {
-                MediaOverlayView()
-                    .environmentObject(mediaOverlayController)
+            
+            if showSplash {
+                SplashScreen()
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    showSplash = false
+                }
             }
         }
     }
@@ -64,11 +81,25 @@ struct MainCoordinator: View {
                         ProfileScreen()
                     case .editProfile:
                         EditProfileScreen()
-                    case .postDetail(let postId):
-                        PostDetailScreen(postId: postId)
                     }
                 }
         }
         .environmentObject(router)
+    }
+}
+
+struct SplashScreen: View {
+    var body: some View {
+        ZStack {
+            IssueSpotColors.surface.ignoresSafeArea()
+            
+            VStack {
+                Image("logo_issue")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 160, height: 160)
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+            }
+        }
     }
 }

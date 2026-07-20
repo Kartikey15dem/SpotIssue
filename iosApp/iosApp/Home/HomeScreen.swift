@@ -78,7 +78,8 @@ struct HomeScreen: View {
                                                 feedState: feedState,
                                                 scrollPosition: scrollPosition(for: currentLevel),
                                                 onIntent: holder.vm.onIntent,
-                                                isSearch: false
+                                                isSearch: false,
+                                                holder: holder
                                             )
                                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                                         }
@@ -91,7 +92,8 @@ struct HomeScreen: View {
                                                 feedState: searchState,
                                                 scrollPosition: scrollPosition(for: currentLevel),
                                                 onIntent: holder.vm.onIntent,
-                                                isSearch: true
+                                                isSearch: true,
+                                                holder: holder
                                             )
                                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                                         }
@@ -197,6 +199,7 @@ private struct HomeFeedContainer: View {
     let scrollPosition: Binding<ScrollPosition>
     let onIntent: (HomeIntent) -> Void
     let isSearch: Bool
+    let holder: ViewModelHolder<HomeViewModel>
 
     var body: some View {
         VStack(spacing: 0) {
@@ -212,7 +215,7 @@ private struct HomeFeedContainer: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .scrollPosition(scrollPosition)
-                        .refreshable {
+            .refreshable {
                 onIntent(isSearch ? HomeIntentRefreshSearchPosts.shared : HomeIntentRefreshCurrentPosts.shared)
             }
             .onChange(of: feedState.error?.message) { _, error in
@@ -230,6 +233,8 @@ private struct HomePostsList: View {
     let onIntent: (HomeIntent) -> Void
     let isSearch: Bool
 
+    @State private var visibleIndices: Set<Int> = []
+
     var body: some View {
         Group {
             if feedState.posts.isEmpty {
@@ -241,6 +246,15 @@ private struct HomePostsList: View {
             }
 
             if !feedState.posts.isEmpty {
+                if feedState.isRefreshing {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .padding(.vertical, IssueSpotSpacing.smallMedium)
+                }
+
                 ForEach(Array(feedState.posts.enumerated()), id: \.element.id) { index, post in
                     let isFirstOrLast = index == 0 || index >= feedState.posts.count - 5
                     PostCard(
@@ -274,9 +288,13 @@ private struct HomePostsList: View {
                     .padding(.horizontal, IssueSpotSpacing.medium)
                     .id(post.id)
                     .onAppear {
+                        visibleIndices.insert(index)
                         if index >= feedState.posts.count - 5 {
                             onIntent(isSearch ? HomeIntentLoadMoreSearchPosts.shared : HomeIntentLoadMorePosts.shared)
                         }
+                    }
+                    .onDisappear {
+                        visibleIndices.remove(index)
                     }
                 }
 
@@ -285,6 +303,14 @@ private struct HomePostsList: View {
                     onRetry: { onIntent(isSearch ? HomeIntentRetrySearchPosts.shared : HomeIntentRetryPosts.shared) },
                     endMessage: "No more posts"
                 )
+            }
+        }
+        .onChange(of: feedState.isRefreshing) { _, isRef in
+            if !isRef && !feedState.posts.isEmpty {
+                let maxIndex = visibleIndices.max() ?? 0
+                if maxIndex >= feedState.posts.count - 5 {
+                    onIntent(isSearch ? HomeIntentLoadMoreSearchPosts.shared : HomeIntentLoadMorePosts.shared)
+                }
             }
         }
     }
@@ -390,7 +416,7 @@ struct HomeBottomNavigationBar: View {
     }
     
     let items = [
-        BottomNavItem(level: .locality, iconName: "location.fill"),
+        BottomNavItem(level: .locality, iconName: "mappin.and.ellipse"),
         BottomNavItem(level: .district, iconName: "building.2.fill"),
         BottomNavItem(level: .state, iconName: "map.fill"),
         BottomNavItem(level: .national, iconName: "globe.americas.fill")

@@ -13,7 +13,6 @@ enum MainRoute: Hashable {
     case createPost
     case profile
     case editProfile
-    case postDetail(String)
 }
 
 class AuthRouter: ObservableObject {

@@ -205,24 +205,7 @@ class OfflinePager<Key : Any>(
                 val isBackground =
                     (reason == FeedRefreshReason.APP_RESUMED || reason == FeedRefreshReason.NETWORK_RESTORED) && cachedCount > 0
 
-                // 1. Lock the Mutex and bump the Generation Counter.
-                // Why bump generation? If a previous refresh was taking too long, its response might arrive LATE.
-                // By incrementing the generation, we can check the generation later and discard late, outdated data.
-                val requestGeneration =
-                    pagingMutex.withLock {
-                        pagingState =
-                            pagingState.copy(
-                                nextPage = 0, // Reset to page 0
-                                hasMore = true,
-                                generation = pagingState.generation + 1,
-                                lastFailedAction = null,
-                                lastFailedPage = 0,
-                            )
-                        windowState.value = windowEngineFor(key).reset()
-                        pagingState.generation
-                    }
-
-                // 2. Show the loading spinner in the UI State
+                // 1. Show the loading spinner in the UI State IMMEDIATELY before waiting for the lock
                 _uiState.update {
                     when {
                         cachedCount == 0 ->
@@ -252,6 +235,23 @@ class OfflinePager<Key : Any>(
                             )
                     }
                 }
+
+                // 2. Lock the Mutex and bump the Generation Counter.
+                // Why bump generation? If a previous refresh was taking too long, its response might arrive LATE.
+                // By incrementing the generation, we can check the generation later and discard late, outdated data.
+                val requestGeneration =
+                    pagingMutex.withLock {
+                        pagingState =
+                            pagingState.copy(
+                                nextPage = 0, // Reset to page 0
+                                hasMore = true,
+                                generation = pagingState.generation + 1,
+                                lastFailedAction = null,
+                                lastFailedPage = 0,
+                            )
+                        windowState.value = windowEngineFor(key).reset()
+                        pagingState.generation
+                    }
 
                 try {
                     // 3. Fetch from Network (with exponential backoff retries if the server fails)

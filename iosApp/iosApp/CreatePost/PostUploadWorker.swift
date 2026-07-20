@@ -14,7 +14,7 @@ class PostUploadWorker {
             }
         }
         
-        Task {
+        Task.detached {
             var preparedTemporaryPaths: [String] = []
             do {
                 let prefRepository = KoinHelper().getUserPreferencesRepository()

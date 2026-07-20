@@ -32,7 +32,10 @@ fun HomeSearchFeed(
     val appendError = searchState.appendError
     val showNoMorePosts = itemCount > 0 && !searchState.hasMore && appendError == null && !searchState.isAppending
 
-    InfiniteScrollHandler(listState = listState) {
+    InfiniteScrollHandler(
+        listState = listState,
+        isRefreshing = searchState.isRefreshing
+    ) {
         onIntent(HomeIntent.LoadMoreSearchPosts)
     }
 

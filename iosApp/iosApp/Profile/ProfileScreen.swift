@@ -107,8 +107,6 @@ struct ProfileScreen: View {
                     switch effect {
                     case is ProfileSideEffectNavigateToCreatePost:
                         router.navigate(to: .createPost)
-                    case let nav as ProfileSideEffectNavigateToPost:
-                        router.navigate(to: .postDetail(nav.postId))
                     case is ProfileSideEffectNavigateToEditProfile:
                         router.navigate(to: .editProfile)
                     case let shareEffect as ProfileSideEffectSharePost:
@@ -284,6 +282,8 @@ private struct ProfilePostsListView: View {
     let holder: ViewModelHolder<ProfileViewModel>
     let onDelete: (String) -> Void
 
+    @State private var visibleIndices: Set<Int> = []
+
     var body: some View {
         Group {
             if feedState.posts.isEmpty {
@@ -295,6 +295,15 @@ private struct ProfilePostsListView: View {
             }
 
             if !feedState.posts.isEmpty {
+                if feedState.isRefreshing {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .padding(.vertical, IssueSpotSpacing.smallMedium)
+                }
+
                 ForEach(Array(feedState.posts.enumerated()), id: \.element.id) { index, post in
                     let isLiked = post.isLiked
                     let resolvedLikes = Int(post.likes)
@@ -325,9 +334,13 @@ private struct ProfilePostsListView: View {
                     .padding(.horizontal, IssueSpotSpacing.medium)
                     .id("\(state.isMine)_\(state.sort.name)_\(post.id)")
                     .onAppear {
+                        visibleIndices.insert(index)
                         if index >= feedState.posts.count - 5 {
                             holder.vm.onIntent(intent: ProfileIntentLoadMorePosts.shared)
                         }
+                    }
+                    .onDisappear {
+                        visibleIndices.remove(index)
                     }
                 }
 
@@ -336,6 +349,15 @@ private struct ProfilePostsListView: View {
                     onRetry: { holder.vm.onIntent(intent: ProfileIntentRetryPosts.shared) },
                     endMessage: "No more posts"
                 )
+            }
+        }
+
+        .onChange(of: feedState.isRefreshing) { _, isRef in
+            if !isRef && !feedState.posts.isEmpty {
+                let maxIndex = visibleIndices.max() ?? 0
+                if maxIndex >= feedState.posts.count - 5 {
+                    holder.vm.onIntent(intent: ProfileIntentLoadMorePosts.shared)
+                }
             }
         }
         .onChange(of: feedState.error?.message) { _, error in
@@ -476,7 +498,8 @@ private struct ProfilePostTabsHeader: View {
             )
         }
     }
-    
+   
+
 
 }
 

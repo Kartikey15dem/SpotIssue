@@ -186,13 +186,13 @@ fun rememberFeedUiState(feedState: FeedState): FeedUiState {
     val isPullRefreshing = feedState.isRefreshing && itemCount > 0
 
     val appendError = feedState.appendError
-    val shouldShowFooter = itemCount > 0 && !feedState.isRefreshing
+    val shouldShowFooter = itemCount > 0
     val showNoMorePosts = shouldShowFooter && !feedState.hasMore && appendError == null && !feedState.isAppending
 
     val footerState =
         when {
             !shouldShowFooter -> FooterState.Hidden
-            feedState.isAppending -> FooterState.Loading
+            feedState.isAppending || feedState.isRefreshing || feedState.isBackgroundRefreshing -> FooterState.Loading
             appendError != null -> FooterState.Error(Throwable(appendError.message))
             showNoMorePosts -> FooterState.EndReached
             else -> FooterState.Hidden

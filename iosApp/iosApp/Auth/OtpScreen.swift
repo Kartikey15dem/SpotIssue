@@ -6,6 +6,8 @@ struct OtpScreen: View {
     @EnvironmentObject var router: AuthRouter
     
     @State private var focusedIndex = 0
+    @State private var timeRemaining = 60
+    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         Observing(holder.vm.uiState) { (state: AuthUiState) in
@@ -58,12 +60,20 @@ struct OtpScreen: View {
                 
                 Spacer().frame(height: IssueSpotSpacing.medium)
                 
-                Button(action: { holder.vm.handleIntent(intent: AuthIntent.SendOtpClicked.shared) }) {
-                    Text("Resend Code")
+                Button(action: {
+                    timeRemaining = 60
+                    holder.vm.handleIntent(intent: AuthIntent.SendOtpClicked.shared)
+                }) {
+                    Text(timeRemaining > 0 ? "Resend Code in \(timeRemaining)s" : "Resend Code")
                         .font(IssueSpotTypography.labelLarge)
-                        .foregroundColor(IssueSpotColors.primary)
+                        .foregroundColor(timeRemaining > 0 ? IssueSpotColors.onSurfaceVariant : IssueSpotColors.primary)
                 }
-                .disabled(state.isLoading)
+                .disabled(state.isLoading || timeRemaining > 0)
+                .onReceive(timer) { _ in
+                    if timeRemaining > 0 {
+                        timeRemaining -= 1
+                    }
+                }
                 
                 Spacer()
             }

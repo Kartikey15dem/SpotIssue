@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.delay
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
@@ -218,14 +219,26 @@ fun OTPContent(
 
         Spacer(modifier = Modifier.height(spacing.medium))
 
+        var timer by remember { mutableIntStateOf(60) }
+        
+        LaunchedEffect(timer) {
+            if (timer > 0) {
+                delay(1000L)
+                timer--
+            }
+        }
+
         TextButton(
-            onClick = { onAction(AuthIntent.SendOtpClicked) },
-            enabled = !isLoading,
+            onClick = { 
+                timer = 60
+                onAction(AuthIntent.SendOtpClicked) 
+            },
+            enabled = !isLoading && timer == 0,
         ) {
             Text(
-                text = "Resend Code",
+                text = if (timer > 0) "Resend Code in ${timer}s" else "Resend Code",
                 style = IssueSpotTypography.labelLarge,
-                color = IssueSpotColors.Primary,
+                color = if (timer > 0) IssueSpotColors.OnSurfaceVariant else IssueSpotColors.Primary,
             )
         }
 
