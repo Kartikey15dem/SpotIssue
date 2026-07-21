@@ -71,6 +71,6 @@ Instead of relying solely on window insets, IssueSpot implements a custom scroll
 
 | The Bug (Hidden Cursor) | The Fix (Dynamic Auto-Scroll) |
 | :---: | :---: | 
-| <video src="https://github.com/user-attachments/assets/12a4de3e-f8e1-4ddb-88dd-0a3dc8c7cd99" controls height="400"></video> | <video src="https://github.com/user-attachments/assets/75426b76-e31f-43b5-a9f9-895558cdb4b5" controls height="400"></video> 
+| <video src="https://github.com/user-attachments/assets/3bb94201-b21a-4dd4-bf79-e7b1fcaf34ce" controls height="400"></video> | <video src="https://github.com/user-attachments/assets/4c94702f-268a-4749-a910-597a1b354d08" controls height="400"></video> 
 
 ---
