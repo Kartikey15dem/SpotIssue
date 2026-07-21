@@ -137,7 +137,7 @@ class ProfileViewModel(
     }
 
     private fun openComments(postId: String) {
-        postRepository.startComments(postId)
+        postRepository.initializeComments(postId)
         val repoFlow = postRepository.observeComments(postId)
 
         val combinedFlow =
@@ -146,7 +146,9 @@ class ProfileViewModel(
                 if (optimisticList.isEmpty()) {
                     state
                 } else {
-                    state.copy(items = optimisticList + state.items)
+                    val optimisticTexts = optimisticList.map { it.text }.toSet()
+                    val filteredStateItems = state.items.filterNot { it.text in optimisticTexts }
+                    state.copy(items = optimisticList + filteredStateItems)
                 }
             }.stateIn(
                 scope = viewModelScope,

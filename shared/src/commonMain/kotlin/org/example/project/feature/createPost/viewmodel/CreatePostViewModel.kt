@@ -29,6 +29,8 @@ class CreatePostViewModel(
 
     private val _sideEffects = Channel<CreatePostSideEffect>(Channel.BUFFERED)
     val sideEffects = _sideEffects.receiveAsFlow()
+    
+    private var isDraftRestored = false
 
     init {
         observeUserData()
@@ -69,10 +71,27 @@ class CreatePostViewModel(
                         onNavigateBack()
                     }
                     UploadStatus.UPLOADING -> {
-                        _uiState.update { it.copy(isLoading = true) }
+                        _uiState.update { 
+                            it.copy(
+                                isLoading = true,
+                                description = draft.postText,
+                                selectedMedia = draft.selectedMedia
+                            ) 
+                        }
                     }
                     else -> {
                         _uiState.update { it.copy(isLoading = false) }
+                        if (!isDraftRestored) {
+                            if (draft.postText.isNotEmpty() || draft.selectedMedia != null) {
+                                _uiState.update {
+                                    it.copy(
+                                        description = draft.postText,
+                                        selectedMedia = draft.selectedMedia,
+                                    )
+                                }
+                            }
+                            isDraftRestored = true
+                        }
                     }
                 }
             }

@@ -28,9 +28,9 @@ interface PostRepository {
 
     fun observeComments(postId: String): StateFlow<PaginationState<Comment>>
 
-    fun startComments(postId: String)
+    fun initializeComments(postId: String)
 
-    fun stopComments(postId: String)
+    fun clearComments(postId: String)
 
     fun refreshComments(postId: String)
 

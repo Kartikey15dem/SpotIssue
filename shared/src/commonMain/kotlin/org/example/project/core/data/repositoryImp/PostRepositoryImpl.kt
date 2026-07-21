@@ -83,14 +83,14 @@ class PostRepositoryImpl(
 
     private fun getOrPutCommentsMutex(postId: String): Mutex = commentsMutexMap.getOrPut(postId) { Mutex() }
 
-    override fun startComments(postId: String) {
+    override fun initializeComments(postId: String) {
         val state = getOrPutCommentsState(postId)
         if (state.value.items.isEmpty()) {
             refreshComments(postId)
         }
     }
 
-    override fun stopComments(postId: String) {
+    override fun clearComments(postId: String) {
         // Nothing to do for remote-only paging
     }
 
@@ -281,6 +281,9 @@ class PostRepositoryImpl(
             database.postDao().updateCommentsCount(postId, commentsCountCurrent)
             database.userPostDao().updateCommentsCount(postId, commentsCountCurrent)
             database.likedPostDao().updateCommentsCount(postId, commentsCountCurrent)
+        } else if (result is DataState.Success) {
+            // Refresh comments to ensure the cache is updated with the newly added comment
+            refreshComments(postId)
         }
 
         return result

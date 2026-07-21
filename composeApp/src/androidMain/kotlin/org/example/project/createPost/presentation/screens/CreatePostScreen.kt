@@ -330,15 +330,25 @@ fun CreatePostScreenContent(
                 ) {
                     val scrollState = rememberScrollState()
 
+                    // This logic ensures that the text cursor remains visible when the software keyboard (IME) appears.
+                    // It calculates how far to scroll the TextField upward if the keyboard overlaps the current cursor position.
                     val amountToScroll by remember(imeHeightPx, cursorYInText, boxHeightPx, scrollState.value) {
                         derivedStateOf {
+                            // 1. Calculate the cursor's vertical position relative to the visible screen area
                             val cursorScreenY = cursorYInText - scrollState.value
+                            
+                            // 2. Calculate how much space is left between the cursor and the bottom of the text box
                             val distanceToBottom = boxHeightPx - cursorScreenY
+                            
+                            // 3. Determine if the keyboard height (imeHeightPx) overlaps with the cursor
                             val overlap = imeHeightPx - distanceToBottom
+                            
+                            // If overlap is positive, the keyboard covers the cursor, so we need to scroll by that amount
                             if (overlap > 0) overlap else 0f
                         }
                     }
 
+                    // Automatically scroll the text field when an overlap is detected
                     LaunchedEffect(amountToScroll) {
                         if (amountToScroll > 0) {
                             scrollState.scrollBy(amountToScroll)
